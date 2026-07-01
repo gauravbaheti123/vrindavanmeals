@@ -13,12 +13,6 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-const navLinks = [
-  { label: "Home", href: "#home" },
-  { label: "About", href: "#about" },
-  { label: "Menu", href: "#menu" },
-  { label: "Contact", href: "#contact" },
-];
 
 function scrollTo(id: string) {
   const el = document.querySelector(id);
@@ -59,21 +53,12 @@ function Navbar() {
           </span>
         </a>
 
-        <div className="hidden md:flex items-center gap-8">
-          {navLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              onClick={(e) => {
-                e.preventDefault();
-                scrollTo(link.href);
-              }}
-              className="text-sm font-medium text-brown/80 hover:text-saffron transition-colors"
-            >
-              {link.label}
-            </a>
-          ))}
-        </div>
+        <Link
+          to="/login"
+          className="inline-flex items-center justify-center rounded-full bg-saffron px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-saffron/90 transition-colors"
+        >
+          Login
+        </Link>
       </div>
     </nav>
   );
@@ -98,14 +83,17 @@ function Hero() {
         <span className="inline-block rounded-full bg-white/15 backdrop-blur-sm border border-white/20 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white mb-6">
           Student Canteen Service
         </span>
-        <h1 className="font-[Playfair_Display] text-5xl md:text-7xl font-bold text-white leading-tight max-w-4xl mx-auto">
+        <h1
+          className="font-[Playfair_Display] text-5xl md:text-7xl font-bold text-[#FFFFFF] leading-tight max-w-4xl mx-auto"
+          style={{ textShadow: "0 4px 24px rgba(0,0,0,0.55), 0 2px 10px rgba(0,0,0,0.65)" }}
+        >
           Fresh, Wholesome Meals Every Day
         </h1>
         <p className="mt-6 text-lg md:text-xl text-white/90 max-w-2xl mx-auto leading-relaxed">
           Serving quality Lunch & Dinner to students across our canteen units —
           wholesome, hygienic, and made with care.
         </p>
-        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="mt-10 flex items-center justify-center">
           <a
             href="#menu"
             onClick={(e) => {
@@ -115,16 +103,6 @@ function Hero() {
             className="inline-flex items-center justify-center rounded-full bg-saffron px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-saffron/25 hover:bg-saffron/90 transition-colors"
           >
             Explore Our Menu
-          </a>
-          <a
-            href="#about"
-            onClick={(e) => {
-              e.preventDefault();
-              scrollTo("#about");
-            }}
-            className="inline-flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/30 px-8 py-3.5 text-base font-semibold text-white hover:bg-white/20 transition-colors"
-          >
-            About Us
           </a>
         </div>
       </div>
@@ -267,13 +245,10 @@ function Contact() {
 function Footer() {
   return (
     <footer className="bg-brown text-white/80">
-      <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-center">
         <p className="text-sm">
           © 2026 Vrindavan Meals. All rights reserved.
         </p>
-        <Link to="/login" className="text-xs text-white/50 hover:text-white/80 transition-colors">
-          Staff Login
-        </Link>
       </div>
     </footer>
   );
