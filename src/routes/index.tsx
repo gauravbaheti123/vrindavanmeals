@@ -23,7 +23,8 @@ function Navbar() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
+    const onScroll = () => setScrolled(window.scrollY > 50);
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -32,8 +33,8 @@ function Navbar() {
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-cream/95 backdrop-blur-md shadow-sm border-b border-brown/10"
-          : "bg-transparent"
+          ? "nav-scrolled bg-cream/95 backdrop-blur-md shadow-sm border-b border-brown/10"
+          : "nav-top bg-transparent"
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -48,14 +49,18 @@ function Navbar() {
           <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-saffron to-terracotta grid place-items-center shadow-md">
             <UtensilsCrossed className="h-4 w-4 text-white" />
           </div>
-          <span className="font-[Playfair_Display] text-lg font-bold text-brown tracking-tight">
+          <span
+            className={`font-[Playfair_Display] text-lg font-bold tracking-tight transition-colors duration-300 ${
+              scrolled ? "text-[#c2410c]" : "text-white"
+            }`}
+          >
             Vrindavan Meals
           </span>
         </a>
 
         <Link
           to="/login"
-          className="inline-flex items-center justify-center rounded-full bg-saffron px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-saffron/90 transition-colors"
+          className="inline-flex items-center justify-center rounded-full bg-saffron px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-saffron/90 transition-all duration-300"
         >
           Login
         </Link>
