@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, CalendarClock, IndianRupee, AlertTriangle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Users, CalendarClock, IndianRupee, AlertTriangle, Activity } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Vrindavan Meals" }] }),
@@ -29,12 +31,30 @@ function Dashboard() {
     },
   });
 
+  const { data: recent, isLoading: recentLoading } = useQuery({
+    queryKey: ["dashboard-recent-attendance"],
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from("attendance")
+        .select("id, meal_type, scan_type, scan_time, students(full_name), units(name)")
+        .eq("scan_date", today)
+        .order("scan_time", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const stats = [
     { label: "Approved Students", value: data?.students ?? "—", icon: Users, color: "text-primary" },
     { label: "Active Subscriptions", value: data?.active ?? "—", icon: CalendarClock, color: "text-success" },
     { label: "Expiring in 5 days", value: data?.expiring ?? "—", icon: AlertTriangle, color: "text-warning-foreground" },
     { label: "Unmapped Scans", value: data?.unmapped ?? "—", icon: IndianRupee, color: "text-destructive" },
   ];
+
+  const fmtTime = (t: string) =>
+    new Date(t).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" });
 
   return (
     <div className="space-y-6">
@@ -57,11 +77,46 @@ function Dashboard() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Getting started</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5" />Recent Activity</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>Phase 1 modules are live: authentication, roles, and student management.</p>
-          <p>Coming next: biometric mapping, subscriptions & payments, attendance/token flow, reports, and integrations.</p>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Student Name</TableHead>
+                <TableHead>Unit</TableHead>
+                <TableHead>Meal Type</TableHead>
+                <TableHead>Time</TableHead>
+                <TableHead>Type</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recentLoading ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
+              ) : !recent?.length ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                    No recent activity today
+                  </TableCell>
+                </TableRow>
+              ) : recent.map((r) => {
+                const row = r as unknown as { id: string; meal_type: string; scan_type: string; scan_time: string; students?: { full_name: string }; units?: { name: string } };
+                return (
+                  <TableRow key={row.id}>
+                    <TableCell className="font-medium">{row.students?.full_name ?? "—"}</TableCell>
+                    <TableCell>{row.units?.name ?? "—"}</TableCell>
+                    <TableCell className="capitalize">{row.meal_type}</TableCell>
+                    <TableCell>{fmtTime(row.scan_time)}</TableCell>
+                    <TableCell>
+                      <Badge variant={row.scan_type === "biometric" ? "default" : "secondary"} className="capitalize">
+                        {row.scan_type === "biometric" ? "Biometric" : "Manual"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

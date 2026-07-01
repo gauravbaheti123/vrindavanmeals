@@ -78,14 +78,15 @@ export function AppShell() {
           })}
         </nav>
         <div className="p-3 border-t space-y-2">
-          <div className="text-xs">
-            <div className="font-medium truncate">{profile?.name || "User"}</div>
-            <Badge variant="secondary" className="mt-1 capitalize">{primaryRole.replace("_", " ")}</Badge>
-          </div>
+          {profile?.name ? (
+            <div className="text-xs font-medium truncate">{profile.name}</div>
+          ) : null}
+          <Badge variant="secondary" className="capitalize">{primaryRole.replace("_", " ")}</Badge>
           <Button variant="outline" size="sm" className="w-full" onClick={signOut}>
             <LogOut className="h-4 w-4 mr-2" />Sign out
           </Button>
         </div>
+
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0">

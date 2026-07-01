@@ -15,11 +15,17 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedStudentsRouteImport } from './routes/_authenticated/students'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedSubscriptionsIndexRouteImport } from './routes/_authenticated/subscriptions.index'
 import { Route as AuthenticatedStudentsIndexRouteImport } from './routes/_authenticated/students.index'
+import { Route as AuthenticatedPaymentsIndexRouteImport } from './routes/_authenticated/payments.index'
+import { Route as AuthenticatedSubscriptionsNewRouteImport } from './routes/_authenticated/subscriptions.new'
+import { Route as AuthenticatedSubscriptionsIdRouteImport } from './routes/_authenticated/subscriptions.$id'
 import { Route as AuthenticatedStudentsPendingRouteImport } from './routes/_authenticated/students.pending'
 import { Route as AuthenticatedStudentsNewRouteImport } from './routes/_authenticated/students.new'
 import { Route as AuthenticatedStudentsIdRouteImport } from './routes/_authenticated/students.$id'
+import { Route as AuthenticatedPaymentsNewRouteImport } from './routes/_authenticated/payments.new'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -50,16 +56,45 @@ const AuthenticatedStudentsRoute = AuthenticatedStudentsRouteImport.update({
   path: '/students',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSubscriptionsIndexRoute =
+  AuthenticatedSubscriptionsIndexRouteImport.update({
+    id: '/subscriptions/',
+    path: '/subscriptions/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedStudentsIndexRoute =
   AuthenticatedStudentsIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedStudentsRoute,
+  } as any)
+const AuthenticatedPaymentsIndexRoute =
+  AuthenticatedPaymentsIndexRouteImport.update({
+    id: '/payments/',
+    path: '/payments/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedSubscriptionsNewRoute =
+  AuthenticatedSubscriptionsNewRouteImport.update({
+    id: '/subscriptions/new',
+    path: '/subscriptions/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedSubscriptionsIdRoute =
+  AuthenticatedSubscriptionsIdRouteImport.update({
+    id: '/subscriptions/$id',
+    path: '/subscriptions/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedStudentsPendingRoute =
   AuthenticatedStudentsPendingRouteImport.update({
@@ -78,6 +113,12 @@ const AuthenticatedStudentsIdRoute = AuthenticatedStudentsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthenticatedStudentsRoute,
 } as any)
+const AuthenticatedPaymentsNewRoute =
+  AuthenticatedPaymentsNewRouteImport.update({
+    id: '/payments/new',
+    path: '/payments/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -85,11 +126,17 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/settings': typeof AuthenticatedSettingsRoute
   '/students': typeof AuthenticatedStudentsRouteWithChildren
+  '/payments/new': typeof AuthenticatedPaymentsNewRoute
   '/students/$id': typeof AuthenticatedStudentsIdRoute
   '/students/new': typeof AuthenticatedStudentsNewRoute
   '/students/pending': typeof AuthenticatedStudentsPendingRoute
+  '/subscriptions/$id': typeof AuthenticatedSubscriptionsIdRoute
+  '/subscriptions/new': typeof AuthenticatedSubscriptionsNewRoute
+  '/payments/': typeof AuthenticatedPaymentsIndexRoute
   '/students/': typeof AuthenticatedStudentsIndexRoute
+  '/subscriptions/': typeof AuthenticatedSubscriptionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -97,10 +144,16 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/payments/new': typeof AuthenticatedPaymentsNewRoute
   '/students/$id': typeof AuthenticatedStudentsIdRoute
   '/students/new': typeof AuthenticatedStudentsNewRoute
   '/students/pending': typeof AuthenticatedStudentsPendingRoute
+  '/subscriptions/$id': typeof AuthenticatedSubscriptionsIdRoute
+  '/subscriptions/new': typeof AuthenticatedSubscriptionsNewRoute
+  '/payments': typeof AuthenticatedPaymentsIndexRoute
   '/students': typeof AuthenticatedStudentsIndexRoute
+  '/subscriptions': typeof AuthenticatedSubscriptionsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -110,11 +163,17 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/students': typeof AuthenticatedStudentsRouteWithChildren
+  '/_authenticated/payments/new': typeof AuthenticatedPaymentsNewRoute
   '/_authenticated/students/$id': typeof AuthenticatedStudentsIdRoute
   '/_authenticated/students/new': typeof AuthenticatedStudentsNewRoute
   '/_authenticated/students/pending': typeof AuthenticatedStudentsPendingRoute
+  '/_authenticated/subscriptions/$id': typeof AuthenticatedSubscriptionsIdRoute
+  '/_authenticated/subscriptions/new': typeof AuthenticatedSubscriptionsNewRoute
+  '/_authenticated/payments/': typeof AuthenticatedPaymentsIndexRoute
   '/_authenticated/students/': typeof AuthenticatedStudentsIndexRoute
+  '/_authenticated/subscriptions/': typeof AuthenticatedSubscriptionsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -124,11 +183,17 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/dashboard'
+    | '/settings'
     | '/students'
+    | '/payments/new'
     | '/students/$id'
     | '/students/new'
     | '/students/pending'
+    | '/subscriptions/$id'
+    | '/subscriptions/new'
+    | '/payments/'
     | '/students/'
+    | '/subscriptions/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -136,10 +201,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/dashboard'
+    | '/settings'
+    | '/payments/new'
     | '/students/$id'
     | '/students/new'
     | '/students/pending'
+    | '/subscriptions/$id'
+    | '/subscriptions/new'
+    | '/payments'
     | '/students'
+    | '/subscriptions'
   id:
     | '__root__'
     | '/'
@@ -148,11 +219,17 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/_authenticated/dashboard'
+    | '/_authenticated/settings'
     | '/_authenticated/students'
+    | '/_authenticated/payments/new'
     | '/_authenticated/students/$id'
     | '/_authenticated/students/new'
     | '/_authenticated/students/pending'
+    | '/_authenticated/subscriptions/$id'
+    | '/_authenticated/subscriptions/new'
+    | '/_authenticated/payments/'
     | '/_authenticated/students/'
+    | '/_authenticated/subscriptions/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -207,11 +284,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedStudentsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/subscriptions/': {
+      id: '/_authenticated/subscriptions/'
+      path: '/subscriptions'
+      fullPath: '/subscriptions/'
+      preLoaderRoute: typeof AuthenticatedSubscriptionsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/students/': {
@@ -220,6 +311,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/students/'
       preLoaderRoute: typeof AuthenticatedStudentsIndexRouteImport
       parentRoute: typeof AuthenticatedStudentsRoute
+    }
+    '/_authenticated/payments/': {
+      id: '/_authenticated/payments/'
+      path: '/payments'
+      fullPath: '/payments/'
+      preLoaderRoute: typeof AuthenticatedPaymentsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/subscriptions/new': {
+      id: '/_authenticated/subscriptions/new'
+      path: '/subscriptions/new'
+      fullPath: '/subscriptions/new'
+      preLoaderRoute: typeof AuthenticatedSubscriptionsNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/subscriptions/$id': {
+      id: '/_authenticated/subscriptions/$id'
+      path: '/subscriptions/$id'
+      fullPath: '/subscriptions/$id'
+      preLoaderRoute: typeof AuthenticatedSubscriptionsIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/students/pending': {
       id: '/_authenticated/students/pending'
@@ -241,6 +353,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/students/$id'
       preLoaderRoute: typeof AuthenticatedStudentsIdRouteImport
       parentRoute: typeof AuthenticatedStudentsRoute
+    }
+    '/_authenticated/payments/new': {
+      id: '/_authenticated/payments/new'
+      path: '/payments/new'
+      fullPath: '/payments/new'
+      preLoaderRoute: typeof AuthenticatedPaymentsNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
@@ -266,12 +385,24 @@ const AuthenticatedStudentsRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedStudentsRoute: typeof AuthenticatedStudentsRouteWithChildren
+  AuthenticatedPaymentsNewRoute: typeof AuthenticatedPaymentsNewRoute
+  AuthenticatedSubscriptionsIdRoute: typeof AuthenticatedSubscriptionsIdRoute
+  AuthenticatedSubscriptionsNewRoute: typeof AuthenticatedSubscriptionsNewRoute
+  AuthenticatedPaymentsIndexRoute: typeof AuthenticatedPaymentsIndexRoute
+  AuthenticatedSubscriptionsIndexRoute: typeof AuthenticatedSubscriptionsIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedStudentsRoute: AuthenticatedStudentsRouteWithChildren,
+  AuthenticatedPaymentsNewRoute: AuthenticatedPaymentsNewRoute,
+  AuthenticatedSubscriptionsIdRoute: AuthenticatedSubscriptionsIdRoute,
+  AuthenticatedSubscriptionsNewRoute: AuthenticatedSubscriptionsNewRoute,
+  AuthenticatedPaymentsIndexRoute: AuthenticatedPaymentsIndexRoute,
+  AuthenticatedSubscriptionsIndexRoute: AuthenticatedSubscriptionsIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -287,13 +418,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
