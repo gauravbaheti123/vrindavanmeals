@@ -160,6 +160,47 @@ export type Database = {
           },
         ]
       }
+      notifications_log: {
+        Row: {
+          created_at: string
+          id: string
+          mobile: string
+          response_data: Json | null
+          sent_at: string
+          status: string
+          student_id: string | null
+          template_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mobile: string
+          response_data?: Json | null
+          sent_at?: string
+          status?: string
+          student_id?: string | null
+          template_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mobile?: string
+          response_data?: Json | null
+          sent_at?: string
+          status?: string
+          student_id?: string | null
+          template_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_log_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number

@@ -37,7 +37,66 @@ function SettingsPage() {
       <GeneralSettings />
       <MealWindowsCard />
       <UnitsCard />
+      <IntegrationsCard />
     </div>
+  );
+}
+
+function IntegrationsCard() {
+  const [phone, setPhone] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [backing, setBacking] = useState(false);
+  const { data: settings } = useQuery({
+    queryKey: ["system-settings"],
+    queryFn: async () => {
+      const { data } = await supabase.from("system_settings").select("key,value");
+      return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
+    },
+  });
+  async function sendTest() {
+    if (!phone) return toast.error("Enter test phone number");
+    setTesting(true);
+    const { data, error } = await supabase.functions.invoke("send-whatsapp", {
+      body: { phone, template_name: "test_message", params: ["Test from Vrindavan Meals"] },
+    });
+    setTesting(false);
+    if (error) return toast.error(error.message);
+    if (data?.error === "NOT_CONFIGURED") return toast.warning("AISENSY_API_KEY not configured — add it in secrets.");
+    toast.success("Test message sent");
+  }
+  async function runBackup() {
+    setBacking(true);
+    const { data, error } = await supabase.functions.invoke("backup-to-drive", { body: {} });
+    setBacking(false);
+    if (error) return toast.error(error.message);
+    if (data?.error === "NOT_CONFIGURED") return toast.warning("Google Drive keys not configured — add secrets.");
+    if (data?.success) toast.success(`Backup uploaded: ${data.uploaded?.length ?? 0} files`);
+    else toast.error(data?.message ?? "Backup failed");
+  }
+  return (
+    <Card>
+      <CardHeader><CardTitle>Integrations</CardTitle></CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label className="font-semibold">WhatsApp (AiSensy)</Label>
+          <div className="flex gap-2">
+            <Input placeholder="+91…" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <Button onClick={sendTest} disabled={testing}>{testing ? "Sending…" : "Send Test WhatsApp"}</Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Requires <code>AISENSY_API_KEY</code> in edge function secrets.</p>
+        </div>
+        <div className="space-y-2 pt-4 border-t">
+          <Label className="font-semibold">Google Drive Backup</Label>
+          <div className="text-sm text-muted-foreground">
+            Last backup: {settings?.last_backup_at ? new Date(settings.last_backup_at).toLocaleString("en-IN") : "Never"}
+          </div>
+          <Button onClick={runBackup} disabled={backing} variant="outline">
+            {backing ? "Running…" : "Run Manual Backup Now"}
+          </Button>
+          <p className="text-xs text-muted-foreground">Requires <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> and <code>GOOGLE_DRIVE_FOLDER_ID</code> in secrets. Scheduled every Sunday 2:00 AM.</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
