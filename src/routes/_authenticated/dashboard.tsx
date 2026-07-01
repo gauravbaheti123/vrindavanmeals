@@ -40,9 +40,20 @@ function Dashboard() {
         .select("id, meal_type, scan_type, scan_time, students(full_name), units(name)")
         .eq("scan_date", today)
         .order("scan_time", { ascending: false })
-        .limit(10);
+        .limit(20);
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: unmappedToday } = useQuery({
+    queryKey: ["dashboard-unmapped-today"],
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const { count } = await supabase.from("unmapped_scans")
+        .select("id", { count: "exact", head: true })
+        .gte("scan_time", today + "T00:00:00");
+      return count ?? 0;
     },
   });
 
