@@ -293,16 +293,16 @@ function ManualLog({ from, to, unit }: { from: string; to: string; unit: string 
     queryKey: ["rpt-manual", from, to, unit],
     queryFn: async () => {
       let q = supabase.from("attendance")
-        .select("scan_date, meal_type, override_reason, is_override, students(full_name), units(name), profiles:marked_by(name)")
+        .select("scan_date, meal_type, override_reason, is_override, students(full_name), units(name)")
         .eq("scan_type", "manual").gte("scan_date", from).lte("scan_date", to).order("scan_date", { ascending: false });
       if (unit !== "all") q = q.eq("unit_id", unit);
       return (await q).data ?? [];
     },
   });
-  const cols = ["Date", "Student", "Unit", "Meal", "Reason", "By", "Override"];
+  const cols = ["Date", "Student", "Unit", "Meal", "Reason", "Override"];
   const rows = (data ?? []).map((r) => {
-    const x = r as { scan_date: string; meal_type: string; override_reason: string | null; is_override: boolean; students?: { full_name: string }; units?: { name: string }; profiles?: { name: string } };
-    return [x.scan_date, x.students?.full_name ?? "", x.units?.name ?? "", x.meal_type, x.override_reason ?? "", x.profiles?.name ?? "", x.is_override ? "Yes" : "No"];
+    const x = r as unknown as { scan_date: string; meal_type: string; override_reason: string | null; is_override: boolean; students?: { full_name: string }; units?: { name: string } };
+    return [x.scan_date, x.students?.full_name ?? "", x.units?.name ?? "", x.meal_type, x.override_reason ?? "", x.is_override ? "Yes" : "No"];
   });
   return (
     <div className="space-y-3 mt-4">
