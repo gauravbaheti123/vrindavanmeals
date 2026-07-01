@@ -14,9 +14,11 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
 import { Route as AuthenticatedStudentsRouteImport } from './routes/_authenticated/students'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedBiometricRouteImport } from './routes/_authenticated/biometric'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
@@ -57,6 +59,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedStudentsRoute = AuthenticatedStudentsRouteImport.update({
   id: '/students',
   path: '/students',
@@ -70,6 +77,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedImportRoute = AuthenticatedImportRouteImport.update({
+  id: '/import',
+  path: '/import',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -167,9 +179,11 @@ export interface FileRoutesByFullPath {
   '/attendance': typeof AuthenticatedAttendanceRouteWithChildren
   '/biometric': typeof AuthenticatedBiometricRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/import': typeof AuthenticatedImportRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/students': typeof AuthenticatedStudentsRouteWithChildren
+  '/users': typeof AuthenticatedUsersRoute
   '/attendance/reprint': typeof AuthenticatedAttendanceReprintRoute
   '/payments/new': typeof AuthenticatedPaymentsNewRoute
   '/students/$id': typeof AuthenticatedStudentsIdRoute
@@ -189,8 +203,10 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/import': typeof AuthenticatedImportRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/users': typeof AuthenticatedUsersRoute
   '/attendance/reprint': typeof AuthenticatedAttendanceReprintRoute
   '/payments/new': typeof AuthenticatedPaymentsNewRoute
   '/students/$id': typeof AuthenticatedStudentsIdRoute
@@ -214,9 +230,11 @@ export interface FileRoutesById {
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRouteWithChildren
   '/_authenticated/biometric': typeof AuthenticatedBiometricRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/import': typeof AuthenticatedImportRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/students': typeof AuthenticatedStudentsRouteWithChildren
+  '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/attendance/reprint': typeof AuthenticatedAttendanceReprintRoute
   '/_authenticated/payments/new': typeof AuthenticatedPaymentsNewRoute
   '/_authenticated/students/$id': typeof AuthenticatedStudentsIdRoute
@@ -240,9 +258,11 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/biometric'
     | '/dashboard'
+    | '/import'
     | '/reports'
     | '/settings'
     | '/students'
+    | '/users'
     | '/attendance/reprint'
     | '/payments/new'
     | '/students/$id'
@@ -262,8 +282,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/dashboard'
+    | '/import'
     | '/reports'
     | '/settings'
+    | '/users'
     | '/attendance/reprint'
     | '/payments/new'
     | '/students/$id'
@@ -286,9 +308,11 @@ export interface FileRouteTypes {
     | '/_authenticated/attendance'
     | '/_authenticated/biometric'
     | '/_authenticated/dashboard'
+    | '/_authenticated/import'
     | '/_authenticated/reports'
     | '/_authenticated/settings'
     | '/_authenticated/students'
+    | '/_authenticated/users'
     | '/_authenticated/attendance/reprint'
     | '/_authenticated/payments/new'
     | '/_authenticated/students/$id'
@@ -348,6 +372,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/users': {
+      id: '/_authenticated/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof AuthenticatedUsersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/students': {
       id: '/_authenticated/students'
       path: '/students'
@@ -367,6 +398,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/import': {
+      id: '/_authenticated/import'
+      path: '/import'
+      fullPath: '/import'
+      preLoaderRoute: typeof AuthenticatedImportRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
@@ -530,9 +568,11 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRouteWithChildren
   AuthenticatedBiometricRoute: typeof AuthenticatedBiometricRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedImportRoute: typeof AuthenticatedImportRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedStudentsRoute: typeof AuthenticatedStudentsRouteWithChildren
+  AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedPaymentsNewRoute: typeof AuthenticatedPaymentsNewRoute
   AuthenticatedSubscriptionsIdRoute: typeof AuthenticatedSubscriptionsIdRoute
   AuthenticatedSubscriptionsNewRoute: typeof AuthenticatedSubscriptionsNewRoute
@@ -544,9 +584,11 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAttendanceRoute: AuthenticatedAttendanceRouteWithChildren,
   AuthenticatedBiometricRoute: AuthenticatedBiometricRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedImportRoute: AuthenticatedImportRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedStudentsRoute: AuthenticatedStudentsRouteWithChildren,
+  AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedPaymentsNewRoute: AuthenticatedPaymentsNewRoute,
   AuthenticatedSubscriptionsIdRoute: AuthenticatedSubscriptionsIdRoute,
   AuthenticatedSubscriptionsNewRoute: AuthenticatedSubscriptionsNewRoute,
