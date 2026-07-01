@@ -354,7 +354,7 @@ export const importAttendance = createServerFn({ method: "POST" })
 
       // dup check
       const { data: dup } = await supabaseAdmin.from("attendance")
-        .select("id").eq("student_id", studentId).eq("meal_type", meal)
+        .select("id").eq("student_id", studentId).eq("meal_type", meal as "lunch" | "dinner")
         .eq("scan_date", scanDate).limit(1);
       if (dup && dup.length) { skipped++; continue; }
 
