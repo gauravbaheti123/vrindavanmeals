@@ -30,6 +30,7 @@ import { Route as AuthenticatedStudentsPendingRouteImport } from './routes/_auth
 import { Route as AuthenticatedStudentsNewRouteImport } from './routes/_authenticated/students.new'
 import { Route as AuthenticatedStudentsIdRouteImport } from './routes/_authenticated/students.$id'
 import { Route as AuthenticatedPaymentsNewRouteImport } from './routes/_authenticated/payments.new'
+import { Route as AuthenticatedAttendanceReprintRouteImport } from './routes/_authenticated/attendance.reprint'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -145,6 +146,12 @@ const AuthenticatedPaymentsNewRoute =
     path: '/payments/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAttendanceReprintRoute =
+  AuthenticatedAttendanceReprintRouteImport.update({
+    id: '/reprint',
+    path: '/reprint',
+    getParentRoute: () => AuthenticatedAttendanceRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -156,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/students': typeof AuthenticatedStudentsRouteWithChildren
+  '/attendance/reprint': typeof AuthenticatedAttendanceReprintRoute
   '/payments/new': typeof AuthenticatedPaymentsNewRoute
   '/students/$id': typeof AuthenticatedStudentsIdRoute
   '/students/new': typeof AuthenticatedStudentsNewRoute
@@ -175,6 +183,7 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/attendance/reprint': typeof AuthenticatedAttendanceReprintRoute
   '/payments/new': typeof AuthenticatedPaymentsNewRoute
   '/students/$id': typeof AuthenticatedStudentsIdRoute
   '/students/new': typeof AuthenticatedStudentsNewRoute
@@ -199,6 +208,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/students': typeof AuthenticatedStudentsRouteWithChildren
+  '/_authenticated/attendance/reprint': typeof AuthenticatedAttendanceReprintRoute
   '/_authenticated/payments/new': typeof AuthenticatedPaymentsNewRoute
   '/_authenticated/students/$id': typeof AuthenticatedStudentsIdRoute
   '/_authenticated/students/new': typeof AuthenticatedStudentsNewRoute
@@ -223,6 +233,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/settings'
     | '/students'
+    | '/attendance/reprint'
     | '/payments/new'
     | '/students/$id'
     | '/students/new'
@@ -242,6 +253,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/dashboard'
     | '/settings'
+    | '/attendance/reprint'
     | '/payments/new'
     | '/students/$id'
     | '/students/new'
@@ -265,6 +277,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/settings'
     | '/_authenticated/students'
+    | '/_authenticated/attendance/reprint'
     | '/_authenticated/payments/new'
     | '/_authenticated/students/$id'
     | '/_authenticated/students/new'
@@ -435,15 +448,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPaymentsNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/attendance/reprint': {
+      id: '/_authenticated/attendance/reprint'
+      path: '/reprint'
+      fullPath: '/attendance/reprint'
+      preLoaderRoute: typeof AuthenticatedAttendanceReprintRouteImport
+      parentRoute: typeof AuthenticatedAttendanceRoute
+    }
   }
 }
 
 interface AuthenticatedAttendanceRouteChildren {
+  AuthenticatedAttendanceReprintRoute: typeof AuthenticatedAttendanceReprintRoute
   AuthenticatedAttendanceIndexRoute: typeof AuthenticatedAttendanceIndexRoute
 }
 
 const AuthenticatedAttendanceRouteChildren: AuthenticatedAttendanceRouteChildren =
   {
+    AuthenticatedAttendanceReprintRoute: AuthenticatedAttendanceReprintRoute,
     AuthenticatedAttendanceIndexRoute: AuthenticatedAttendanceIndexRoute,
   }
 
