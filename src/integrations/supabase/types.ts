@@ -255,6 +255,24 @@ export type Database = {
           },
         ]
       }
+      registration_rate_limit: {
+        Row: {
+          created_at: string
+          id: string
+          ip_hash: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_hash: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_hash?: string
+        }
+        Relationships: []
+      }
       role_permissions: {
         Row: {
           can_access: boolean

@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { submitStudentRegistration } from "@/lib/registration.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,24 +31,30 @@ function RegisterPage() {
     queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
   });
 
+  const register = useServerFn(submitStudentRegistration);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.full_name.trim() || !form.mobile.trim()) return toast.error("Name and mobile are required");
     setBusy(true);
-    const { error } = await supabase.from("students").insert({
-      full_name: form.full_name.trim(),
-      mobile: form.mobile.trim(),
-      roll_number: form.roll_number || null,
-      course: form.course || null,
-      hostel_room: form.hostel_room || null,
-      parent_mobile: form.parent_mobile || null,
-      email: form.email || null,
-      unit_id: form.unit_id || null,
-      is_approved: false,
-    });
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    setDone(true);
+    try {
+      await register({
+        data: {
+          full_name: form.full_name.trim(),
+          mobile: form.mobile.trim(),
+          roll_number: form.roll_number || null,
+          course: form.course || null,
+          hostel_room: form.hostel_room || null,
+          parent_mobile: form.parent_mobile || null,
+          email: form.email || null,
+          unit_id: form.unit_id || null,
+        },
+      });
+      setDone(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (done) {
