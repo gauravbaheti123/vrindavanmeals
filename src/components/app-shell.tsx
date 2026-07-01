@@ -30,7 +30,7 @@ const NAV: NavItem[] = [
 ];
 
 export function AppShell() {
-  const { user, profile, roles, loading } = useCurrentUser();
+  const { profile, roles, loading } = useCurrentUser();
   const flags = roleFlags(roles);
   const navigate = useNavigate();
   const qc = useQueryClient();
