@@ -223,8 +223,10 @@ function Contact() {
             <div>
               <div className="font-semibold text-brown">Address</div>
               <p className="mt-1 text-brown/70">
-                Vrindavan Meals, Canteen Block,<br />
-                Student Campus Area, India
+                Dayanand Girls' Hostel<br />
+                Dayanand Education Society Campus, Barshi Road<br />
+                Latur – 413512<br />
+                Maharashtra, India&nbsp;
               </p>
             </div>
           </div>
