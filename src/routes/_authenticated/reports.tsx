@@ -147,14 +147,13 @@ function RevenueReport({ from, to, unit }: { from: string; to: string; unit: str
     },
   });
   const totals = useMemo(() => {
-    const acc: Record<string, number> = { cash: 0, upi: 0, card: 0, razorpay: 0 };
-    let total = 0;
+    const acc = { total: 0, cash: 0, upi: 0, card: 0, razorpay: 0 } as Record<string, number>;
     (data ?? []).forEach((r) => {
       const amt = Number(r.amount) || 0;
-      total += amt;
+      acc.total += amt;
       if (acc[r.mode] !== undefined) acc[r.mode] += amt;
     });
-    return { total, ...acc };
+    return acc as { total: number; cash: number; upi: number; card: number; razorpay: number };
   }, [data]);
   const cols = ["Date", "Student", "Amount", "Mode"];
   const rows = (data ?? []).map((r) => {
