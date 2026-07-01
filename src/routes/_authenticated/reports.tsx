@@ -325,15 +325,15 @@ function ReprintLog({ from, to }: { from: string; to: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-reprint", from, to],
     queryFn: async () => (await supabase.from("token_reprints")
-      .select("created_at, reason, attendance:attendance_id(scan_date, meal_type, token_number, students(full_name), units(name)), profiles:reprinted_by(name)")
+      .select("created_at, reason, attendance:attendance_id(scan_date, meal_type, token_number, students(full_name), units(name))")
       .gte("created_at", from + "T00:00:00").lte("created_at", to + "T23:59:59")
       .order("created_at", { ascending: false })).data ?? [],
   });
-  const cols = ["Reprint Time", "Student", "Unit", "Meal", "Token", "Reason", "By"];
+  const cols = ["Reprint Time", "Student", "Unit", "Meal", "Token", "Reason"];
   const rows = (data ?? []).map((r) => {
-    const x = r as { created_at: string; reason: string | null; attendance?: { meal_type: string; token_number: number; students?: { full_name: string }; units?: { name: string } }; profiles?: { name: string } };
+    const x = r as unknown as { created_at: string; reason: string | null; attendance?: { meal_type: string; token_number: number; students?: { full_name: string }; units?: { name: string } } };
     return [new Date(x.created_at).toLocaleString("en-IN"), x.attendance?.students?.full_name ?? "", x.attendance?.units?.name ?? "",
-      x.attendance?.meal_type ?? "", x.attendance?.token_number ?? "", x.reason ?? "", x.profiles?.name ?? ""];
+      x.attendance?.meal_type ?? "", x.attendance?.token_number ?? "", x.reason ?? ""];
   });
   return (
     <div className="space-y-3 mt-4">
