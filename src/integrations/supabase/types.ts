@@ -128,6 +128,45 @@ export type Database = {
           },
         ]
       }
+      import_logs: {
+        Row: {
+          created_at: string
+          error_report: Json | null
+          error_rows: number
+          file_name: string | null
+          id: string
+          import_type: string
+          imported_by: string | null
+          imported_rows: number
+          skipped_rows: number
+          total_rows: number
+        }
+        Insert: {
+          created_at?: string
+          error_report?: Json | null
+          error_rows?: number
+          file_name?: string | null
+          id?: string
+          import_type: string
+          imported_by?: string | null
+          imported_rows?: number
+          skipped_rows?: number
+          total_rows?: number
+        }
+        Update: {
+          created_at?: string
+          error_report?: Json | null
+          error_rows?: number
+          file_name?: string | null
+          id?: string
+          import_type?: string
+          imported_by?: string | null
+          imported_rows?: number
+          skipped_rows?: number
+          total_rows?: number
+        }
+        Relationships: []
+      }
       meal_windows: {
         Row: {
           end_time: string
