@@ -1,119 +1,293 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { UtensilsCrossed, ShieldCheck, Fingerprint, Printer, BarChart3, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { MapPin, Phone, UtensilsCrossed } from "lucide-react";
+import heroMeal from "../assets/hero-meal.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Vrindavan Meals — Canteen Management Portal" },
-      { name: "description", content: "Subscription-based canteen management with biometric attendance, thermal token printing, and unit-level operations built for modern institutions." },
+      { title: "Vrindavan Meals — Fresh Wholesome Meals Every Day" },
+      { name: "description", content: "Vrindavan Meals serves fresh, wholesome lunch and dinner to students across our canteen units. Quality food, student-focused, daily fresh meals." },
     ],
   }),
   component: Landing,
 });
 
+const navLinks = [
+  { label: "Home", href: "#home" },
+  { label: "About", href: "#about" },
+  { label: "Menu", href: "#menu" },
+  { label: "Contact", href: "#contact" },
+];
+
+function scrollTo(id: string) {
+  const el = document.querySelector(id);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function Navbar() {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  return (
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled
+          ? "bg-cream/95 backdrop-blur-md shadow-sm border-b border-brown/10"
+          : "bg-transparent"
+      }`}
+    >
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <a
+          href="#home"
+          onClick={(e) => {
+            e.preventDefault();
+            scrollTo("#home");
+          }}
+          className="flex items-center gap-2.5"
+        >
+          <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-saffron to-terracotta grid place-items-center shadow-md">
+            <UtensilsCrossed className="h-4 w-4 text-white" />
+          </div>
+          <span className="font-[Playfair_Display] text-lg font-bold text-brown tracking-tight">
+            Vrindavan Meals
+          </span>
+        </a>
+
+        <div className="hidden md:flex items-center gap-8">
+          {navLinks.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              onClick={(e) => {
+                e.preventDefault();
+                scrollTo(link.href);
+              }}
+              className="text-sm font-medium text-brown/80 hover:text-saffron transition-colors"
+            >
+              {link.label}
+            </a>
+          ))}
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+function Hero() {
+  return (
+    <section id="home" className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+      <div className="absolute inset-0">
+        <img
+          src={heroMeal}
+          alt="Fresh Indian thali meal served by Vrindavan Meals"
+          className="h-full w-full object-cover"
+          width={1920}
+          height={1080}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-brown/80 via-brown/60 to-brown/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-cream via-transparent to-transparent" />
+      </div>
+
+      <div className="relative z-10 max-w-7xl mx-auto px-6 pt-28 pb-20 text-center">
+        <span className="inline-block rounded-full bg-white/15 backdrop-blur-sm border border-white/20 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white mb-6">
+          Student Canteen Service
+        </span>
+        <h1 className="font-[Playfair_Display] text-5xl md:text-7xl font-bold text-white leading-tight max-w-4xl mx-auto">
+          Fresh, Wholesome Meals Every Day
+        </h1>
+        <p className="mt-6 text-lg md:text-xl text-white/90 max-w-2xl mx-auto leading-relaxed">
+          Serving quality Lunch & Dinner to students across our canteen units —
+          wholesome, hygienic, and made with care.
+        </p>
+        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a
+            href="#menu"
+            onClick={(e) => {
+              e.preventDefault();
+              scrollTo("#menu");
+            }}
+            className="inline-flex items-center justify-center rounded-full bg-saffron px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-saffron/25 hover:bg-saffron/90 transition-colors"
+          >
+            Explore Our Menu
+          </a>
+          <a
+            href="#about"
+            onClick={(e) => {
+              e.preventDefault();
+              scrollTo("#about");
+            }}
+            className="inline-flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/30 px-8 py-3.5 text-base font-semibold text-white hover:bg-white/20 transition-colors"
+          >
+            About Us
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function About() {
+  const stats = [
+    { value: "700+", label: "Students Served" },
+    { value: "2", label: "Canteen Units" },
+    { value: "Daily", label: "Fresh Meals" },
+  ];
+
+  return (
+    <section id="about" className="py-20 md:py-28 bg-cream">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid md:grid-cols-2 gap-12 items-center">
+          <div>
+            <span className="text-saffron font-semibold text-sm uppercase tracking-wider">
+              About Us
+            </span>
+            <h2 className="font-[Playfair_Display] text-4xl md:text-5xl font-bold text-brown mt-3 leading-tight">
+              About Vrindavan Meals
+            </h2>
+            <p className="mt-6 text-lg text-brown/80 leading-relaxed">
+              Vrindavan Meals is a student-focused canteen service built around one simple idea:
+              every student deserves a wholesome, home-style meal. We prepare daily lunch and dinner
+              with fresh ingredients, balanced nutrition, and the warmth of traditional Indian cooking.
+            </p>
+            <p className="mt-4 text-lg text-brown/80 leading-relaxed">
+              From our kitchens to your canteen unit, we focus on quality, hygiene, and consistency —
+              so students can focus on what matters most.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {stats.map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-2xl bg-white p-6 shadow-sm border border-brown/10 text-center hover:shadow-md transition-shadow"
+              >
+                <div className="font-[Playfair_Display] text-4xl font-bold text-saffron">{stat.value}</div>
+                <div className="mt-2 text-sm font-medium text-brown/70">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Menu() {
+  const meals = [
+    {
+      emoji: "🍱",
+      title: "Lunch",
+      desc: "A hearty afternoon meal with rice, dal, seasonal vegetables, roti, and a fresh side — designed to keep students energised through the day.",
+    },
+    {
+      emoji: "🍽️",
+      title: "Dinner",
+      desc: "A comforting evening thali with warm curries, fresh bread, rice, and a light side — the perfect end to a busy day of classes.",
+    },
+  ];
+
+  return (
+    <section id="menu" className="py-20 md:py-28 bg-warm-beige">
+      <div className="max-w-7xl mx-auto px-6 text-center">
+        <span className="text-saffron font-semibold text-sm uppercase tracking-wider">Our Menu</span>
+        <h2 className="font-[Playfair_Display] text-4xl md:text-5xl font-bold text-brown mt-3">
+          What We Serve
+        </h2>
+        <p className="mt-4 text-lg text-brown/70 max-w-2xl mx-auto">
+          Simple, wholesome meal plans prepared fresh every day for our student canteens.
+        </p>
+
+        <div className="mt-14 grid md:grid-cols-2 gap-8">
+          {meals.map((meal) => (
+            <div
+              key={meal.title}
+              className="group rounded-2xl bg-white p-8 md:p-10 shadow-sm border border-brown/10 text-left hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+            >
+              <div className="text-5xl mb-6">{meal.emoji}</div>
+              <h3 className="font-[Playfair_Display] text-2xl md:text-3xl font-bold text-brown">{meal.title}</h3>
+              <p className="mt-4 text-brown/75 leading-relaxed">{meal.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Contact() {
+  return (
+    <section id="contact" className="py-20 md:py-28 bg-cream">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="text-center mb-14">
+          <span className="text-saffron font-semibold text-sm uppercase tracking-wider">Get in Touch</span>
+          <h2 className="font-[Playfair_Display] text-4xl md:text-5xl font-bold text-brown mt-3">Contact</h2>
+          <p className="mt-4 text-lg text-brown/70 max-w-2xl mx-auto">
+            Reach out to learn more about meal plans and canteen partnerships.
+          </p>
+        </div>
+
+        <div className="max-w-3xl mx-auto grid sm:grid-cols-2 gap-6">
+          <div className="flex items-start gap-4 rounded-2xl bg-white p-6 shadow-sm border border-brown/10">
+            <div className="h-11 w-11 rounded-full bg-saffron/10 grid place-items-center shrink-0">
+              <MapPin className="h-5 w-5 text-saffron" />
+            </div>
+            <div>
+              <div className="font-semibold text-brown">Address</div>
+              <p className="mt-1 text-brown/70">
+                Vrindavan Meals, Canteen Block,<br />
+                Student Campus Area, India
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-4 rounded-2xl bg-white p-6 shadow-sm border border-brown/10">
+            <div className="h-11 w-11 rounded-full bg-saffron/10 grid place-items-center shrink-0">
+              <Phone className="h-5 w-5 text-saffron" />
+            </div>
+            <div>
+              <div className="font-semibold text-brown">Phone</div>
+              <p className="mt-1 text-brown/70">
+                +91 98XXX XXXXX<br />
+                <span className="text-sm text-brown/50">Mon – Sat, 9am – 7pm</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="bg-brown text-white/80">
+      <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <p className="text-sm">
+          © 2026 Vrindavan Meals. All rights reserved.
+        </p>
+        <Link to="/login" className="text-xs text-white/50 hover:text-white/80 transition-colors">
+          Staff Login
+        </Link>
+      </div>
+    </footer>
+  );
+}
+
 function Landing() {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[oklch(0.22_0.06_45)] text-[oklch(0.98_0.02_80)]">
-      {/* Ambient gradient blobs */}
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-40 -left-32 h-[520px] w-[520px] rounded-full bg-[oklch(0.72_0.2_55)] opacity-40 blur-3xl" />
-        <div className="absolute top-1/3 -right-40 h-[600px] w-[600px] rounded-full bg-[oklch(0.65_0.22_35)] opacity-35 blur-3xl" />
-        <div className="absolute bottom-[-15rem] left-1/3 h-[500px] w-[500px] rounded-full bg-[oklch(0.6_0.18_25)] opacity-30 blur-3xl" />
-      </div>
-      {/* Grid pattern */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.08]"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)",
-          backgroundSize: "56px 56px",
-          maskImage: "radial-gradient(ellipse at center, black 40%, transparent 75%)",
-          WebkitMaskImage: "radial-gradient(ellipse at center, black 40%, transparent 75%)",
-        }}
-      />
-
-      <div className="relative z-10 flex min-h-screen flex-col">
-        <header className="border-b border-white/10 backdrop-blur-md bg-white/[0.03]">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[oklch(0.78_0.2_65)] to-[oklch(0.6_0.22_35)] grid place-items-center shadow-lg shadow-black/30 ring-1 ring-white/20">
-                <UtensilsCrossed className="h-5 w-5 text-white" />
-              </div>
-              <div className="leading-tight">
-                <div className="font-semibold text-lg tracking-tight">Vrindavan Meals</div>
-                <div className="text-[11px] uppercase tracking-[0.18em] text-white/60">Canteen Portal</div>
-              </div>
-            </div>
-            <Button
-              asChild
-              className="bg-white text-[oklch(0.28_0.08_45)] hover:bg-white/90 shadow-md font-medium"
-            >
-              <Link to="/auth">Login <ArrowRight className="h-4 w-4" /></Link>
-            </Button>
-          </div>
-        </header>
-
-        <main className="flex-1">
-          <section className="max-w-7xl mx-auto px-6 pt-20 pb-16 md:pt-28 md:pb-24">
-            <div className="max-w-4xl">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-white/80 backdrop-blur">
-                <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.78_0.2_65)]" />
-                Trusted by institutional canteens
-              </span>
-              <h1 className="mt-6 text-5xl md:text-7xl font-bold tracking-tight leading-[1.02]">
-                Canteen management,{" "}
-                <span className="bg-gradient-to-r from-[oklch(0.85_0.18_75)] via-[oklch(0.78_0.2_60)] to-[oklch(0.68_0.22_35)] bg-clip-text text-transparent">
-                  reimagined.
-                </span>
-              </h1>
-              <p className="mt-6 text-lg md:text-xl text-white/70 max-w-2xl leading-relaxed">
-                Monthly subscriptions, face-biometric attendance, thermal token
-                printing, and role-based operations — unified in one elegant portal.
-              </p>
-              <div className="mt-10 flex items-center gap-4">
-                <Button
-                  asChild
-                  size="lg"
-                  className="h-12 px-8 text-base bg-white text-[oklch(0.28_0.08_45)] hover:bg-white/90 shadow-xl shadow-black/20 font-medium"
-                >
-                  <Link to="/auth">Login <ArrowRight className="h-4 w-4" /></Link>
-                </Button>
-                <div className="text-sm text-white/60">Staff access only</div>
-              </div>
-            </div>
-          </section>
-
-          <section className="max-w-7xl mx-auto px-6 pb-24">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {[
-                { icon: Fingerprint, title: "Face Biometric", desc: "Contactless attendance with instant meal verification." },
-                { icon: Printer, title: "Token Printing", desc: "Thermal tokens generated the moment a student scans in." },
-                { icon: ShieldCheck, title: "Role-Based Access", desc: "Fine-grained permissions across every operational role." },
-                { icon: BarChart3, title: "Live Reporting", desc: "Unit-level insights on subscriptions, attendance, and revenue." },
-              ].map(({ icon: Icon, title, desc }) => (
-                <div
-                  key={title}
-                  className="group relative rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-md transition hover:bg-white/[0.07] hover:border-white/20"
-                >
-                  <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-[oklch(0.78_0.2_65)] to-[oklch(0.6_0.22_35)] grid place-items-center shadow-lg shadow-black/20 ring-1 ring-white/15">
-                    <Icon className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="mt-4 font-semibold text-base">{title}</div>
-                  <div className="mt-1.5 text-sm text-white/60 leading-relaxed">{desc}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </main>
-
-        <footer className="border-t border-white/10 bg-black/20 backdrop-blur-md">
-          <div className="max-w-7xl mx-auto px-6 py-6 text-center text-sm text-white/50">
-            © {new Date().getFullYear()} Vrindavan Meals · Canteen Management Portal
-          </div>
-        </footer>
-      </div>
+    <div className="bg-cream text-brown">
+      <Navbar />
+      <Hero />
+      <About />
+      <Menu />
+      <Contact />
+      <Footer />
     </div>
   );
 }

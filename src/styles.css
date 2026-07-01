@@ -40,58 +40,70 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  /* Food brand extras */
+  --color-cream: var(--cream);
+  --color-saffron: var(--saffron);
+  --color-brown: var(--brown);
+  --color-warm-beige: var(--warm-beige);
+  --color-terracotta: var(--terracotta);
 }
 
 :root {
   --radius: 0.625rem;
-  /* Warm ivory background, deep saffron primary — Vrindavan feel */
-  --background: oklch(0.99 0.012 80);
-  --foreground: oklch(0.22 0.03 40);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.03 40);
+  /* Vrindavan Meals food brand palette: saffron, cream, deep brown */
+  --background: oklch(0.97 0.015 80);        /* warm cream */
+  --foreground: oklch(0.3 0.05 45);          /* deep brown */
+  --card: oklch(1 0 0);                      /* off-white */
+  --card-foreground: oklch(0.3 0.05 45);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.03 40);
-  --primary: oklch(0.68 0.19 50);            /* saffron */
+  --popover-foreground: oklch(0.3 0.05 45);
+  --primary: oklch(0.65 0.18 55);            /* saffron orange */
   --primary-foreground: oklch(0.99 0.01 80);
-  --secondary: oklch(0.95 0.03 70);
-  --secondary-foreground: oklch(0.3 0.06 45);
-  --muted: oklch(0.96 0.015 75);
-  --muted-foreground: oklch(0.5 0.03 55);
-  --accent: oklch(0.92 0.06 65);
-  --accent-foreground: oklch(0.3 0.08 45);
+  --secondary: oklch(0.94 0.025 75);         /* warm beige */
+  --secondary-foreground: oklch(0.3 0.05 45);
+  --muted: oklch(0.92 0.02 75);
+  --muted-foreground: oklch(0.55 0.04 55);
+  --accent: oklch(0.88 0.08 65);             /* terracotta accent */
+  --accent-foreground: oklch(0.3 0.05 45);
   --destructive: oklch(0.6 0.22 25);
   --destructive-foreground: oklch(0.99 0.01 80);
   --success: oklch(0.65 0.14 150);
   --success-foreground: oklch(0.99 0.01 80);
   --warning: oklch(0.78 0.16 85);
   --warning-foreground: oklch(0.25 0.06 45);
-  --border: oklch(0.9 0.02 70);
-  --input: oklch(0.92 0.02 70);
-  --ring: oklch(0.68 0.19 50);
-  --sidebar: oklch(0.98 0.02 75);
+  --border: oklch(0.85 0.02 70);
+  --input: oklch(0.9 0.02 70);
+  --ring: oklch(0.65 0.18 55);
+  --sidebar: oklch(0.98 0.02 80);
   --sidebar-foreground: oklch(0.25 0.04 45);
-  --sidebar-primary: oklch(0.68 0.19 50);
+  --sidebar-primary: oklch(0.65 0.18 55);
   --sidebar-primary-foreground: oklch(0.99 0.01 80);
   --sidebar-accent: oklch(0.93 0.04 70);
-  --sidebar-accent-foreground: oklch(0.3 0.08 45);
-  --sidebar-border: oklch(0.9 0.02 70);
-  --sidebar-ring: oklch(0.68 0.19 50);
+  --sidebar-accent-foreground: oklch(0.3 0.05 45);
+  --sidebar-border: oklch(0.85 0.02 70);
+  --sidebar-ring: oklch(0.65 0.18 55);
+  /* Brand aliases */
+  --cream: oklch(0.97 0.015 80);
+  --saffron: oklch(0.65 0.18 55);
+  --brown: oklch(0.3 0.05 45);
+  --warm-beige: oklch(0.94 0.025 75);
+  --terracotta: oklch(0.6 0.14 50);
 }
 
 .dark {
-  --background: oklch(0.18 0.02 40);
+  --background: oklch(0.22 0.03 45);
   --foreground: oklch(0.97 0.015 75);
-  --card: oklch(0.22 0.025 40);
+  --card: oklch(0.28 0.03 45);
   --card-foreground: oklch(0.97 0.015 75);
-  --popover: oklch(0.22 0.025 40);
+  --popover: oklch(0.28 0.03 45);
   --popover-foreground: oklch(0.97 0.015 75);
   --primary: oklch(0.72 0.19 55);
   --primary-foreground: oklch(0.18 0.02 40);
-  --secondary: oklch(0.28 0.03 45);
+  --secondary: oklch(0.32 0.03 45);
   --secondary-foreground: oklch(0.97 0.015 75);
-  --muted: oklch(0.28 0.03 45);
+  --muted: oklch(0.32 0.03 45);
   --muted-foreground: oklch(0.72 0.03 65);
-  --accent: oklch(0.32 0.05 50);
+  --accent: oklch(0.38 0.05 50);
   --accent-foreground: oklch(0.97 0.015 75);
   --destructive: oklch(0.65 0.2 25);
   --destructive-foreground: oklch(0.99 0.01 80);
@@ -102,7 +114,7 @@
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.72 0.19 55);
-  --sidebar: oklch(0.2 0.025 40);
+  --sidebar: oklch(0.24 0.025 40);
   --sidebar-foreground: oklch(0.97 0.015 75);
   --sidebar-primary: oklch(0.72 0.19 55);
   --sidebar-primary-foreground: oklch(0.18 0.02 40);
@@ -114,9 +126,15 @@
 
 @layer base {
   * { border-color: var(--color-border); }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Playfair Display", Georgia, serif;
   }
 }
