@@ -23,6 +23,7 @@ import { Route as AuthenticatedSubscriptionsIndexRouteImport } from './routes/_a
 import { Route as AuthenticatedStudentsIndexRouteImport } from './routes/_authenticated/students.index'
 import { Route as AuthenticatedPaymentsIndexRouteImport } from './routes/_authenticated/payments.index'
 import { Route as AuthenticatedBiometricIndexRouteImport } from './routes/_authenticated/biometric.index'
+import { Route as AuthenticatedAttendanceIndexRouteImport } from './routes/_authenticated/attendance.index'
 import { Route as AuthenticatedSubscriptionsNewRouteImport } from './routes/_authenticated/subscriptions.new'
 import { Route as AuthenticatedSubscriptionsIdRouteImport } from './routes/_authenticated/subscriptions.$id'
 import { Route as AuthenticatedStudentsPendingRouteImport } from './routes/_authenticated/students.pending'
@@ -103,6 +104,12 @@ const AuthenticatedBiometricIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedBiometricRoute,
   } as any)
+const AuthenticatedAttendanceIndexRoute =
+  AuthenticatedAttendanceIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAttendanceRoute,
+  } as any)
 const AuthenticatedSubscriptionsNewRoute =
   AuthenticatedSubscriptionsNewRouteImport.update({
     id: '/subscriptions/new',
@@ -144,7 +151,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
-  '/attendance': typeof AuthenticatedAttendanceRoute
+  '/attendance': typeof AuthenticatedAttendanceRouteWithChildren
   '/biometric': typeof AuthenticatedBiometricRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -155,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/students/pending': typeof AuthenticatedStudentsPendingRoute
   '/subscriptions/$id': typeof AuthenticatedSubscriptionsIdRoute
   '/subscriptions/new': typeof AuthenticatedSubscriptionsNewRoute
+  '/attendance/': typeof AuthenticatedAttendanceIndexRoute
   '/biometric/': typeof AuthenticatedBiometricIndexRoute
   '/payments/': typeof AuthenticatedPaymentsIndexRoute
   '/students/': typeof AuthenticatedStudentsIndexRoute
@@ -165,7 +173,6 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
-  '/attendance': typeof AuthenticatedAttendanceRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/payments/new': typeof AuthenticatedPaymentsNewRoute
@@ -174,6 +181,7 @@ export interface FileRoutesByTo {
   '/students/pending': typeof AuthenticatedStudentsPendingRoute
   '/subscriptions/$id': typeof AuthenticatedSubscriptionsIdRoute
   '/subscriptions/new': typeof AuthenticatedSubscriptionsNewRoute
+  '/attendance': typeof AuthenticatedAttendanceIndexRoute
   '/biometric': typeof AuthenticatedBiometricIndexRoute
   '/payments': typeof AuthenticatedPaymentsIndexRoute
   '/students': typeof AuthenticatedStudentsIndexRoute
@@ -186,7 +194,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
-  '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
+  '/_authenticated/attendance': typeof AuthenticatedAttendanceRouteWithChildren
   '/_authenticated/biometric': typeof AuthenticatedBiometricRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/_authenticated/students/pending': typeof AuthenticatedStudentsPendingRoute
   '/_authenticated/subscriptions/$id': typeof AuthenticatedSubscriptionsIdRoute
   '/_authenticated/subscriptions/new': typeof AuthenticatedSubscriptionsNewRoute
+  '/_authenticated/attendance/': typeof AuthenticatedAttendanceIndexRoute
   '/_authenticated/biometric/': typeof AuthenticatedBiometricIndexRoute
   '/_authenticated/payments/': typeof AuthenticatedPaymentsIndexRoute
   '/_authenticated/students/': typeof AuthenticatedStudentsIndexRoute
@@ -220,6 +229,7 @@ export interface FileRouteTypes {
     | '/students/pending'
     | '/subscriptions/$id'
     | '/subscriptions/new'
+    | '/attendance/'
     | '/biometric/'
     | '/payments/'
     | '/students/'
@@ -230,7 +240,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/login'
     | '/register'
-    | '/attendance'
     | '/dashboard'
     | '/settings'
     | '/payments/new'
@@ -239,6 +248,7 @@ export interface FileRouteTypes {
     | '/students/pending'
     | '/subscriptions/$id'
     | '/subscriptions/new'
+    | '/attendance'
     | '/biometric'
     | '/payments'
     | '/students'
@@ -261,6 +271,7 @@ export interface FileRouteTypes {
     | '/_authenticated/students/pending'
     | '/_authenticated/subscriptions/$id'
     | '/_authenticated/subscriptions/new'
+    | '/_authenticated/attendance/'
     | '/_authenticated/biometric/'
     | '/_authenticated/payments/'
     | '/_authenticated/students/'
@@ -375,6 +386,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBiometricIndexRouteImport
       parentRoute: typeof AuthenticatedBiometricRoute
     }
+    '/_authenticated/attendance/': {
+      id: '/_authenticated/attendance/'
+      path: '/'
+      fullPath: '/attendance/'
+      preLoaderRoute: typeof AuthenticatedAttendanceIndexRouteImport
+      parentRoute: typeof AuthenticatedAttendanceRoute
+    }
     '/_authenticated/subscriptions/new': {
       id: '/_authenticated/subscriptions/new'
       path: '/subscriptions/new'
@@ -420,6 +438,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedAttendanceRouteChildren {
+  AuthenticatedAttendanceIndexRoute: typeof AuthenticatedAttendanceIndexRoute
+}
+
+const AuthenticatedAttendanceRouteChildren: AuthenticatedAttendanceRouteChildren =
+  {
+    AuthenticatedAttendanceIndexRoute: AuthenticatedAttendanceIndexRoute,
+  }
+
+const AuthenticatedAttendanceRouteWithChildren =
+  AuthenticatedAttendanceRoute._addFileChildren(
+    AuthenticatedAttendanceRouteChildren,
+  )
+
 interface AuthenticatedBiometricRouteChildren {
   AuthenticatedBiometricIndexRoute: typeof AuthenticatedBiometricIndexRoute
 }
@@ -454,7 +486,7 @@ const AuthenticatedStudentsRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRoute
+  AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRouteWithChildren
   AuthenticatedBiometricRoute: typeof AuthenticatedBiometricRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -467,7 +499,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAttendanceRoute: AuthenticatedAttendanceRoute,
+  AuthenticatedAttendanceRoute: AuthenticatedAttendanceRouteWithChildren,
   AuthenticatedBiometricRoute: AuthenticatedBiometricRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
