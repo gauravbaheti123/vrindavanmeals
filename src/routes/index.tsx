@@ -238,8 +238,8 @@ function Contact() {
             <div>
               <div className="font-semibold text-brown">Phone</div>
               <p className="mt-1 text-brown/70">
-                +91 98XXX XXXXX<br />
-                <span className="text-sm text-brown/50">Mon – Sat, 9am – 7pm</span>
+                +91 75077 81000<br />
+                <span className="text-sm text-brown/50"></span>
               </p>
             </div>
           </div>
