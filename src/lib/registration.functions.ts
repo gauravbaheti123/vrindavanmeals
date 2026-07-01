@@ -19,7 +19,7 @@ const MAX_PER_HOUR = 3;
 export const submitStudentRegistration = createServerFn({ method: "POST" })
   .inputValidator((raw: unknown) => RegistrationSchema.parse(raw))
   .handler(async ({ data }) => {
-    const headers = getRequestHeaders();
+    const headers = getRequestHeaders() as Record<string, string | undefined>;
     const ip =
       headers["cf-connecting-ip"] ||
       headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
