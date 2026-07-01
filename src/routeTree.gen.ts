@@ -19,6 +19,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedSubscriptionsIndexRouteImport } from './routes/_authenticated/subscriptions.index'
 import { Route as AuthenticatedStudentsIndexRouteImport } from './routes/_authenticated/students.index'
 import { Route as AuthenticatedSubscriptionsNewRouteImport } from './routes/_authenticated/subscriptions.new'
+import { Route as AuthenticatedSubscriptionsIdRouteImport } from './routes/_authenticated/subscriptions.$id'
 import { Route as AuthenticatedStudentsPendingRouteImport } from './routes/_authenticated/students.pending'
 import { Route as AuthenticatedStudentsNewRouteImport } from './routes/_authenticated/students.new'
 import { Route as AuthenticatedStudentsIdRouteImport } from './routes/_authenticated/students.$id'
@@ -75,6 +76,12 @@ const AuthenticatedSubscriptionsNewRoute =
     path: '/subscriptions/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSubscriptionsIdRoute =
+  AuthenticatedSubscriptionsIdRouteImport.update({
+    id: '/subscriptions/$id',
+    path: '/subscriptions/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedStudentsPendingRoute =
   AuthenticatedStudentsPendingRouteImport.update({
     id: '/pending',
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/students/$id': typeof AuthenticatedStudentsIdRoute
   '/students/new': typeof AuthenticatedStudentsNewRoute
   '/students/pending': typeof AuthenticatedStudentsPendingRoute
+  '/subscriptions/$id': typeof AuthenticatedSubscriptionsIdRoute
   '/subscriptions/new': typeof AuthenticatedSubscriptionsNewRoute
   '/students/': typeof AuthenticatedStudentsIndexRoute
   '/subscriptions/': typeof AuthenticatedSubscriptionsIndexRoute
@@ -116,6 +124,7 @@ export interface FileRoutesByTo {
   '/students/$id': typeof AuthenticatedStudentsIdRoute
   '/students/new': typeof AuthenticatedStudentsNewRoute
   '/students/pending': typeof AuthenticatedStudentsPendingRoute
+  '/subscriptions/$id': typeof AuthenticatedSubscriptionsIdRoute
   '/subscriptions/new': typeof AuthenticatedSubscriptionsNewRoute
   '/students': typeof AuthenticatedStudentsIndexRoute
   '/subscriptions': typeof AuthenticatedSubscriptionsIndexRoute
@@ -132,6 +141,7 @@ export interface FileRoutesById {
   '/_authenticated/students/$id': typeof AuthenticatedStudentsIdRoute
   '/_authenticated/students/new': typeof AuthenticatedStudentsNewRoute
   '/_authenticated/students/pending': typeof AuthenticatedStudentsPendingRoute
+  '/_authenticated/subscriptions/$id': typeof AuthenticatedSubscriptionsIdRoute
   '/_authenticated/subscriptions/new': typeof AuthenticatedSubscriptionsNewRoute
   '/_authenticated/students/': typeof AuthenticatedStudentsIndexRoute
   '/_authenticated/subscriptions/': typeof AuthenticatedSubscriptionsIndexRoute
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/students/$id'
     | '/students/new'
     | '/students/pending'
+    | '/subscriptions/$id'
     | '/subscriptions/new'
     | '/students/'
     | '/subscriptions/'
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/students/$id'
     | '/students/new'
     | '/students/pending'
+    | '/subscriptions/$id'
     | '/subscriptions/new'
     | '/students'
     | '/subscriptions'
@@ -176,6 +188,7 @@ export interface FileRouteTypes {
     | '/_authenticated/students/$id'
     | '/_authenticated/students/new'
     | '/_authenticated/students/pending'
+    | '/_authenticated/subscriptions/$id'
     | '/_authenticated/subscriptions/new'
     | '/_authenticated/students/'
     | '/_authenticated/subscriptions/'
@@ -261,6 +274,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSubscriptionsNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/subscriptions/$id': {
+      id: '/_authenticated/subscriptions/$id'
+      path: '/subscriptions/$id'
+      fullPath: '/subscriptions/$id'
+      preLoaderRoute: typeof AuthenticatedSubscriptionsIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/students/pending': {
       id: '/_authenticated/students/pending'
       path: '/pending'
@@ -307,6 +327,7 @@ const AuthenticatedStudentsRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedStudentsRoute: typeof AuthenticatedStudentsRouteWithChildren
+  AuthenticatedSubscriptionsIdRoute: typeof AuthenticatedSubscriptionsIdRoute
   AuthenticatedSubscriptionsNewRoute: typeof AuthenticatedSubscriptionsNewRoute
   AuthenticatedSubscriptionsIndexRoute: typeof AuthenticatedSubscriptionsIndexRoute
 }
@@ -314,6 +335,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedStudentsRoute: AuthenticatedStudentsRouteWithChildren,
+  AuthenticatedSubscriptionsIdRoute: AuthenticatedSubscriptionsIdRoute,
   AuthenticatedSubscriptionsNewRoute: AuthenticatedSubscriptionsNewRoute,
   AuthenticatedSubscriptionsIndexRoute: AuthenticatedSubscriptionsIndexRoute,
 }
