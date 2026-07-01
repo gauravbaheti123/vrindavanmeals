@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
 import {
   UtensilsCrossed, LayoutDashboard, Users, Fingerprint, CalendarClock,
-  CreditCard, ClipboardList, BarChart3, Settings, ShieldCheck, LogOut,
+  CreditCard, ClipboardList, BarChart3, Settings, ShieldCheck, LogOut, Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,8 +25,9 @@ const NAV: NavItem[] = [
   { to: "/payments", label: "Payments", icon: CreditCard, show: (f) => f.isSuperAdmin || f.isManager || f.isCounterStaff || f.isAccountant },
   { to: "/attendance", label: "Attendance", icon: ClipboardList, show: (f) => f.isSuperAdmin || f.isManager || f.isCounterStaff },
   { to: "/reports", label: "Reports", icon: BarChart3, show: (f) => f.isSuperAdmin || f.isManager || f.isAccountant },
+  { to: "/import", label: "Import Data", icon: Upload, show: (f) => f.isSuperAdmin || f.isManager },
   { to: "/settings", label: "Settings", icon: Settings, show: (f) => f.isSuperAdmin },
-  { to: "/roles", label: "Users & Roles", icon: ShieldCheck, show: (f) => f.isSuperAdmin },
+  { to: "/users", label: "Users & Roles", icon: ShieldCheck, show: (f) => f.isSuperAdmin },
 ];
 
 export function AppShell() {
