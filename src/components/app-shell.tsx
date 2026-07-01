@@ -91,9 +91,6 @@ export function AppShell() {
       <main className="flex-1 flex flex-col min-w-0">
         <header className="h-14 border-b bg-card flex items-center px-4 md:px-6 justify-between">
           <div className="md:hidden font-semibold">Vrindavan Meals</div>
-          <div className="text-sm text-muted-foreground hidden md:block">
-            Signed in as <span className="font-medium text-foreground">{profile?.name || user?.email}</span>
-          </div>
           <Button variant="ghost" size="sm" className="md:hidden" onClick={signOut}>
             <LogOut className="h-4 w-4" />
           </Button>
