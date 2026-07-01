@@ -24,6 +24,7 @@ import { Route as AuthenticatedSubscriptionsIdRouteImport } from './routes/_auth
 import { Route as AuthenticatedStudentsPendingRouteImport } from './routes/_authenticated/students.pending'
 import { Route as AuthenticatedStudentsNewRouteImport } from './routes/_authenticated/students.new'
 import { Route as AuthenticatedStudentsIdRouteImport } from './routes/_authenticated/students.$id'
+import { Route as AuthenticatedPaymentsNewRouteImport } from './routes/_authenticated/payments.new'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -106,6 +107,12 @@ const AuthenticatedStudentsIdRoute = AuthenticatedStudentsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthenticatedStudentsRoute,
 } as any)
+const AuthenticatedPaymentsNewRoute =
+  AuthenticatedPaymentsNewRouteImport.update({
+    id: '/payments/new',
+    path: '/payments/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -114,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/students': typeof AuthenticatedStudentsRouteWithChildren
+  '/payments/new': typeof AuthenticatedPaymentsNewRoute
   '/students/$id': typeof AuthenticatedStudentsIdRoute
   '/students/new': typeof AuthenticatedStudentsNewRoute
   '/students/pending': typeof AuthenticatedStudentsPendingRoute
@@ -129,6 +137,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/payments/new': typeof AuthenticatedPaymentsNewRoute
   '/students/$id': typeof AuthenticatedStudentsIdRoute
   '/students/new': typeof AuthenticatedStudentsNewRoute
   '/students/pending': typeof AuthenticatedStudentsPendingRoute
@@ -147,6 +156,7 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/students': typeof AuthenticatedStudentsRouteWithChildren
+  '/_authenticated/payments/new': typeof AuthenticatedPaymentsNewRoute
   '/_authenticated/students/$id': typeof AuthenticatedStudentsIdRoute
   '/_authenticated/students/new': typeof AuthenticatedStudentsNewRoute
   '/_authenticated/students/pending': typeof AuthenticatedStudentsPendingRoute
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/dashboard'
     | '/students'
+    | '/payments/new'
     | '/students/$id'
     | '/students/new'
     | '/students/pending'
@@ -180,6 +191,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/dashboard'
+    | '/payments/new'
     | '/students/$id'
     | '/students/new'
     | '/students/pending'
@@ -197,6 +209,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/_authenticated/dashboard'
     | '/_authenticated/students'
+    | '/_authenticated/payments/new'
     | '/_authenticated/students/$id'
     | '/_authenticated/students/new'
     | '/_authenticated/students/pending'
@@ -322,6 +335,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedStudentsIdRouteImport
       parentRoute: typeof AuthenticatedStudentsRoute
     }
+    '/_authenticated/payments/new': {
+      id: '/_authenticated/payments/new'
+      path: '/payments/new'
+      fullPath: '/payments/new'
+      preLoaderRoute: typeof AuthenticatedPaymentsNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -347,6 +367,7 @@ const AuthenticatedStudentsRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedStudentsRoute: typeof AuthenticatedStudentsRouteWithChildren
+  AuthenticatedPaymentsNewRoute: typeof AuthenticatedPaymentsNewRoute
   AuthenticatedSubscriptionsIdRoute: typeof AuthenticatedSubscriptionsIdRoute
   AuthenticatedSubscriptionsNewRoute: typeof AuthenticatedSubscriptionsNewRoute
   AuthenticatedPaymentsIndexRoute: typeof AuthenticatedPaymentsIndexRoute
@@ -356,6 +377,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedStudentsRoute: AuthenticatedStudentsRouteWithChildren,
+  AuthenticatedPaymentsNewRoute: AuthenticatedPaymentsNewRoute,
   AuthenticatedSubscriptionsIdRoute: AuthenticatedSubscriptionsIdRoute,
   AuthenticatedSubscriptionsNewRoute: AuthenticatedSubscriptionsNewRoute,
   AuthenticatedPaymentsIndexRoute: AuthenticatedPaymentsIndexRoute,

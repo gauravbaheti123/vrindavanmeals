@@ -1,0 +1,251 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Pencil, Plus, Save } from "lucide-react";
+import { toast } from "sonner";
+import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
+
+export const Route = createFileRoute("/_authenticated/settings")({
+  head: () => ({ meta: [{ title: "Settings — Vrindavan Meals" }] }),
+  component: SettingsPage,
+});
+
+function SettingsPage() {
+  const { roles } = useCurrentUser();
+  const flags = roleFlags(roles);
+  if (!flags.isSuperAdmin) {
+    return (
+      <div className="max-w-md mx-auto mt-16 text-center space-y-2">
+        <h2 className="text-xl font-semibold">Restricted</h2>
+        <p className="text-muted-foreground">Only Super Admins can access Settings.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div>
+        <h1 className="text-3xl font-bold">Settings</h1>
+        <p className="text-muted-foreground">Manage system-wide preferences.</p>
+      </div>
+      <GeneralSettings />
+      <MealWindowsCard />
+      <UnitsCard />
+    </div>
+  );
+}
+
+function GeneralSettings() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["system-settings"],
+    queryFn: async () => {
+      const { data } = await supabase.from("system_settings").select("key,value");
+      return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
+    },
+  });
+  const [price, setPrice] = useState("");
+  const [grace, setGrace] = useState("");
+  const [warn, setWarn] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!data) return;
+    setPrice(data.subscription_price ?? "3000");
+    setGrace(data.grace_period_days ?? "5");
+    setWarn(data.expiry_warning_days ?? "5");
+  }, [data]);
+
+  async function save() {
+    setSaving(true);
+    const updates = [
+      { key: "subscription_price", value: price },
+      { key: "grace_period_days", value: grace },
+      { key: "expiry_warning_days", value: warn },
+    ];
+    const { error } = await supabase.from("system_settings").upsert(updates, { onConflict: "key" });
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Settings updated");
+    qc.invalidateQueries({ queryKey: ["system-settings"] });
+  }
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>General</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>Subscription Price (₹)</Label>
+            <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Grace Period (days)</Label>
+            <Input type="number" value={grace} onChange={(e) => setGrace(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Expiry Warning (days)</Label>
+            <Input type="number" value={warn} onChange={(e) => setWarn(e.target.value)} />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={save} disabled={saving}><Save className="h-4 w-4 mr-2" />{saving ? "Saving…" : "Save"}</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface Window { id: string; unit_id: string; meal_type: "lunch" | "dinner"; start_time: string; end_time: string; }
+
+function MealWindowsCard() {
+  const { data: units } = useQuery({
+    queryKey: ["units"],
+    queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
+  });
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Meal Windows</CardTitle></CardHeader>
+      <CardContent>
+        {units && units.length > 0 ? (
+          <Tabs defaultValue={units[0].id}>
+            <TabsList>
+              {units.map((u) => <TabsTrigger key={u.id} value={u.id}>{u.name}</TabsTrigger>)}
+            </TabsList>
+            {units.map((u) => (
+              <TabsContent key={u.id} value={u.id} className="mt-4">
+                <UnitMealWindows unitId={u.id} />
+              </TabsContent>
+            ))}
+          </Tabs>
+        ) : <p className="text-muted-foreground text-sm">No units configured.</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function UnitMealWindows({ unitId }: { unitId: string }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["meal-windows", unitId],
+    queryFn: async () => (await supabase.from("meal_windows").select("*").eq("unit_id", unitId)).data ?? [],
+  });
+  const [state, setState] = useState<Record<"lunch" | "dinner", { start: string; end: string }>>({
+    lunch: { start: "10:00", end: "14:00" },
+    dinner: { start: "18:00", end: "23:30" },
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!data) return;
+    const next = { ...state };
+    (data as Window[]).forEach((w) => {
+      next[w.meal_type] = { start: w.start_time.slice(0, 5), end: w.end_time.slice(0, 5) };
+    });
+    setState(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  async function save() {
+    setSaving(true);
+    for (const meal of ["lunch", "dinner"] as const) {
+      const { start, end } = state[meal];
+      await supabase.from("meal_windows").upsert(
+        { unit_id: unitId, meal_type: meal, start_time: start, end_time: end },
+        { onConflict: "unit_id,meal_type" },
+      );
+    }
+    setSaving(false);
+    toast.success("Meal windows updated");
+    qc.invalidateQueries({ queryKey: ["meal-windows", unitId] });
+  }
+
+  return (
+    <div className="space-y-4">
+      {(["lunch", "dinner"] as const).map((meal) => (
+        <div key={meal} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+          <div className="capitalize font-medium">{meal}</div>
+          <div className="space-y-2">
+            <Label>Start</Label>
+            <Input type="time" value={state[meal].start} onChange={(e) => setState({ ...state, [meal]: { ...state[meal], start: e.target.value } })} />
+          </div>
+          <div className="space-y-2">
+            <Label>End</Label>
+            <Input type="time" value={state[meal].end} onChange={(e) => setState({ ...state, [meal]: { ...state[meal], end: e.target.value } })} />
+          </div>
+        </div>
+      ))}
+      <div className="flex justify-end">
+        <Button onClick={save} disabled={saving}><Save className="h-4 w-4 mr-2" />{saving ? "Saving…" : "Save"}</Button>
+      </div>
+    </div>
+  );
+}
+
+function UnitsCard() {
+  const qc = useQueryClient();
+  const { data: units } = useQuery({
+    queryKey: ["units"],
+    queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
+  });
+  const [newName, setNewName] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  async function addUnit() {
+    if (!newName.trim()) return;
+    const { error } = await supabase.from("units").insert({ name: newName.trim() });
+    if (error) { toast.error(error.message); return; }
+    setNewName("");
+    toast.success("Unit added");
+    qc.invalidateQueries({ queryKey: ["units"] });
+  }
+
+  async function saveEdit() {
+    if (!editId || !editName.trim()) return;
+    const { error } = await supabase.from("units").update({ name: editName.trim() }).eq("id", editId);
+    if (error) { toast.error(error.message); return; }
+    setEditId(null);
+    toast.success("Unit updated");
+    qc.invalidateQueries({ queryKey: ["units"] });
+  }
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Units</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-2">
+          {units?.map((u) => (
+            <div key={u.id} className="flex items-center gap-2 border rounded-md px-3 py-2">
+              {editId === u.id ? (
+                <>
+                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="flex-1" />
+                  <Button size="sm" onClick={saveEdit}>Save</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditId(null)}>Cancel</Button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1 font-medium">{u.name}</span>
+                  <Button size="sm" variant="ghost" onClick={() => { setEditId(u.id); setEditName(u.name); }}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 pt-2 border-t">
+          <Input placeholder="New unit name" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <Button onClick={addUnit}><Plus className="h-4 w-4 mr-2" />Add Unit</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
