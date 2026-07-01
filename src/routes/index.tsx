@@ -251,13 +251,10 @@ function Contact() {
 function Footer() {
   return (
     <footer className="bg-brown text-white/80">
-      <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-center">
         <p className="text-sm">
           © 2026 Vrindavan Meals. All rights reserved.
         </p>
-        <Link to="/login" className="text-xs text-white/50 hover:text-white/80 transition-colors">
-          Staff Login
-        </Link>
       </div>
     </footer>
   );
