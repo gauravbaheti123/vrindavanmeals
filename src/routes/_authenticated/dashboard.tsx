@@ -73,6 +73,18 @@ function Dashboard() {
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Overview of canteen operations across all units.</p>
       </div>
+      {(unmappedToday ?? 0) > 0 && (
+        <Card className="border-destructive/50 bg-destructive/10">
+          <CardContent className="flex items-center gap-3 py-4">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <div className="flex-1">
+              <div className="font-semibold text-destructive">{unmappedToday} unmapped scan(s) today</div>
+              <div className="text-sm text-muted-foreground">Resolve them in Biometric Mapping.</div>
+            </div>
+            <a href="/biometric" className="text-sm text-primary underline">Resolve →</a>
+          </CardContent>
+        </Card>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((s) => (
           <Card key={s.label}>
