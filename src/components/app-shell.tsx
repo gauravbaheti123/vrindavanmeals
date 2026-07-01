@@ -79,8 +79,7 @@ export function AppShell() {
         </nav>
         <div className="p-3 border-t space-y-2">
           <div className="text-xs">
-            <div className="font-medium truncate">{profile?.name || user?.email}</div>
-            <div className="text-muted-foreground truncate">{user?.email}</div>
+            <div className="font-medium truncate">{profile?.name || "User"}</div>
             <Badge variant="secondary" className="mt-1 capitalize">{primaryRole.replace("_", " ")}</Badge>
           </div>
           <Button variant="outline" size="sm" className="w-full" onClick={signOut}>
