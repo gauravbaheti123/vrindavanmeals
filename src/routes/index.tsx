@@ -13,12 +13,6 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-const navLinks = [
-  { label: "Home", href: "#home" },
-  { label: "About", href: "#about" },
-  { label: "Menu", href: "#menu" },
-  { label: "Contact", href: "#contact" },
-];
 
 function scrollTo(id: string) {
   const el = document.querySelector(id);
