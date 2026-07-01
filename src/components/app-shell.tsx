@@ -99,7 +99,7 @@ export function AppShell() {
           {loading ? (
             <div className="text-muted-foreground">Loading…</div>
           ) : !flags.hasAny ? (
-            <NoRoleNotice email={user?.email} />
+            <NoRoleNotice />
           ) : (
             <Outlet />
           )}
@@ -109,7 +109,7 @@ export function AppShell() {
   );
 }
 
-function NoRoleNotice({ email }: { email?: string }) {
+function NoRoleNotice() {
   return (
     <div className="max-w-lg mx-auto mt-16 text-center space-y-3">
       <div className="mx-auto h-12 w-12 rounded-full bg-warning/20 grid place-items-center">
@@ -117,7 +117,7 @@ function NoRoleNotice({ email }: { email?: string }) {
       </div>
       <h2 className="text-xl font-semibold">Account pending role assignment</h2>
       <p className="text-muted-foreground">
-        Your account ({email}) has been created but no role has been assigned yet.
+        Your account has been created but no role has been assigned yet.
         Please ask a Super Admin to grant you access.
       </p>
     </div>
