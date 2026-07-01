@@ -30,7 +30,7 @@ const NAV: NavItem[] = [
 ];
 
 export function AppShell() {
-  const { user, profile, roles, loading } = useCurrentUser();
+  const { profile, roles, loading } = useCurrentUser();
   const flags = roleFlags(roles);
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -79,8 +79,7 @@ export function AppShell() {
         </nav>
         <div className="p-3 border-t space-y-2">
           <div className="text-xs">
-            <div className="font-medium truncate">{profile?.name || user?.email}</div>
-            <div className="text-muted-foreground truncate">{user?.email}</div>
+            <div className="font-medium truncate">{profile?.name || "User"}</div>
             <Badge variant="secondary" className="mt-1 capitalize">{primaryRole.replace("_", " ")}</Badge>
           </div>
           <Button variant="outline" size="sm" className="w-full" onClick={signOut}>
@@ -92,9 +91,6 @@ export function AppShell() {
       <main className="flex-1 flex flex-col min-w-0">
         <header className="h-14 border-b bg-card flex items-center px-4 md:px-6 justify-between">
           <div className="md:hidden font-semibold">Vrindavan Meals</div>
-          <div className="text-sm text-muted-foreground hidden md:block">
-            Signed in as <span className="font-medium text-foreground">{profile?.name || user?.email}</span>
-          </div>
           <Button variant="ghost" size="sm" className="md:hidden" onClick={signOut}>
             <LogOut className="h-4 w-4" />
           </Button>
@@ -103,7 +99,7 @@ export function AppShell() {
           {loading ? (
             <div className="text-muted-foreground">Loading…</div>
           ) : !flags.hasAny ? (
-            <NoRoleNotice email={user?.email} />
+            <NoRoleNotice />
           ) : (
             <Outlet />
           )}
@@ -113,7 +109,7 @@ export function AppShell() {
   );
 }
 
-function NoRoleNotice({ email }: { email?: string }) {
+function NoRoleNotice() {
   return (
     <div className="max-w-lg mx-auto mt-16 text-center space-y-3">
       <div className="mx-auto h-12 w-12 rounded-full bg-warning/20 grid place-items-center">
@@ -121,7 +117,7 @@ function NoRoleNotice({ email }: { email?: string }) {
       </div>
       <h2 className="text-xl font-semibold">Account pending role assignment</h2>
       <p className="text-muted-foreground">
-        Your account ({email}) has been created but no role has been assigned yet.
+        Your account has been created but no role has been assigned yet.
         Please ask a Super Admin to grant you access.
       </p>
     </div>
