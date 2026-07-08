@@ -284,7 +284,96 @@ type Parsed = {
   skippedSubs: number;
 };
 
+function isoOnly(v: any): string | null {
+  if (v == null || v === "") return null;
+  const s = String(v).trim();
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  return excelDateToISO(v);
+}
+
+function parseCleanWorkbook(
+  fileName: string,
+  wb: XLSX.WorkBook,
+  studentsSheet: string,
+  paymentsSheet: string,
+  subsSheet: string,
+): Parsed {
+  const sRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[studentsSheet], { raw: true, defval: null });
+  const pRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[paymentsSheet], { raw: true, defval: null });
+  const subRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[subsSheet], { raw: true, defval: null });
+
+  const students: any[] = [];
+  let skippedStudents = 0;
+  for (const r of sRows) {
+    const name = String(r["STUDENT NAME"] ?? r["Student Name"] ?? "").trim();
+    const messNo = padMess(r["MESS NO"] ?? r["Mess No"]);
+    if (!name || !messNo) { skippedStudents++; continue; }
+    const room = r["ROOM NO"] != null && String(r["ROOM NO"]).trim() !== ""
+      ? String(r["ROOM NO"]).trim() : null;
+    const mobileRaw = r["MOBILE"] ?? r["Mobile"];
+    const mobile = mobileRaw ? String(mobileRaw).replace(/\D/g, "").slice(-10) : null;
+    const status = String(r["STATUS"] ?? "").trim().toLowerCase();
+    students.push({
+      mess_no: messNo,
+      full_name: titleCase(name),
+      mobile: mobile || null,
+      hostel_room: room,
+      joining_date: isoOnly(r["JOINING DATE"]),
+      exit_date: isoOnly(r["EXIT DATE"]),
+      is_inactive: status === "inactive",
+    });
+  }
+
+  const payments: any[] = [];
+  let skippedPayments = 0;
+  for (const r of pRows) {
+    const messNo = padMess(r["MESS NO"] ?? r["Mess No"]);
+    const amount = Number(r["AMOUNT"] ?? r["Amount"]);
+    const paidAt = isoOnly(r["PAYMENT DATE"] ?? r["Date"]);
+    if (!messNo || !paidAt || !amount || isNaN(amount) || amount <= 0) { skippedPayments++; continue; }
+    const modeRaw = String(r["PAYMENT MODE"] ?? "").trim().toLowerCase();
+    const mode: "cash" | "upi" | "card" | "razorpay" =
+      modeRaw === "cash" ? "cash" : modeRaw === "card" ? "card" : modeRaw === "razorpay" ? "razorpay" : "upi";
+    const remarks = r["REMARKS"];
+    payments.push({
+      mess_no: messNo,
+      amount,
+      mode,
+      paid_at: paidAt,
+      reference_note: remarks != null && remarks !== "" ? String(remarks).trim() : null,
+    });
+  }
+
+  const subscriptions: any[] = [];
+  let skippedSubs = 0;
+  for (const r of subRows) {
+    const messNo = padMess(r["MESS NO"] ?? r["Mess No"]);
+    const start = isoOnly(r["START DATE"]);
+    if (!messNo || !start) { skippedSubs++; continue; }
+    const end = isoOnly(r["END DATE"]);
+    const subStatus = String(r["SUB STATUS"] ?? "").trim().toLowerCase();
+    const inactive = subStatus === "expired" || subStatus === "inactive" || subStatus === "closed";
+    subscriptions.push({
+      mess_no: messNo,
+      start_date: start,
+      end_date: end,
+      is_inactive: inactive,
+    });
+  }
+
+  return {
+    fileName,
+    students, subscriptions, payments,
+    masterRaw: sRows.length,
+    receiptsRaw: pRows.length,
+    ledgerRaw: subRows.length,
+    skippedStudents, skippedPayments, skippedSubs,
+  };
+}
+
 function parseWorkbook(file: File): Promise<Parsed> {
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Failed to read file"));
