@@ -483,7 +483,7 @@ function ExcelWorkbookTab() {
               </div>
               <Button variant="outline" onClick={() => {
                 const rows = [["section", "row", "reason"], ...result.errors.map((e: any) => [e.section, String(e.row), e.reason])];
-                const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+                const csv = rows.map((r) => r.map((c: string) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
                 const blob = new Blob([csv], { type: "text/csv" });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
