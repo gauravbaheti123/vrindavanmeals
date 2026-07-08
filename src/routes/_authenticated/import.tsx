@@ -294,7 +294,10 @@ function parseWorkbook(file: File): Promise<Parsed> {
         if (!mName) throw new Error("Sheet 'Master' not found");
 
         const master = mName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[mName], { raw: true, defval: null }) : [];
-        const receipts = rName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[rName], { raw: true, defval: null }) : [];
+        const receiptsAoA: any[][] = rName
+          ? XLSX.utils.sheet_to_json(wb.Sheets[rName], { header: 1, raw: true, defval: null })
+          : [];
+
         const ledger = lName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[lName], { raw: true, defval: null }) : [];
 
         // ---- students from Master ----
