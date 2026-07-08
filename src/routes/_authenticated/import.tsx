@@ -288,19 +288,29 @@ function parseWorkbook(file: File): Promise<Parsed> {
         const wb = XLSX.read(reader.result as ArrayBuffer, { type: "array" });
         const findSheet = (name: string) =>
           wb.SheetNames.find((n) => n.trim().toLowerCase() === name.toLowerCase());
+
+        // ---------- Clean format detection ----------
+        // New "Vrindavan_Meals_Clean.xlsx": sheets Students / Payments / Subscriptions
+        const cleanStudents = findSheet("Students");
+        const cleanPayments = findSheet("Payments");
+        const cleanSubs = findSheet("Subscriptions");
+        if (cleanStudents && cleanPayments && cleanSubs) {
+          resolve(parseCleanWorkbook(file.name, wb, cleanStudents, cleanPayments, cleanSubs));
+          return;
+        }
+
+        // ---------- Legacy format (Master / Receipts / STUDENT LEDGER) ----------
         const mName = findSheet("Master");
         const rName = findSheet("Receipts");
         const lName = findSheet("STUDENT LEDGER") ?? findSheet("Student Ledger");
-        if (!mName) throw new Error("Sheet 'Master' not found");
+        if (!mName) throw new Error("No recognised sheets. Expected either Students/Payments/Subscriptions (clean) or Master/Receipts/STUDENT LEDGER (legacy).");
 
         const master = mName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[mName], { raw: true, defval: null }) : [];
         const receiptsAoA: any[][] = rName
           ? XLSX.utils.sheet_to_json(wb.Sheets[rName], { header: 1, raw: true, defval: null })
           : [];
-
         const ledger = lName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[lName], { raw: true, defval: null }) : [];
 
-        // ---- students from Master ----
         const students: any[] = [];
         let skippedStudents = 0;
         for (const row of master) {
@@ -324,7 +334,6 @@ function parseWorkbook(file: File): Promise<Parsed> {
           });
         }
 
-        // ---- subscriptions from LEDGER (fallback to master joining/exit) ----
         const subscriptions: any[] = [];
         let skippedSubs = 0;
         const source = ledger.length ? ledger : master;
@@ -345,10 +354,9 @@ function parseWorkbook(file: File): Promise<Parsed> {
           });
         }
 
-        // ---- payments from Receipts (index-based access; header row skipped) ----
         const payments: any[] = [];
         let skippedPayments = 0;
-        const receiptRows = receiptsAoA.slice(1); // skip header row
+        const receiptRows = receiptsAoA.slice(1);
         for (const row of receiptRows) {
           if (!row || row.every((c) => c == null || c === "")) { skippedPayments++; continue; }
           const dateCell = row[0];
@@ -356,29 +364,19 @@ function parseWorkbook(file: File): Promise<Parsed> {
           const amountCell = row[3];
           const modeRaw = row[10];
           const remarks = row[11];
-
-          // header repeats / blank mess no
           if (messRaw == null || messRaw === "") { skippedPayments++; continue; }
           const messStr = String(messRaw).trim();
           if (messStr.toLowerCase() === "mess no" || messStr.toLowerCase() === "mess no.") { skippedPayments++; continue; }
-
-          // amount validation
           if (amountCell == null || amountCell === "") { skippedPayments++; continue; }
           if (typeof amountCell === "string" && /#(NUM|N\/A|VALUE|REF|DIV|NAME)/i.test(amountCell)) { skippedPayments++; continue; }
           const amount = Number(amountCell);
           if (isNaN(amount) || amount <= 0) { skippedPayments++; continue; }
-
           const messNo = padMess(messStr);
           if (!messNo) { skippedPayments++; continue; }
-
           const paidAt = excelDateToISO(dateCell);
           if (!paidAt) { skippedPayments++; continue; }
-
           payments.push({
-            mess_no: messNo,
-            amount,
-            mode: normalizeMode(modeRaw),
-            paid_at: paidAt,
+            mess_no: messNo, amount, mode: normalizeMode(modeRaw), paid_at: paidAt,
             reference_note: remarks != null && remarks !== "" ? String(remarks).trim() : null,
           });
         }
@@ -388,11 +386,11 @@ function parseWorkbook(file: File): Promise<Parsed> {
           students, subscriptions, payments,
           masterRaw: master.length,
           receiptsRaw: receiptsAoA.length > 0 ? receiptsAoA.length - 1 : 0,
-
           ledgerRaw: ledger.length,
           skippedStudents, skippedPayments, skippedSubs,
         });
       } catch (e: any) {
+
         reject(e);
       }
     };
