@@ -294,7 +294,10 @@ function parseWorkbook(file: File): Promise<Parsed> {
         if (!mName) throw new Error("Sheet 'Master' not found");
 
         const master = mName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[mName], { raw: true, defval: null }) : [];
-        const receipts = rName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[rName], { raw: true, defval: null }) : [];
+        const receiptsAoA: any[][] = rName
+          ? XLSX.utils.sheet_to_json(wb.Sheets[rName], { header: 1, raw: true, defval: null })
+          : [];
+
         const ledger = lName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[lName], { raw: true, defval: null }) : [];
 
         // ---- students from Master ----
@@ -342,21 +345,41 @@ function parseWorkbook(file: File): Promise<Parsed> {
           });
         }
 
-        // ---- payments from Receipts ----
+        // ---- payments from Receipts (index-based access; header row skipped) ----
         const payments: any[] = [];
         let skippedPayments = 0;
-        for (const row of receipts) {
-          const messNo = padMess(row["Mess No"] ?? row["Mess no"]);
-          const amount = Number(row["Amount Received"] ?? row["Amount"]);
-          if (!messNo || !amount || isNaN(amount) || amount <= 0) { skippedPayments++; continue; }
-          const paidAt = excelDateToISO(row["Date"]);
+        const receiptRows = receiptsAoA.slice(1); // skip header row
+        for (const row of receiptRows) {
+          if (!row || row.every((c) => c == null || c === "")) { skippedPayments++; continue; }
+          const dateCell = row[0];
+          const messRaw = row[1];
+          const amountCell = row[3];
+          const modeRaw = row[10];
+          const remarks = row[11];
+
+          // header repeats / blank mess no
+          if (messRaw == null || messRaw === "") { skippedPayments++; continue; }
+          const messStr = String(messRaw).trim();
+          if (messStr.toLowerCase() === "mess no" || messStr.toLowerCase() === "mess no.") { skippedPayments++; continue; }
+
+          // amount validation
+          if (amountCell == null || amountCell === "") { skippedPayments++; continue; }
+          if (typeof amountCell === "string" && /#(NUM|N\/A|VALUE|REF|DIV|NAME)/i.test(amountCell)) { skippedPayments++; continue; }
+          const amount = Number(amountCell);
+          if (isNaN(amount) || amount <= 0) { skippedPayments++; continue; }
+
+          const messNo = padMess(messStr);
+          if (!messNo) { skippedPayments++; continue; }
+
+          const paidAt = excelDateToISO(dateCell);
           if (!paidAt) { skippedPayments++; continue; }
+
           payments.push({
             mess_no: messNo,
             amount,
-            mode: normalizeMode(row["TO"] ?? row["Mode"] ?? row["Payment Mode"]),
+            mode: normalizeMode(modeRaw),
             paid_at: paidAt,
-            reference_note: row["Remarks"] ? String(row["Remarks"]).trim() : null,
+            reference_note: remarks != null && remarks !== "" ? String(remarks).trim() : null,
           });
         }
 
@@ -364,7 +387,8 @@ function parseWorkbook(file: File): Promise<Parsed> {
           fileName: file.name,
           students, subscriptions, payments,
           masterRaw: master.length,
-          receiptsRaw: receipts.length,
+          receiptsRaw: receiptsAoA.length > 0 ? receiptsAoA.length - 1 : 0,
+
           ledgerRaw: ledger.length,
           skippedStudents, skippedPayments, skippedSubs,
         });
