@@ -69,13 +69,15 @@ function ImportPage() {
         <AlertTriangle className="h-4 w-4" />
         <AlertDescription>This action cannot be undone. Please download a database backup before importing large datasets.</AlertDescription>
       </Alert>
-      <Tabs defaultValue="students">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+      <Tabs defaultValue="excel">
+        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+          <TabsTrigger value="excel">Excel Workbook</TabsTrigger>
           <TabsTrigger value="students">Students</TabsTrigger>
           <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
         </TabsList>
+        <TabsContent value="excel"><ExcelWorkbookTab /></TabsContent>
         <TabsContent value="students"><ImportTab kind="students" fn={importStudents} /></TabsContent>
         <TabsContent value="subscriptions"><ImportTab kind="subscriptions" fn={importSubscriptions} /></TabsContent>
         <TabsContent value="payments"><ImportTab kind="payments" fn={importPayments} /></TabsContent>
@@ -85,6 +87,7 @@ function ImportPage() {
     </div>
   );
 }
+
 
 function downloadCsv(name: string, rows: string[][]) {
   const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
