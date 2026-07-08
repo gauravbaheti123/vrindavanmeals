@@ -253,10 +253,15 @@ function titleCase(s: string): string {
 
 function padMess(n: any): string | null {
   if (n == null || n === "") return null;
-  const num = Number(String(n).trim());
+  const s = String(n).trim();
+  // Already MESS-001 style?
+  const m = s.match(/^MESS[-_ ]?(\d+)$/i);
+  if (m) return `MESS-${m[1].padStart(3, "0")}`;
+  const num = Number(s);
   if (isNaN(num)) return null;
   return `MESS-${String(num).padStart(3, "0")}`;
 }
+
 
 function normalizeMode(v: any): "cash" | "upi" | "card" | "razorpay" {
   const s = String(v || "").toLowerCase();
