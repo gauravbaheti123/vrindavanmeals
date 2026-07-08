@@ -225,3 +225,290 @@ function ImportHistory() {
     </Card>
   );
 }
+
+// ============ Excel Workbook (multi-sheet legacy format) ============
+
+function excelDateToISO(serial: any): string | null {
+  if (serial == null || serial === "") return null;
+  if (typeof serial === "string") {
+    const s = serial.trim();
+    const dm = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (dm) return `${dm[3]}-${dm[2].padStart(2, "0")}-${dm[1].padStart(2, "0")}`;
+    const ym = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (ym) return `${ym[1]}-${ym[2].padStart(2, "0")}-${ym[3].padStart(2, "0")}`;
+    const n = Number(s);
+    if (!isNaN(n) && n > 20000 && n < 80000) serial = n;
+    else return null;
+  }
+  if (typeof serial !== "number" || isNaN(serial)) return null;
+  const ms = Math.round((serial - 25569) * 86400 * 1000);
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function titleCase(s: string): string {
+  return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function padMess(n: any): string | null {
+  if (n == null || n === "") return null;
+  const num = Number(String(n).trim());
+  if (isNaN(num)) return null;
+  return `MESS-${String(num).padStart(3, "0")}`;
+}
+
+function normalizeMode(v: any): "cash" | "upi" | "card" | "razorpay" {
+  const s = String(v || "").toLowerCase();
+  if (s.includes("cash")) return "cash";
+  if (s.includes("card")) return "card";
+  if (s.includes("razor")) return "razorpay";
+  return "upi";
+}
+
+type Parsed = {
+  fileName: string;
+  students: any[];
+  subscriptions: any[];
+  payments: any[];
+  masterRaw: number;
+  receiptsRaw: number;
+  ledgerRaw: number;
+  skippedStudents: number;
+  skippedPayments: number;
+  skippedSubs: number;
+};
+
+function parseWorkbook(file: File): Promise<Parsed> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.onload = () => {
+      try {
+        const wb = XLSX.read(reader.result as ArrayBuffer, { type: "array" });
+        const findSheet = (name: string) =>
+          wb.SheetNames.find((n) => n.trim().toLowerCase() === name.toLowerCase());
+        const mName = findSheet("Master");
+        const rName = findSheet("Receipts");
+        const lName = findSheet("STUDENT LEDGER") ?? findSheet("Student Ledger");
+        if (!mName) throw new Error("Sheet 'Master' not found");
+
+        const master = mName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[mName], { raw: true, defval: null }) : [];
+        const receipts = rName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[rName], { raw: true, defval: null }) : [];
+        const ledger = lName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[lName], { raw: true, defval: null }) : [];
+
+        // ---- students from Master ----
+        const students: any[] = [];
+        let skippedStudents = 0;
+        for (const row of master) {
+          const name = String(row["Student Name"] ?? row["Name"] ?? "").trim();
+          const messNo = padMess(row["Mess No"] ?? row["Mess no"]);
+          if (!name || !messNo) { skippedStudents++; continue; }
+          const roomRaw = row["Room No"];
+          const room = roomRaw == null || String(roomRaw).trim().toLowerCase() === "no"
+            ? null : String(roomRaw).trim();
+          const mobileRaw = row["Mobile no"] ?? row["Mobile No"] ?? row["Mobile"];
+          const mobile = mobileRaw ? String(mobileRaw).replace(/\D/g, "").slice(-10) : null;
+          const inactive = String(row["Inactive"] ?? "").trim().toLowerCase() === "inactive";
+          students.push({
+            mess_no: messNo,
+            full_name: titleCase(name),
+            mobile: mobile || null,
+            hostel_room: room,
+            joining_date: excelDateToISO(row["Joining Date"]),
+            exit_date: excelDateToISO(row["Exit Date"]),
+            is_inactive: inactive,
+          });
+        }
+
+        // ---- subscriptions from LEDGER (fallback to master joining/exit) ----
+        const subscriptions: any[] = [];
+        let skippedSubs = 0;
+        const source = ledger.length ? ledger : master;
+        for (const row of source) {
+          const name = String(row["Name"] ?? row["Student Name"] ?? "").trim();
+          const messNo = padMess(row["Mess No"] ?? row["Mess no"]);
+          if (!name || !messNo) { skippedSubs++; continue; }
+          const start = excelDateToISO(row["Date of Admission"] ?? row["Joining Date"]);
+          if (!start) { skippedSubs++; continue; }
+          const end = excelDateToISO(row["Date of Exit"] ?? row["Exit Date"]);
+          const statusRaw = String(row["Status"] ?? row["Inactive"] ?? "").trim().toLowerCase();
+          const inactive = statusRaw.includes("inactive") || statusRaw === "closed";
+          subscriptions.push({
+            mess_no: messNo,
+            start_date: start,
+            end_date: end,
+            is_inactive: inactive,
+          });
+        }
+
+        // ---- payments from Receipts ----
+        const payments: any[] = [];
+        let skippedPayments = 0;
+        for (const row of receipts) {
+          const messNo = padMess(row["Mess No"] ?? row["Mess no"]);
+          const amount = Number(row["Amount Received"] ?? row["Amount"]);
+          if (!messNo || !amount || isNaN(amount) || amount <= 0) { skippedPayments++; continue; }
+          const paidAt = excelDateToISO(row["Date"]);
+          if (!paidAt) { skippedPayments++; continue; }
+          payments.push({
+            mess_no: messNo,
+            amount,
+            mode: normalizeMode(row["TO"] ?? row["Mode"] ?? row["Payment Mode"]),
+            paid_at: paidAt,
+            reference_note: row["Remarks"] ? String(row["Remarks"]).trim() : null,
+          });
+        }
+
+        resolve({
+          fileName: file.name,
+          students, subscriptions, payments,
+          masterRaw: master.length,
+          receiptsRaw: receipts.length,
+          ledgerRaw: ledger.length,
+          skippedStudents, skippedPayments, skippedSubs,
+        });
+      } catch (e: any) {
+        reject(e);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function ExcelWorkbookTab() {
+  const [parsed, setParsed] = useState<Parsed | null>(null);
+  const [result, setResult] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const runFn = useServerFn(importExcelWorkbook);
+
+  const runImport = useMutation({
+    mutationFn: async () => {
+      if (!parsed) throw new Error("Nothing to import");
+      return runFn({
+        data: {
+          file_name: parsed.fileName,
+          students: parsed.students,
+          subscriptions: parsed.subscriptions,
+          payments: parsed.payments,
+        },
+      });
+    },
+    onSuccess: (res: any) => {
+      setResult(res);
+      toast.success(`Import complete — ${res.summary.students.imported} students, ${res.summary.payments.imported} payments`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  async function onFile(f: File) {
+    setBusy(true); setResult(null); setParsed(null);
+    try {
+      const p = await parseWorkbook(f);
+      setParsed(p);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="mt-4"><CardContent className="p-6 space-y-4">
+      <div className="flex items-center gap-2">
+        <label className="inline-flex">
+          <input type="file" accept=".xlsx,.xls" className="hidden"
+            onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+          <Button variant="secondary" asChild>
+            <span>
+              {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 mr-2" />}
+              {parsed ? parsed.fileName : "Upload Vrindavan_Meals.xlsx"}
+            </span>
+          </Button>
+        </label>
+        <span className="text-xs text-muted-foreground">Expected sheets: Master, Receipts, STUDENT LEDGER</span>
+      </div>
+
+      {parsed && !result && (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            <PanelStat label="Master (Students)" total={parsed.masterRaw} valid={parsed.students.length} skipped={parsed.skippedStudents} />
+            <PanelStat label="Receipts (Payments)" total={parsed.receiptsRaw} valid={parsed.payments.length} skipped={parsed.skippedPayments} />
+            <PanelStat label="Ledger (Subscriptions)" total={parsed.ledgerRaw} valid={parsed.subscriptions.length} skipped={parsed.skippedSubs} />
+          </div>
+
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Import order: <strong>Students → Subscriptions → Payments</strong>. All students assigned to Unit 1 by default.
+              Existing students (matched by Mess No) will be skipped, not overwritten.
+            </AlertDescription>
+          </Alert>
+
+          <div className="flex gap-2">
+            <Button onClick={() => runImport.mutate()} disabled={runImport.isPending}>
+              {runImport.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Confirm Import
+            </Button>
+            <Button variant="ghost" onClick={() => setParsed(null)}>Cancel</Button>
+          </div>
+        </>
+      )}
+
+      {result && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <ResultBox icon={CheckCircle2} label="Students imported" value={`${result.summary.students.imported} / ${result.summary.students.total}`} color="text-emerald-600" />
+            <ResultBox icon={CheckCircle2} label="Subscriptions" value={`${result.summary.subscriptions.imported} / ${result.summary.subscriptions.total}`} color="text-emerald-600" />
+            <ResultBox icon={CheckCircle2} label="Payments" value={`${result.summary.payments.imported} / ${result.summary.payments.total}`} color="text-emerald-600" />
+            <ResultBox icon={CheckCircle2} label="Total collected" value={`₹${Number(result.summary.payments.total_amount).toLocaleString("en-IN")}`} color="text-emerald-600" />
+          </div>
+
+          {result.errors?.length > 0 && (
+            <>
+              <div className="text-sm font-medium">Errors ({result.errors.length}):</div>
+              <div className="border rounded-md overflow-auto max-h-60">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Section</TableHead><TableHead>Row</TableHead><TableHead>Reason</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {result.errors.slice(0, 100).map((e: any, i: number) => (
+                      <TableRow key={i}>
+                        <TableCell className="capitalize">{e.section}</TableCell>
+                        <TableCell>{e.row}</TableCell>
+                        <TableCell className="text-xs">{e.reason}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <Button variant="outline" onClick={() => {
+                const rows = [["section", "row", "reason"], ...result.errors.map((e: any) => [e.section, String(e.row), e.reason])];
+                const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+                const blob = new Blob([csv], { type: "text/csv" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = "excel-import-errors.csv"; a.click();
+                URL.revokeObjectURL(url);
+              }}><Download className="h-4 w-4 mr-2" />Download Error CSV</Button>
+            </>
+          )}
+          <Button variant="ghost" onClick={() => { setParsed(null); setResult(null); }}>Import Another File</Button>
+        </div>
+      )}
+    </CardContent></Card>
+  );
+}
+
+function PanelStat({ label, total, valid, skipped }: { label: string; total: number; valid: number; skipped: number }) {
+  return (
+    <div className="border rounded-md p-4">
+      <div className="text-xs text-muted-foreground uppercase tracking-wide">{label}</div>
+      <div className="text-2xl font-bold mt-1">{total} <span className="text-sm font-normal text-muted-foreground">rows</span></div>
+      <div className="text-xs mt-2 space-x-3">
+        <span className="text-emerald-600">✓ {valid} valid</span>
+        <span className="text-amber-600">⚠ {skipped} skipped</span>
+      </div>
+    </div>
+  );
+}
+
