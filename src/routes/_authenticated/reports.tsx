@@ -742,7 +742,7 @@ function AttendanceTrend({ from, to, unit }: { from: string; to: string; unit: s
       if (unit !== "all") q = q.eq("unit_id", unit);
       const rows = (await q).data ?? [];
       const map = new Map<string, { date: string; lunch: number; dinner: number }>();
-      rows.forEach((r) => { const cur = map.get(r.scan_date) ?? { date: r.scan_date, lunch: 0, dinner: 0 }; if (r.meal_type === "lunch") cur.lunch++; else cur.dinner++; map.set(r.scan_date, cur); });
+      rows.forEach((r) => { if (!r.scan_date) return; const cur = map.get(r.scan_date) ?? { date: r.scan_date, lunch: 0, dinner: 0 }; if (r.meal_type === "lunch") cur.lunch++; else cur.dinner++; map.set(r.scan_date, cur); });
       return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
     },
   });
