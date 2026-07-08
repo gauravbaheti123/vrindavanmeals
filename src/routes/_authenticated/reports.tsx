@@ -443,7 +443,7 @@ function NoShowReport({ from, to, unit }: { from: string; to: string; unit: stri
       const subs = (await sq).data ?? [];
       const { data: att } = await supabase.from("attendance").select("student_id, scan_date").gte("scan_date", from).lte("scan_date", to);
       const lastByStudent = new Map<string, string>();
-      (att ?? []).forEach((a) => { const cur = lastByStudent.get(a.student_id); if (!cur || a.scan_date > cur) lastByStudent.set(a.student_id, a.scan_date); });
+      (att ?? []).forEach((a) => { if (!a.scan_date) return; const cur = lastByStudent.get(a.student_id); if (!cur || a.scan_date > cur) lastByStudent.set(a.student_id, a.scan_date); });
       const attended = new Set((att ?? []).map((a) => a.student_id));
       return subs.filter((s) => !attended.has(s.student_id)).map((s) => ({ ...s, last: lastByStudent.get(s.student_id) ?? null }));
     },
