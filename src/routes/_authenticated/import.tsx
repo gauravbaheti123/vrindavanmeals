@@ -371,11 +371,44 @@ function parseCleanWorkbook(
   return {
     fileName,
     students, subscriptions, payments,
+    openingBalances: [],
+    openingAsOf: null,
     masterRaw: sRows.length,
     receiptsRaw: pRows.length,
     ledgerRaw: subRows.length,
+    openingRaw: 0,
     skippedStudents, skippedPayments, skippedSubs,
+    skippedOpening: 0,
   };
+}
+
+function parseOpeningBalanceSheet(
+  wb: XLSX.WorkBook,
+  sheetName: string,
+): { rows: OpeningBalance[]; raw: number; skipped: number; asOf: string | null } {
+  // Extract "as of DD MMM YYYY" from sheet name
+  const asOfMatch = sheetName.match(/as\s+of\s+([\d]{1,2})\s*([A-Za-z]+)\s*(\d{4})/i);
+  let asOf: string | null = null;
+  if (asOfMatch) {
+    const months: Record<string, string> = {
+      jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+      jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+    };
+    const m = months[asOfMatch[2].slice(0, 3).toLowerCase()];
+    if (m) asOf = `${asOfMatch[3]}-${m}-${asOfMatch[1].padStart(2, "0")}`;
+  }
+  const raw = XLSX.utils.sheet_to_json<any>(wb.Sheets[sheetName], { raw: true, defval: null });
+  const rows: OpeningBalance[] = [];
+  let skipped = 0;
+  for (const r of raw) {
+    const messNo = padMess(r["MESS NO"] ?? r["Mess No"] ?? r["mess_no"]);
+    const balRaw = r["OPENING BALANCE"] ?? r["Opening Balance"] ?? r["BALANCE"] ?? r["Balance"] ?? r["DUE"] ?? r["Due"];
+    if (!messNo || balRaw == null || balRaw === "") { skipped++; continue; }
+    const bal = Number(balRaw);
+    if (isNaN(bal)) { skipped++; continue; }
+    rows.push({ mess_no: messNo, opening_balance: bal, as_of: asOf ?? new Date().toISOString().slice(0, 10) });
+  }
+  return { rows, raw: raw.length, skipped, asOf };
 }
 
 function parseWorkbook(file: File): Promise<Parsed> {
