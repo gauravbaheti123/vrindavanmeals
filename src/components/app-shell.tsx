@@ -90,9 +90,9 @@ export function AppShell() {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 border-b bg-card flex items-center px-4 md:px-6 justify-between">
-          <div className="md:hidden font-semibold">Vrindavan Meals</div>
-          <Button variant="ghost" size="sm" className="md:hidden" onClick={signOut}>
+        <header className="md:hidden h-14 border-b bg-card flex items-center px-4 justify-between">
+          <div className="font-semibold">Vrindavan Meals</div>
+          <Button variant="ghost" size="sm" onClick={signOut}>
             <LogOut className="h-4 w-4" />
           </Button>
         </header>
