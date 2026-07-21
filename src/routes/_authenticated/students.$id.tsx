@@ -16,9 +16,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Fingerprint, Pencil, Printer, Plus, Trash2, IndianRupee, X } from "lucide-react";
+import { ArrowLeft, Fingerprint, Pencil, Printer, Plus, Trash2, IndianRupee, X, FileText, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
+import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from "@/lib/billing";
+import { generateNocPdf } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/_authenticated/students/$id")({
