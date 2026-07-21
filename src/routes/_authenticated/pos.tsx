@@ -112,10 +112,13 @@ function POSPage() {
     if (cart.length === 0) return toast.error("Cart is empty");
     if (!paymentMode) return toast.error("Select payment mode");
     setSaving(true);
+    const { data: userData } = await db.auth.getUser();
+    const uid = userData.user?.id;
+    if (!uid) { setSaving(false); return toast.error("Not signed in"); }
     const { data: sale, error } = await db.from("pos_sales").insert({
       subtotal, discount_type: discountType, discount_value: Number(discountValue) || 0,
       discount_amount: discountAmount, tax_rate: taxRate, tax_amount: taxAmount,
-      total, payment_mode: paymentMode,
+      total, payment_mode: paymentMode, cashier_id: uid,
     }).select("id, sale_number").single();
     if (error || !sale) { setSaving(false); return toast.error(error?.message ?? "Sale failed"); }
     const saleRow = sale as unknown as { id: string; sale_number: number };
