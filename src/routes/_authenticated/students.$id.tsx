@@ -264,7 +264,18 @@ function StudentDetail() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.pays.length === 0 ? (
+              {summary.opening > 0 && (
+                <TableRow className="bg-muted/40">
+                  <TableCell className="text-sm">{summary.openingAsOf ? new Date(summary.openingAsOf).toLocaleDateString("en-IN") : "—"}</TableCell>
+                  <TableCell className="text-sm italic">Opening Balance</TableCell>
+                  <TableCell><Badge variant="secondary">carry-forward</Badge></TableCell>
+                  <TableCell className="text-xs text-muted-foreground">Imported</TableCell>
+                  <TableCell className="text-right font-semibold">{inr(summary.opening)}</TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                  <TableCell className="print:hidden" />
+                </TableRow>
+              )}
+              {data.pays.length === 0 && summary.opening <= 0 ? (
                 <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No payments yet.</TableCell></TableRow>
               ) : (() => {
                 let running = 0;
