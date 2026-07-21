@@ -7,8 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pencil, Plus, Save, Upload, Fingerprint, Users, ChevronRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Pencil, Plus, Save, Upload, Fingerprint, Users, ChevronRight, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
 
@@ -37,7 +36,6 @@ function SettingsPage() {
       </div>
       <PortalModulesCard />
       <GeneralSettings />
-      <PosMastersCard />
       <BrandingCard />
       <MealWindowsCard />
       <UnitsCard />
@@ -45,6 +43,7 @@ function SettingsPage() {
     </div>
   );
 }
+
 
 
 function BrandingCard() {
@@ -227,6 +226,7 @@ function PortalModulesCard() {
     { title: "Import Data", desc: "Bulk upload students, subscriptions, payments, attendance", icon: Upload, to: "/import" },
     { title: "Biometric Mapping", desc: "Map biometric IDs to students", icon: Fingerprint, to: "/biometric" },
     { title: "Users & Roles", desc: "Manage staff and role permissions", icon: Users, to: "/users" },
+    { title: "POS Masters", desc: "Manage categories, items, payment modes & tax", icon: ShoppingBag, to: "/pos-masters" },
   ];
   return (
     <Card>
