@@ -579,26 +579,31 @@ function SubscriptionModal({
   const [endDate, setEndDate] = useState(existing?.end_date ?? "");
   const [graceEnd, setGraceEnd] = useState(existing?.grace_end_date ?? "");
   const [status, setStatus] = useState<Database["public"]["Enums"]["subscription_status"]>(existing?.status ?? "active");
+  const [billedAmount, setBilledAmount] = useState<string>(
+    existing ? String((existing as unknown as { billed_amount?: number | null }).billed_amount ?? "") : "",
+  );
   const [saving, setSaving] = useState(false);
 
-  // Auto-fill end + grace when plan or start changes (for new only)
+  const plan = plans.find((p) => p.id === planId);
+  const monthlyPrice = Number(plan?.price ?? 3000);
+  const slice = useMemo(() => computeActivationBilling(startDate, monthlyPrice), [startDate, monthlyPrice]);
+
+  // Auto-fill end/grace/amount from 15th-pivot rule (new only)
   useEffect(() => {
     if (existing) return;
-    const plan = plans.find((p) => p.id === planId);
-    if (!plan) return;
-    const start = new Date(startDate);
-    const end = new Date(start); end.setDate(end.getDate() + plan.duration_days - 1);
-    const grace = new Date(end); grace.setDate(grace.getDate() + 5);
-    setEndDate(end.toISOString().slice(0, 10));
-    setGraceEnd(grace.toISOString().slice(0, 10));
-  }, [planId, startDate, plans, existing]);
+    setEndDate(slice.endDate);
+    setGraceEnd(addDaysISO(slice.endDate, 5));
+    setBilledAmount(String(slice.amount));
+  }, [slice.endDate, slice.amount, existing]);
 
   async function save() {
     if (!planId || !startDate || !endDate || !graceEnd) return toast.error("All fields required");
+    const amt = billedAmount === "" ? monthlyPrice : Number(billedAmount);
+    if (Number.isNaN(amt) || amt < 0) return toast.error("Invalid billed amount");
     setSaving(true);
     if (existing) {
       const { error } = await supabase.from("subscriptions").update({
-        plan_id: planId, start_date: startDate, end_date: endDate, grace_end_date: graceEnd, status,
+        plan_id: planId, start_date: startDate, end_date: endDate, grace_end_date: graceEnd, status, billed_amount: amt,
       }).eq("id", existing.id);
       setSaving(false);
       if (error) return toast.error(error.message);
@@ -606,7 +611,7 @@ function SubscriptionModal({
     } else {
       const { error } = await supabase.from("subscriptions").insert({
         student_id: studentId, plan_id: planId, start_date: startDate,
-        end_date: endDate, grace_end_date: graceEnd, status, unit_id: unitId,
+        end_date: endDate, grace_end_date: graceEnd, status, unit_id: unitId, billed_amount: amt,
       });
       setSaving(false);
       if (error) return toast.error(error.message);
