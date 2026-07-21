@@ -734,3 +734,180 @@ function PaymentModal({
     </Dialog>
   );
 }
+
+/* ---------------- Activate Student Modal ---------------- */
+
+function ActivateStudentModal({
+  student, plan, onClose, onSaved,
+}: {
+  student: Student;
+  plan: Database["public"]["Tables"]["subscription_plans"]["Row"] | undefined;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [joinDate, setJoinDate] = useState(todayISO());
+  const [saving, setSaving] = useState(false);
+  const monthlyPrice = Number(plan?.price ?? 3000);
+  const slice = useMemo(() => computeActivationBilling(joinDate, monthlyPrice), [joinDate, monthlyPrice]);
+
+  async function save() {
+    if (!plan) return toast.error("No active plan configured");
+    setSaving(true);
+    const { error: upErr } = await supabase.from("students").update({ is_approved: true }).eq("id", student.id);
+    if (upErr) { setSaving(false); return toast.error(upErr.message); }
+    const { error: subErr } = await supabase.from("subscriptions").insert({
+      student_id: student.id,
+      plan_id: plan.id,
+      unit_id: student.unit_id,
+      start_date: slice.startDate,
+      end_date: slice.endDate,
+      grace_end_date: addDaysISO(slice.endDate, 5),
+      status: "active",
+      billed_amount: slice.amount,
+    });
+    setSaving(false);
+    if (subErr) return toast.error(subErr.message);
+    toast.success(`Activated — ${slice.isFullMonth ? "Full" : "Half"} month · ₹${slice.amount.toLocaleString("en-IN")}`);
+    onSaved();
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Activate Student</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Choose the join/activation date. Billing applies the 15th-pivot rule:
+            day 1–15 = full month, day 16–EOM = half month. Subscription runs till last day of that month.
+          </p>
+          <Field label="Join / Activation Date">
+            <Input type="date" value={joinDate} onChange={(e) => setJoinDate(e.target.value)} />
+          </Field>
+          <div className="rounded-md border bg-muted/40 p-3 text-sm">
+            <div className="flex justify-between"><span>Rule</span><span className="font-medium">{slice.isFullMonth ? "Full month (day ≤ 15)" : "Half month (day 16 – EOM)"}</span></div>
+            <div className="flex justify-between"><span>Period</span><span className="font-medium">{slice.startDate} → {slice.endDate}</span></div>
+            <div className="flex justify-between pt-1 border-t mt-1"><span className="text-muted-foreground">Amount to bill</span><span className="font-bold">{inr(slice.amount)}</span></div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? "Activating…" : "Activate & Bill"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ---------------- Deactivate Student Modal ---------------- */
+
+function DeactivateStudentModal({
+  student, advance, plan, onClose, onSaved,
+}: {
+  student: Student;
+  advance: number;
+  plan: Database["public"]["Tables"]["subscription_plans"]["Row"] | undefined;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [deactivateDate, setDeactivateDate] = useState(todayISO());
+  const [action, setAction] = useState<"none" | "credit" | "refund">("none");
+  const [refundMode, setRefundMode] = useState<PaymentMode>("cash");
+  const [saving, setSaving] = useState(false);
+  const monthlyPrice = Number(plan?.price ?? 3000);
+  const refundable = useMemo(
+    () => computeDeactivationRefund(deactivateDate, monthlyPrice, advance),
+    [deactivateDate, monthlyPrice, advance],
+  );
+
+  async function save() {
+    setSaving(true);
+    try {
+      if (action === "refund" && refundable > 0) {
+        const { data: userRes } = await supabase.auth.getUser();
+        const { error } = await supabase.from("payments").insert({
+          student_id: student.id,
+          subscription_id: null,
+          amount: -refundable,
+          mode: refundMode,
+          status: "success",
+          recorded_by: userRes.user?.id,
+          razorpay_payment_id: `REFUND on deactivation ${deactivateDate}`,
+          created_at: new Date(deactivateDate + "T12:00:00").toISOString(),
+        });
+        if (error) throw new Error(error.message);
+      }
+      // "credit" leaves the advance as-is (still visible on ledger). "none" also leaves it.
+      const { error: dErr } = await supabase.from("students").update({ is_approved: false }).eq("id", student.id);
+      if (dErr) throw new Error(dErr.message);
+      toast.success("Student deactivated");
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to deactivate");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Deactivate Student</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            15th-pivot mirror: exit day 1–15 → liable half month (₹{(monthlyPrice / 2).toLocaleString("en-IN")}) →
+            up to that portion of advance refundable. Exit day 16–EOM → liable full month → no refund.
+          </p>
+          <Field label="Deactivation Date">
+            <Input type="date" value={deactivateDate} onChange={(e) => setDeactivateDate(e.target.value)} />
+          </Field>
+          <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
+            <div className="flex justify-between"><span>Current Advance</span><span className="font-medium">{inr(advance)}</span></div>
+            <div className="flex justify-between"><span>Refundable</span><span className="font-bold text-success">{inr(refundable)}</span></div>
+          </div>
+          {refundable > 0 && (
+            <div className="space-y-2">
+              <Label className="text-xs">Refundable amount — choose action</Label>
+              <RadioGroup value={action} onValueChange={(v) => setAction(v as typeof action)} className="space-y-1">
+                <label className={`flex items-start gap-2 border rounded-md px-3 py-2 cursor-pointer ${action === "credit" ? "border-primary bg-primary/5" : ""}`}>
+                  <RadioGroupItem value="credit" className="mt-1" />
+                  <div>
+                    <div className="font-medium text-sm">Record as Credit</div>
+                    <div className="text-xs text-muted-foreground">Keep {inr(refundable)} as advance on the ledger.</div>
+                  </div>
+                </label>
+                <label className={`flex items-start gap-2 border rounded-md px-3 py-2 cursor-pointer ${action === "refund" ? "border-primary bg-primary/5" : ""}`}>
+                  <RadioGroupItem value="refund" className="mt-1" />
+                  <div>
+                    <div className="font-medium text-sm">Record as Cash Refund</div>
+                    <div className="text-xs text-muted-foreground">Add a negative entry in Payment Ledger for {inr(refundable)}.</div>
+                  </div>
+                </label>
+              </RadioGroup>
+              {action === "refund" && (
+                <Field label="Refund Mode">
+                  <RadioGroup value={refundMode} onValueChange={(v) => setRefundMode(v as PaymentMode)} className="grid grid-cols-4 gap-2">
+                    {(["cash", "upi", "card", "razorpay"] as PaymentMode[]).map((m) => (
+                      <label key={m} className={`flex items-center gap-1 border rounded-md px-2 py-1.5 cursor-pointer text-sm capitalize ${refundMode === m ? "border-primary bg-primary/5" : ""}`}>
+                        <RadioGroupItem value={m} />{m}
+                      </label>
+                    ))}
+                  </RadioGroup>
+                </Field>
+              )}
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving || (refundable > 0 && action === "none")}>
+            {saving ? "Saving…" : "Confirm Deactivation"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
