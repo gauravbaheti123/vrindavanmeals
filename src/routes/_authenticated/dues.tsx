@@ -12,9 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { AlertTriangle, Wallet, Users as UsersIcon, Search, IndianRupee } from "lucide-react";
+import { AlertTriangle, Wallet, Users as UsersIcon, Search, IndianRupee, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
+import { exportPdf, exportExcel } from "@/lib/report-export";
 
 export const Route = createFileRoute("/_authenticated/dues")({
   head: () => ({ meta: [{ title: "Dues & Ledger — Vrindavan Meals" }] }),

@@ -8,8 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, CalendarClock } from "lucide-react";
+import { Plus, Search, CalendarClock, Download, FileText } from "lucide-react";
 import { computeSubscriptionStatus, STATUS_STYLES, STATUS_LABEL, type EffectiveStatus } from "@/lib/subscription-status";
+import { exportPdf, exportExcel } from "@/lib/report-export";
 
 export const Route = createFileRoute("/_authenticated/subscriptions/")({
   head: () => ({ meta: [{ title: "Subscriptions — Vrindavan Meals" }] }),
