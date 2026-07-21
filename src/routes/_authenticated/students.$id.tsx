@@ -72,16 +72,20 @@ function StudentDetail() {
   };
 
   const summary = useMemo(() => {
-    if (!data) return { paid: 0, due: 0, advance: 0, last: null as Payment | null, billed: 0 };
+    if (!data) return { paid: 0, due: 0, advance: 0, last: null as Payment | null, billed: 0, opening: 0, openingAsOf: null as string | null };
     const paid = data.pays.filter((p) => p.status === "success").reduce((s, p) => s + Number(p.amount), 0);
     const price = Number(data.plans[0]?.price ?? 3000);
-    const billed = data.subs.length * price;
+    const opening = Number((data.student as any)?.opening_balance ?? 0);
+    const openingAsOf = ((data.student as any)?.opening_balance_as_of ?? null) as string | null;
+    const billed = data.subs.length * price + opening;
     const balance = billed - paid;
     return {
       paid,
       due: Math.max(0, balance),
       advance: Math.max(0, -balance),
       billed,
+      opening,
+      openingAsOf,
       last: data.pays.filter((p) => p.status === "success").slice(-1)[0] ?? null,
     };
   }, [data]);
