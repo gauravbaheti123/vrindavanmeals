@@ -442,6 +442,23 @@ function StudentDetail() {
           onSaved={() => { setPayModal(null); refresh(); }}
         />
       )}
+      {activateOpen && (
+        <ActivateStudentModal
+          student={s}
+          plan={data.plans[0]}
+          onClose={() => setActivateOpen(false)}
+          onSaved={() => { setActivateOpen(false); refresh(); }}
+        />
+      )}
+      {deactivateOpen && (
+        <DeactivateStudentModal
+          student={s}
+          advance={summary.advance}
+          plan={data.plans[0]}
+          onClose={() => setDeactivateOpen(false)}
+          onSaved={() => { setDeactivateOpen(false); refresh(); }}
+        />
+      )}
     </div>
   );
 }
