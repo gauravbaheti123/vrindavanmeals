@@ -638,16 +638,26 @@ function SubscriptionModal({
             <Field label="End Date"><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></Field>
             <Field label="Grace Until"><Input type="date" value={graceEnd} onChange={(e) => setGraceEnd(e.target.value)} /></Field>
           </div>
-          <Field label="Status">
-            <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {(["active", "grace", "expired", "pending"] as const).map((v) => (
-                  <SelectItem key={v} value={v} className="capitalize">{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Billed Amount (₹)">
+              <Input type="number" value={billedAmount} onChange={(e) => setBilledAmount(e.target.value)} />
+            </Field>
+            <Field label="Status">
+              <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(["active", "grace", "expired", "pending"] as const).map((v) => (
+                    <SelectItem key={v} value={v} className="capitalize">{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          {!existing && (
+            <div className="rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
+              15th-pivot: {slice.isFullMonth ? "Full month" : "Half month"} · Ends {slice.endDate} · Auto ₹{slice.amount.toLocaleString("en-IN")}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
