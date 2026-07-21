@@ -13,8 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Download, Upload, AlertTriangle, CheckCircle2, XCircle, Loader2, FileText, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
-import { importStudents, importSubscriptions, importPayments, importAttendance, importExcelWorkbook } from "@/lib/imports.functions";
-
+import { importPayments, importAttendance, importExcelWorkbook } from "@/lib/imports.functions";
 
 export const Route = createFileRoute("/_authenticated/import")({
   head: () => ({ meta: [{ title: "Import Data — Vrindavan Meals" }] }),
@@ -22,20 +21,6 @@ export const Route = createFileRoute("/_authenticated/import")({
 });
 
 const TEMPLATES: Record<string, { headers: string[]; samples: string[][] }> = {
-  students: {
-    headers: ["full_name", "mobile", "roll_number", "course", "hostel_room", "parent_mobile", "email", "batch_year", "blood_group", "address", "unit_name", "doc_type", "doc_number"],
-    samples: [
-      ["Priya Sharma", "9876543210", "R101", "B.Sc", "A-12", "9123456789", "priya@example.com", "2024", "O+", "Latur", "Unit 1", "college_id", "COL-2024-101"],
-      ["Anita Patel", "9876543211", "R102", "B.Com", "A-13", "", "", "2024", "", "", "Unit 2", "aadhar", "1234-5678-9012"],
-    ],
-  },
-  subscriptions: {
-    headers: ["student_mobile", "unit_name", "start_date", "end_date", "status"],
-    samples: [
-      ["9876543210", "Unit 1", "01-01-2026", "31-01-2026", "active"],
-      ["9876543211", "Unit 2", "01-06-2025", "30-06-2025", "expired"],
-    ],
-  },
   payments: {
     headers: ["student_mobile", "amount", "payment_mode", "payment_date", "reference_note", "subscription_start_date"],
     samples: [
@@ -70,16 +55,12 @@ function ImportPage() {
         <AlertDescription>This action cannot be undone. Please download a database backup before importing large datasets.</AlertDescription>
       </Alert>
       <Tabs defaultValue="excel">
-        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+        <TabsList className="grid grid-cols-3 w-full max-w-xl">
           <TabsTrigger value="excel">Excel Workbook</TabsTrigger>
-          <TabsTrigger value="students">Students</TabsTrigger>
-          <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
         </TabsList>
         <TabsContent value="excel"><ExcelWorkbookTab /></TabsContent>
-        <TabsContent value="students"><ImportTab kind="students" fn={importStudents} /></TabsContent>
-        <TabsContent value="subscriptions"><ImportTab kind="subscriptions" fn={importSubscriptions} /></TabsContent>
         <TabsContent value="payments"><ImportTab kind="payments" fn={importPayments} /></TabsContent>
         <TabsContent value="attendance"><ImportTab kind="attendance" fn={importAttendance} /></TabsContent>
       </Tabs>
@@ -87,7 +68,6 @@ function ImportPage() {
     </div>
   );
 }
-
 
 function downloadCsv(name: string, rows: string[][]) {
   const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -226,333 +206,144 @@ function ImportHistory() {
   );
 }
 
-// ============ Excel Workbook (multi-sheet legacy format) ============
+// ============ Excel Workbook — Unified 2-sheet format ============
 
-function excelDateToISO(serial: any): string | null {
-  if (serial == null || serial === "") return null;
-  if (typeof serial === "string") {
-    const s = serial.trim();
+function excelDateToISO(v: any): string | null {
+  if (v == null || v === "") return null;
+  if (typeof v === "string") {
+    const s = v.trim();
     const dm = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
     if (dm) return `${dm[3]}-${dm[2].padStart(2, "0")}-${dm[1].padStart(2, "0")}`;
-    const ym = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    const ym = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
     if (ym) return `${ym[1]}-${ym[2].padStart(2, "0")}-${ym[3].padStart(2, "0")}`;
     const n = Number(s);
-    if (!isNaN(n) && n > 20000 && n < 80000) serial = n;
+    if (!isNaN(n) && n > 20000 && n < 80000) v = n;
     else return null;
   }
-  if (typeof serial !== "number" || isNaN(serial)) return null;
-  const ms = Math.round((serial - 25569) * 86400 * 1000);
+  if (typeof v !== "number" || isNaN(v)) return null;
+  const ms = Math.round((v - 25569) * 86400 * 1000);
   const d = new Date(ms);
   if (isNaN(d.getTime())) return null;
   return d.toISOString().slice(0, 10);
 }
 
-function titleCase(s: string): string {
-  return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function padMess(n: any): string | null {
-  if (n == null || n === "") return null;
-  const s = String(n).trim();
-  // Already MESS-001 style?
-  const m = s.match(/^MESS[-_ ]?(\d+)$/i);
-  if (m) return `MESS-${m[1].padStart(3, "0")}`;
-  const num = Number(s);
-  if (isNaN(num)) return null;
-  return `MESS-${String(num).padStart(3, "0")}`;
-}
-
-
-function normalizeMode(v: any): "cash" | "upi" | "card" | "razorpay" {
-  const s = String(v || "").toLowerCase();
+function normalizeMode(v: any): "cash" | "upi" | "card" | "razorpay" | null {
+  if (v == null || String(v).trim() === "") return null;
+  const s = String(v).toLowerCase();
   if (s.includes("cash")) return "cash";
   if (s.includes("card")) return "card";
   if (s.includes("razor")) return "razorpay";
+  if (s.includes("upi")) return "upi";
   return "upi";
 }
 
-type OpeningBalance = { mess_no: string; opening_balance: number; as_of: string };
+function pickSheet(wb: XLSX.WorkBook, patterns: RegExp[]): string | undefined {
+  return wb.SheetNames.find((n) => patterns.some((p) => p.test(n.trim())));
+}
+
+type StudentRow = {
+  full_name: string; mobile: string; mess_no: string | null;
+  unit_name: string | null; room: string | null; opening_balance: number | null;
+  course: string | null; parent_mobile: string | null; email: string | null;
+  blood_group: string | null; address: string | null;
+};
+type TxnRow = {
+  mobile: string; name: string | null; date: string | null;
+  amount: number | null; mode: "cash" | "upi" | "card" | "razorpay" | null;
+  sub_start: string | null; sub_end: string | null;
+};
 
 type Parsed = {
   fileName: string;
-  students: any[];
-  subscriptions: any[];
-  payments: any[];
-  openingBalances: OpeningBalance[];
-  openingAsOf: string | null;
-  masterRaw: number;
-  receiptsRaw: number;
-  ledgerRaw: number;
-  openingRaw: number;
+  students: StudentRow[];
+  transactions: TxnRow[];
+  studentsRaw: number;
+  txnsRaw: number;
   skippedStudents: number;
-  skippedPayments: number;
-  skippedSubs: number;
-  skippedOpening: number;
+  skippedTxns: number;
 };
 
-function isoOnly(v: any): string | null {
-  if (v == null || v === "") return null;
-  const s = String(v).trim();
-  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
-  return excelDateToISO(v);
-}
-
-function parseCleanWorkbook(
-  fileName: string,
-  wb: XLSX.WorkBook,
-  studentsSheet: string,
-  paymentsSheet: string,
-  subsSheet: string,
-): Parsed {
-  const sRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[studentsSheet], { raw: true, defval: null });
-  const pRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[paymentsSheet], { raw: true, defval: null });
-  const subRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[subsSheet], { raw: true, defval: null });
-
-  const students: any[] = [];
-  let skippedStudents = 0;
-  for (const r of sRows) {
-    const name = String(r["STUDENT NAME"] ?? r["Student Name"] ?? "").trim();
-    const messNo = padMess(r["MESS NO"] ?? r["Mess No"]);
-    if (!name || !messNo) { skippedStudents++; continue; }
-    const room = r["ROOM NO"] != null && String(r["ROOM NO"]).trim() !== ""
-      ? String(r["ROOM NO"]).trim() : null;
-    const mobileRaw = r["MOBILE"] ?? r["Mobile"];
-    const mobile = mobileRaw ? String(mobileRaw).replace(/\D/g, "").slice(-10) : null;
-    const status = String(r["STATUS"] ?? "").trim().toLowerCase();
-    students.push({
-      mess_no: messNo,
-      full_name: titleCase(name),
-      mobile: mobile || null,
-      hostel_room: room,
-      joining_date: isoOnly(r["JOINING DATE"]),
-      exit_date: isoOnly(r["EXIT DATE"]),
-      is_inactive: status === "inactive",
-    });
+function pick(r: any, keys: string[]): any {
+  for (const k of keys) {
+    if (r[k] !== undefined && r[k] !== null && r[k] !== "") return r[k];
+    const upper = Object.keys(r).find((x) => x.trim().toLowerCase() === k.toLowerCase());
+    if (upper && r[upper] !== null && r[upper] !== "") return r[upper];
   }
-
-  const payments: any[] = [];
-  let skippedPayments = 0;
-  for (const r of pRows) {
-    const messNo = padMess(r["MESS NO"] ?? r["Mess No"]);
-    const amount = Number(r["AMOUNT"] ?? r["Amount"]);
-    const paidAt = isoOnly(r["PAYMENT DATE"] ?? r["Date"]);
-    if (!messNo || !paidAt || !amount || isNaN(amount) || amount <= 0) { skippedPayments++; continue; }
-    const modeRaw = String(r["PAYMENT MODE"] ?? "").trim().toLowerCase();
-    const mode: "cash" | "upi" | "card" | "razorpay" =
-      modeRaw === "cash" ? "cash" : modeRaw === "card" ? "card" : modeRaw === "razorpay" ? "razorpay" : "upi";
-    const remarks = r["REMARKS"];
-    payments.push({
-      mess_no: messNo,
-      amount,
-      mode,
-      paid_at: paidAt,
-      reference_note: remarks != null && remarks !== "" ? String(remarks).trim() : null,
-    });
-  }
-
-  const subscriptions: any[] = [];
-  let skippedSubs = 0;
-  for (const r of subRows) {
-    const messNo = padMess(r["MESS NO"] ?? r["Mess No"]);
-    const start = isoOnly(r["START DATE"]);
-    if (!messNo || !start) { skippedSubs++; continue; }
-    const end = isoOnly(r["END DATE"]);
-    const subStatus = String(r["SUB STATUS"] ?? "").trim().toLowerCase();
-    const inactive = subStatus === "expired" || subStatus === "inactive" || subStatus === "closed";
-    subscriptions.push({
-      mess_no: messNo,
-      start_date: start,
-      end_date: end,
-      is_inactive: inactive,
-    });
-  }
-
-  return {
-    fileName,
-    students, subscriptions, payments,
-    openingBalances: [],
-    openingAsOf: null,
-    masterRaw: sRows.length,
-    receiptsRaw: pRows.length,
-    ledgerRaw: subRows.length,
-    openingRaw: 0,
-    skippedStudents, skippedPayments, skippedSubs,
-    skippedOpening: 0,
-  };
-}
-
-function parseOpeningBalanceSheet(
-  wb: XLSX.WorkBook,
-  sheetName: string,
-): { rows: OpeningBalance[]; raw: number; skipped: number; asOf: string | null } {
-  // Extract "as of DD MMM YYYY" from sheet name
-  const asOfMatch = sheetName.match(/as\s+of\s+([\d]{1,2})\s*([A-Za-z]+)\s*(\d{4})/i);
-  let asOf: string | null = null;
-  if (asOfMatch) {
-    const months: Record<string, string> = {
-      jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
-      jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
-    };
-    const m = months[asOfMatch[2].slice(0, 3).toLowerCase()];
-    if (m) asOf = `${asOfMatch[3]}-${m}-${asOfMatch[1].padStart(2, "0")}`;
-  }
-  const raw = XLSX.utils.sheet_to_json<any>(wb.Sheets[sheetName], { raw: true, defval: null });
-  const rows: OpeningBalance[] = [];
-  let skipped = 0;
-  for (const r of raw) {
-    const messNo = padMess(r["MESS NO"] ?? r["Mess No"] ?? r["mess_no"]);
-    const balRaw = r["OPENING BALANCE"] ?? r["Opening Balance"] ?? r["BALANCE"] ?? r["Balance"] ?? r["DUE"] ?? r["Due"];
-    if (!messNo || balRaw == null || balRaw === "") { skipped++; continue; }
-    const bal = Number(balRaw);
-    if (isNaN(bal)) { skipped++; continue; }
-    rows.push({ mess_no: messNo, opening_balance: bal, as_of: asOf ?? new Date().toISOString().slice(0, 10) });
-  }
-  return { rows, raw: raw.length, skipped, asOf };
+  return null;
 }
 
 function parseWorkbook(file: File): Promise<Parsed> {
-
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Failed to read file"));
     reader.onload = () => {
       try {
         const wb = XLSX.read(reader.result as ArrayBuffer, { type: "array" });
-        const findSheet = (name: string) =>
-          wb.SheetNames.find((n) => n.trim().toLowerCase() === name.toLowerCase());
+        const studentsSheet = pickSheet(wb, [/^students?$/i, /^student\s*master$/i, /^master$/i]);
+        const txnSheet = pickSheet(wb, [/^transactions?$/i, /^payments?$/i, /^receipts?$/i]);
+        if (!studentsSheet) throw new Error("No 'Students' sheet found. Download the template to see the expected format.");
 
-        // ---------- Opening Balance template detection ----------
-        // Sheets: "Student Master" + "Opening Balance as of <date>" + "Transactions from <month> onwards"
-        const studentMasterSheet = wb.SheetNames.find((n) => /^student\s*master$/i.test(n.trim()));
-        const openingSheet = wb.SheetNames.find((n) => /^opening\s+balance/i.test(n.trim()));
-        const txnSheet = wb.SheetNames.find((n) => /^transactions?/i.test(n.trim()));
-        if (studentMasterSheet && openingSheet && txnSheet) {
-          // Reuse clean parser for student master + transactions (payments).
-          // Subscriptions sheet is optional in this template.
-          const subsSheet = findSheet("Subscriptions") ?? studentMasterSheet;
-          const parsed = parseCleanWorkbook(file.name, wb, studentMasterSheet, txnSheet, subsSheet);
-          if (subsSheet === studentMasterSheet) {
-            parsed.subscriptions = [];
-            parsed.ledgerRaw = 0;
-            parsed.skippedSubs = 0;
-          }
-          const ob = parseOpeningBalanceSheet(wb, openingSheet);
-          parsed.openingBalances = ob.rows;
-          parsed.openingAsOf = ob.asOf;
-          parsed.openingRaw = ob.raw;
-          parsed.skippedOpening = ob.skipped;
-          resolve(parsed);
-          return;
-        }
-
-        // ---------- Clean format detection ----------
-        // "Vrindavan_Meals_Clean.xlsx": sheets Students / Payments / Subscriptions
-        const cleanStudents = findSheet("Students");
-        const cleanPayments = findSheet("Payments");
-        const cleanSubs = findSheet("Subscriptions");
-        if (cleanStudents && cleanPayments && cleanSubs) {
-          resolve(parseCleanWorkbook(file.name, wb, cleanStudents, cleanPayments, cleanSubs));
-          return;
-        }
-
-
-        // ---------- Legacy format (Master / Receipts / STUDENT LEDGER) ----------
-        const mName = findSheet("Master");
-        const rName = findSheet("Receipts");
-        const lName = findSheet("STUDENT LEDGER") ?? findSheet("Student Ledger");
-        if (!mName) throw new Error("No recognised sheets. Expected either Students/Payments/Subscriptions (clean) or Master/Receipts/STUDENT LEDGER (legacy).");
-
-        const master = mName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[mName], { raw: true, defval: null }) : [];
-        const receiptsAoA: any[][] = rName
-          ? XLSX.utils.sheet_to_json(wb.Sheets[rName], { header: 1, raw: true, defval: null })
-          : [];
-        const ledger = lName ? XLSX.utils.sheet_to_json<any>(wb.Sheets[lName], { raw: true, defval: null }) : [];
-
-        const students: any[] = [];
+        const sRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[studentsSheet], { raw: true, defval: null });
+        const students: StudentRow[] = [];
         let skippedStudents = 0;
-        for (const row of master) {
-          const name = String(row["Student Name"] ?? row["Name"] ?? "").trim();
-          const messNo = padMess(row["Mess No"] ?? row["Mess no"]);
-          if (!name || !messNo) { skippedStudents++; continue; }
-          const roomRaw = row["Room No"];
-          const room = roomRaw == null || String(roomRaw).trim().toLowerCase() === "no"
-            ? null : String(roomRaw).trim();
-          const mobileRaw = row["Mobile no"] ?? row["Mobile No"] ?? row["Mobile"];
-          const mobile = mobileRaw ? String(mobileRaw).replace(/\D/g, "").slice(-10) : null;
-          const inactive = String(row["Inactive"] ?? "").trim().toLowerCase() === "inactive";
+        for (const r of sRows) {
+          const name = String(pick(r, ["Name", "STUDENT NAME", "Student Name", "full_name"]) ?? "").trim();
+          const mobileRaw = pick(r, ["Mobile", "MOBILE", "Mobile No", "mobile"]);
+          const mobile = mobileRaw ? String(mobileRaw).replace(/\D/g, "").slice(-10) : "";
+          if (!name || !mobile) { skippedStudents++; continue; }
+          const messRaw = pick(r, ["Mess No", "MESS NO", "mess_no"]);
+          const ob = pick(r, ["Opening Balance", "OPENING BALANCE", "opening_balance"]);
           students.push({
-            mess_no: messNo,
-            full_name: titleCase(name),
-            mobile: mobile || null,
-            hostel_room: room,
-            joining_date: excelDateToISO(row["Joining Date"]),
-            exit_date: excelDateToISO(row["Exit Date"]),
-            is_inactive: inactive,
+            full_name: name,
+            mobile,
+            mess_no: messRaw ? String(messRaw).trim() : null,
+            unit_name: (pick(r, ["Unit", "UNIT", "unit_name"]) ?? null) as any,
+            room: (pick(r, ["Room", "ROOM", "Room No", "hostel_room"]) ?? null) as any,
+            opening_balance: ob != null && ob !== "" && !isNaN(Number(ob)) ? Number(ob) : null,
+            course: (pick(r, ["Course", "COURSE", "course"]) ?? null) as any,
+            parent_mobile: (pick(r, ["Parent Mobile", "PARENT MOBILE", "parent_mobile"]) ?? null) as any,
+            email: (pick(r, ["Email", "EMAIL", "email"]) ?? null) as any,
+            blood_group: (pick(r, ["Blood Group", "BLOOD GROUP", "blood_group"]) ?? null) as any,
+            address: (pick(r, ["Address", "ADDRESS", "address"]) ?? null) as any,
           });
         }
 
-        const subscriptions: any[] = [];
-        let skippedSubs = 0;
-        const source = ledger.length ? ledger : master;
-        for (const row of source) {
-          const name = String(row["Name"] ?? row["Student Name"] ?? "").trim();
-          const messNo = padMess(row["Mess No"] ?? row["Mess no"]);
-          if (!name || !messNo) { skippedSubs++; continue; }
-          const start = excelDateToISO(row["Date of Admission"] ?? row["Joining Date"]);
-          if (!start) { skippedSubs++; continue; }
-          const end = excelDateToISO(row["Date of Exit"] ?? row["Exit Date"]);
-          const statusRaw = String(row["Status"] ?? row["Inactive"] ?? "").trim().toLowerCase();
-          const inactive = statusRaw.includes("inactive") || statusRaw === "closed";
-          subscriptions.push({
-            mess_no: messNo,
-            start_date: start,
-            end_date: end,
-            is_inactive: inactive,
-          });
-        }
-
-        const payments: any[] = [];
-        let skippedPayments = 0;
-        const receiptRows = receiptsAoA.slice(1);
-        for (const row of receiptRows) {
-          if (!row || row.every((c) => c == null || c === "")) { skippedPayments++; continue; }
-          const dateCell = row[0];
-          const messRaw = row[1];
-          const amountCell = row[3];
-          const modeRaw = row[10];
-          const remarks = row[11];
-          if (messRaw == null || messRaw === "") { skippedPayments++; continue; }
-          const messStr = String(messRaw).trim();
-          if (messStr.toLowerCase() === "mess no" || messStr.toLowerCase() === "mess no.") { skippedPayments++; continue; }
-          if (amountCell == null || amountCell === "") { skippedPayments++; continue; }
-          if (typeof amountCell === "string" && /#(NUM|N\/A|VALUE|REF|DIV|NAME)/i.test(amountCell)) { skippedPayments++; continue; }
-          const amount = Number(amountCell);
-          if (isNaN(amount) || amount <= 0) { skippedPayments++; continue; }
-          const messNo = padMess(messStr);
-          if (!messNo) { skippedPayments++; continue; }
-          const paidAt = excelDateToISO(dateCell);
-          if (!paidAt) { skippedPayments++; continue; }
-          payments.push({
-            mess_no: messNo, amount, mode: normalizeMode(modeRaw), paid_at: paidAt,
-            reference_note: remarks != null && remarks !== "" ? String(remarks).trim() : null,
-          });
+        const transactions: TxnRow[] = [];
+        let skippedTxns = 0;
+        let txnsRaw = 0;
+        if (txnSheet) {
+          const tRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[txnSheet], { raw: true, defval: null });
+          txnsRaw = tRows.length;
+          for (const r of tRows) {
+            const isEmpty = Object.values(r).every((v) => v == null || v === "");
+            if (isEmpty) { skippedTxns++; continue; }
+            const mobileRaw = pick(r, ["Mobile", "MOBILE", "Mobile No", "mobile", "student_mobile"]);
+            const mobile = mobileRaw ? String(mobileRaw).replace(/\D/g, "").slice(-10) : "";
+            const name = pick(r, ["Name", "STUDENT NAME", "Student Name"]);
+            if (!mobile && !name) { skippedTxns++; continue; }
+            if (!mobile) { skippedTxns++; continue; } // name-only cannot match; skip
+            const amtRaw = pick(r, ["Amount", "AMOUNT", "amount"]);
+            const amount = amtRaw != null && amtRaw !== "" && !isNaN(Number(amtRaw)) ? Number(amtRaw) : null;
+            transactions.push({
+              mobile,
+              name: name ? String(name).trim() : null,
+              date: excelDateToISO(pick(r, ["Date", "DATE", "Payment Date", "PAYMENT DATE", "payment_date"])),
+              amount,
+              mode: normalizeMode(pick(r, ["Mode", "MODE", "Payment Mode", "PAYMENT MODE"])),
+              sub_start: excelDateToISO(pick(r, ["Subscription Start Date", "Sub Start", "SUB START", "START DATE", "Start Date"])),
+              sub_end: excelDateToISO(pick(r, ["Subscription End Date", "Sub End", "SUB END", "END DATE", "End Date"])),
+            });
+          }
         }
 
         resolve({
           fileName: file.name,
-          students, subscriptions, payments,
-          openingBalances: [],
-          openingAsOf: null,
-          masterRaw: master.length,
-          receiptsRaw: receiptsAoA.length > 0 ? receiptsAoA.length - 1 : 0,
-          ledgerRaw: ledger.length,
-          openingRaw: 0,
-          skippedStudents, skippedPayments, skippedSubs,
-          skippedOpening: 0,
+          students, transactions,
+          studentsRaw: sRows.length,
+          txnsRaw,
+          skippedStudents, skippedTxns,
         });
       } catch (e: any) {
-
         reject(e);
       }
     };
@@ -560,54 +351,22 @@ function parseWorkbook(file: File): Promise<Parsed> {
   });
 }
 
-function downloadWorkbookTemplate(kind: "clean" | "opening" | "legacy") {
+function downloadMasterTemplate() {
   const wb = XLSX.utils.book_new();
-  const today = new Date().toISOString().slice(0, 10);
-
-  if (kind === "clean") {
-    const students = [["MESS NO", "STUDENT NAME", "ROOM NO", "JOINING DATE", "EXIT DATE", "STATUS", "MOBILE"],
-      ["MESS-001", "Sample Student", "A-101", "2026-07-01", "", "ACTIVE", "9876543210"]];
-    const payments = [["PAYMENT DATE", "MESS NO", "AMOUNT", "PAYMENT MODE", "REMARKS"],
-      ["2026-07-05", "MESS-001", 3500, "UPI", "July fees"]];
-    const subs = [["MESS NO", "STUDENT NAME", "START DATE", "END DATE", "PAYMENT STATUS", "SUB STATUS"],
-      ["MESS-001", "Sample Student", "2026-07-01", "2026-07-31", "PAID", "ACTIVE"]];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(students), "Students");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(payments), "Payments");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(subs), "Subscriptions");
-    XLSX.writeFile(wb, `Vrindavan_Meals_Clean_Template_${today}.xlsx`);
-    return;
-  }
-
-  if (kind === "opening") {
-    const students = [["MESS NO", "STUDENT NAME", "ROOM NO", "JOINING DATE", "EXIT DATE", "STATUS", "MOBILE"],
-      ["MESS-001", "Sample Student", "A-101", "2025-08-01", "", "ACTIVE", "9876543210"],
-      ["MESS-002", "Second Student", "A-102", "2025-09-15", "", "ACTIVE", "9876500000"]];
-    const opening = [["MESS NO", "STUDENT NAME", "OPENING BALANCE"],
-      ["MESS-001", "Sample Student", 1200],
-      ["MESS-002", "Second Student", -500]];
-    const txns = [["PAYMENT DATE", "MESS NO", "AMOUNT", "PAYMENT MODE", "REMARKS"],
-      ["2026-07-05", "MESS-001", 3500, "UPI", "July fees"],
-      ["2026-07-10", "MESS-002", 3500, "CASH", "July fees"]];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(students), "Student Master");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(opening), "Opening Balance as of 30 June 2026");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(txns), "Transactions from July 2026 onwards");
-    XLSX.writeFile(wb, `Vrindavan_Meals_OpeningBalance_Template_${today}.xlsx`);
-    return;
-  }
-
-  // legacy
-  const master = [["MESS NO", "STUDENT NAME", "ROOM NO", "JOINING DATE", "EXIT DATE", "STATUS", "MOBILE"],
-    ["MESS-001", "Sample Student", "A-101", "2026-07-01", "", "ACTIVE", "9876543210"]];
-  const receipts = [["RECEIPT NO", "DATE", "MESS NO", "STUDENT NAME", "AMOUNT", "MODE", "PERIOD FROM", "PERIOD TO", "REMARKS", "COL10", "COL11", "COL12"],
-    [1, "2026-07-05", "MESS-001", "Sample Student", 3500, "UPI", "2026-07-01", "2026-07-31", "July fees", "", "", ""]];
-  const ledger = [["MESS NO", "STUDENT NAME", "START DATE", "END DATE", "AMOUNT", "STATUS"],
-    ["MESS-001", "Sample Student", "2026-07-01", "2026-07-31", 3500, "PAID"]];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(master), "Master");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(receipts), "Receipts");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ledger), "STUDENT LEDGER");
-  XLSX.writeFile(wb, `Vrindavan_Meals_Legacy_Template_${today}.xlsx`);
+  const students = [
+    ["Name*", "Mobile*", "Mess No", "Unit", "Room", "Opening Balance", "Course", "Parent Mobile", "Email", "Blood Group", "Address"],
+    ["Priya Sharma", "9876543210", "MESS-001", "Unit 1", "A-101", 0, "B.Sc", "9123456789", "priya@example.com", "O+", "Latur"],
+    ["Anita Patel", "9876543211", "", "", "A-102", 1200, "", "", "", "", ""],
+  ];
+  const txns = [
+    ["Mobile*", "Name", "Date", "Amount", "Mode", "Subscription Start Date", "Subscription End Date"],
+    ["9876543210", "Priya Sharma", "2026-07-05", 3500, "UPI", "2026-07-01", "2026-07-31"],
+    ["9876543211", "Anita Patel", "2026-07-10", 3500, "Cash", "", ""],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(students), "Students");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(txns), "Transactions");
+  XLSX.writeFile(wb, `Vrindavan_Meals_Template.xlsx`);
 }
-
 
 function ExcelWorkbookTab() {
   const [parsed, setParsed] = useState<Parsed | null>(null);
@@ -622,93 +381,62 @@ function ExcelWorkbookTab() {
         data: {
           file_name: parsed.fileName,
           students: parsed.students,
-          subscriptions: parsed.subscriptions,
-          payments: parsed.payments,
-          opening_balances: parsed.openingBalances,
+          transactions: parsed.transactions,
         },
       });
     },
     onSuccess: (res: any) => {
       setResult(res);
-      toast.success(`Import complete — ${res.summary.students.imported} students, ${res.summary.payments.imported} payments`);
+      toast.success(`Import complete — ${res.summary.students.imported} new, ${res.summary.students.updated} updated, ${res.summary.payments.imported} payments`);
     },
     onError: (e: any) => toast.error(e.message),
   });
 
   async function onFile(f: File) {
     setBusy(true); setResult(null); setParsed(null);
-    try {
-      const p = await parseWorkbook(f);
-      setParsed(p);
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setBusy(false);
-    }
+    try { setParsed(await parseWorkbook(f)); }
+    catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
   }
 
   return (
     <Card className="mt-4"><CardContent className="p-6 space-y-4">
       <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="outline" onClick={downloadMasterTemplate}>
+          <Download className="h-4 w-4 mr-2" />Download Template
+        </Button>
         <label className="inline-flex">
           <input type="file" accept=".xlsx,.xls" className="hidden"
             onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
           <Button variant="secondary" asChild>
             <span>
               {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 mr-2" />}
-              {parsed ? parsed.fileName : "Upload Vrindavan_Meals.xlsx"}
+              {parsed ? parsed.fileName : "Upload Excel Workbook"}
             </span>
           </Button>
         </label>
-        <div className="h-6 w-px bg-border mx-1" />
-        <span className="text-xs text-muted-foreground">Templates:</span>
-        <Button variant="outline" size="sm" onClick={() => downloadWorkbookTemplate("opening")}>
-          <Download className="h-4 w-4 mr-2" />With Opening Balance
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => downloadWorkbookTemplate("clean")}>
-          <Download className="h-4 w-4 mr-2" />Clean
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => downloadWorkbookTemplate("legacy")}>
-          <Download className="h-4 w-4 mr-2" />Legacy
-        </Button>
       </div>
 
       <div className="text-xs text-muted-foreground space-y-1">
-        <div><strong>Supported formats</strong> (auto-detected by sheet names):</div>
+        <div><strong>Unified format — 2 sheets:</strong></div>
         <ul className="list-disc pl-5 space-y-0.5">
-          <li><strong>Clean (recommended)</strong>: <code>Students</code> · <code>Payments</code> · <code>Subscriptions</code></li>
-          <li><strong>With Opening Balance</strong>: <code>Student Master</code> · <code>Opening Balance as of &lt;date&gt;</code> · <code>Transactions from &lt;month&gt; onwards</code></li>
-          <li><strong>Legacy</strong>: <code>Master</code> · <code>Receipts</code> · <code>STUDENT LEDGER</code></li>
+          <li><strong>Students</strong> — required: <code>Name</code>, <code>Mobile</code>. Optional: Mess No (auto-generated if blank), Unit, Room, Opening Balance, Course, Parent Mobile, Email, Blood Group, Address.</li>
+          <li><strong>Transactions</strong> — required: <code>Mobile</code>. Optional: Date, Amount, Mode (Cash/UPI/Card/Razorpay), Subscription Start/End Date (defaults to the transaction month's 1st–last day).</li>
         </ul>
+        <div className="pt-1">Match key is <strong>Mobile number</strong>. Existing students are updated in place — no duplicates. Rows without Amount are skipped (no payment recorded).</div>
       </div>
 
       {parsed && !result && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <PanelStat label="Students" total={parsed.masterRaw} valid={parsed.students.length} skipped={parsed.skippedStudents} />
-            <PanelStat label="Payments" total={parsed.receiptsRaw} valid={parsed.payments.length} skipped={parsed.skippedPayments} />
-            <PanelStat label="Subscriptions" total={parsed.ledgerRaw} valid={parsed.subscriptions.length} skipped={parsed.skippedSubs} />
-            <PanelStat
-              label={parsed.openingAsOf ? `Opening Balances (as of ${parsed.openingAsOf})` : "Opening Balances"}
-              total={parsed.openingRaw}
-              valid={parsed.openingBalances.length}
-              skipped={parsed.skippedOpening}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <PanelStat label="Students" total={parsed.studentsRaw} valid={parsed.students.length} skipped={parsed.skippedStudents} />
+            <PanelStat label="Transactions" total={parsed.txnsRaw} valid={parsed.transactions.length} skipped={parsed.skippedTxns} />
           </div>
-          {parsed.openingBalances.length > 0 && (
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Carry-forward total: ₹{parsed.openingBalances.reduce((s, r) => s + r.opening_balance, 0).toLocaleString("en-IN")}</strong> across {parsed.openingBalances.length} students. Positive = student owes; negative = advance. Will be written to each student's opening balance and shown in Dues & Ledger.
-              </AlertDescription>
-            </Alert>
-          )}
 
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              Import order: <strong>Students → Subscriptions → Payments</strong>. All students assigned to Unit 1 by default.
-              Existing students (matched by Mess No) will be skipped, not overwritten.
+              Existing students matched by <strong>Mobile</strong> will be updated with any filled fields. Transactions without Amount will be skipped.
             </AlertDescription>
           </Alert>
 
@@ -725,10 +453,15 @@ function ExcelWorkbookTab() {
       {result && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <ResultBox icon={CheckCircle2} label="Students imported" value={`${result.summary.students.imported} / ${result.summary.students.total}`} color="text-emerald-600" />
-            <ResultBox icon={CheckCircle2} label="Subscriptions" value={`${result.summary.subscriptions.imported} / ${result.summary.subscriptions.total}`} color="text-emerald-600" />
+            <ResultBox icon={CheckCircle2} label="Students new" value={result.summary.students.imported} color="text-emerald-600" />
+            <ResultBox icon={CheckCircle2} label="Students updated" value={result.summary.students.updated} color="text-blue-600" />
             <ResultBox icon={CheckCircle2} label="Payments" value={`${result.summary.payments.imported} / ${result.summary.payments.total}`} color="text-emerald-600" />
-            <ResultBox icon={CheckCircle2} label="Total collected" value={`₹${Number(result.summary.payments.total_amount).toLocaleString("en-IN")}`} color="text-emerald-600" />
+            <ResultBox icon={CheckCircle2} label="Collected" value={`₹${Number(result.summary.payments.total_amount).toLocaleString("en-IN")}`} color="text-emerald-600" />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <ResultBox icon={AlertTriangle} label="Students skipped" value={result.summary.students.skipped} color="text-amber-600" />
+            <ResultBox icon={AlertTriangle} label="Transactions skipped" value={result.summary.payments.skipped} color="text-amber-600" />
+            <ResultBox icon={CheckCircle2} label="Subscriptions created" value={result.summary.subscriptions.imported} color="text-emerald-600" />
           </div>
 
           {result.errors?.length > 0 && (
@@ -750,12 +483,7 @@ function ExcelWorkbookTab() {
               </div>
               <Button variant="outline" onClick={() => {
                 const rows = [["section", "row", "reason"], ...result.errors.map((e: any) => [e.section, String(e.row), e.reason])];
-                const csv = rows.map((r) => r.map((c: string) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-                const blob = new Blob([csv], { type: "text/csv" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url; a.download = "excel-import-errors.csv"; a.click();
-                URL.revokeObjectURL(url);
+                downloadCsv("excel-import-errors.csv", rows);
               }}><Download className="h-4 w-4 mr-2" />Download Error CSV</Button>
             </>
           )}
@@ -768,14 +496,10 @@ function ExcelWorkbookTab() {
 
 function PanelStat({ label, total, valid, skipped }: { label: string; total: number; valid: number; skipped: number }) {
   return (
-    <div className="border rounded-md p-4">
-      <div className="text-xs text-muted-foreground uppercase tracking-wide">{label}</div>
-      <div className="text-2xl font-bold mt-1">{total} <span className="text-sm font-normal text-muted-foreground">rows</span></div>
-      <div className="text-xs mt-2 space-x-3">
-        <span className="text-emerald-600">✓ {valid} valid</span>
-        <span className="text-amber-600">⚠ {skipped} skipped</span>
-      </div>
+    <div className="border rounded-md p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-xl font-bold">{valid} <span className="text-sm text-muted-foreground font-normal">/ {total}</span></div>
+      {skipped > 0 && <div className="text-xs text-amber-600 mt-1">{skipped} skipped</div>}
     </div>
   );
 }
-
