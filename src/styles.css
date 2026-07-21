@@ -143,8 +143,7 @@
   @page { size: A4 portrait; margin: 10mm; }
   html, body { background: white !important; }
   /* Prevent cards from splitting */
-  [data-slot="card"],
-  .print-card {
+  .bg-card {
     break-inside: avoid;
     page-break-inside: avoid;
   }
