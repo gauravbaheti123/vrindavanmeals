@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
 import {
   UtensilsCrossed, LayoutDashboard, Users, CalendarClock,
-  ClipboardList, BarChart3, Settings, ShieldCheck, LogOut, Receipt,
+  ClipboardList, BarChart3, Settings, ShieldCheck, LogOut, Receipt, ShoppingCart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,9 +25,11 @@ const NAV: NavItem[] = [
   { to: "/students", label: "Students", icon: Users, show: (f) => f.isSuperAdmin || f.isManager || f.isCounterStaff || f.isAccountant },
   { to: "/subscriptions", label: "Subscriptions", icon: CalendarClock, show: (f) => f.isSuperAdmin || f.isManager || f.isAccountant },
   { to: "/attendance", label: "Attendance", icon: ClipboardList, show: (f) => f.isSuperAdmin || f.isManager || f.isCounterStaff },
+  { to: "/pos", label: "POS", icon: ShoppingCart, show: (f) => f.isSuperAdmin || f.isManager || f.isCounterStaff || f.isAccountant },
   { to: "/reports", label: "Reports", icon: BarChart3, show: (f) => f.isSuperAdmin || f.isManager || f.isAccountant },
   { to: "/settings", label: "Settings", icon: Settings, show: (f) => f.isSuperAdmin },
 ];
+
 
 export function AppShell() {
   const { profile, roles, loading } = useCurrentUser();
