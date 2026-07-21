@@ -114,11 +114,11 @@ function Dashboard() {
       const grace = eff.filter((s) => s.eff === "grace").length;
       const expired = eff.filter((s) => s.eff === "expired").length;
 
-      const unpaid = eff.filter(
-        (s) => (s.eff === "active" || s.eff === "grace" || s.eff === "expired") && !paidStudentIds.has(s.student_id),
-      );
-      const uniqUnpaidStudents = new Set(unpaid.map((u) => u.student_id));
-      const outstandingAmount = uniqUnpaidStudents.size * planPrice;
+      // Single source of truth — same formula as /dues page
+      const duesRows = await fetchDuesRows(planPrice);
+      const scopedDues = unitId === "all" ? duesRows : duesRows.filter((r) => r.unit_id === unitId);
+      const outstandingAmount = scopedDues.reduce((s, r) => s + r.due_amount, 0);
+      const uniqUnpaidStudents = new Set(scopedDues.map((r) => r.student_id));
 
       const expiring = eff.filter(
         (s) => s.eff === "active" && s.end_date >= today && s.end_date <= in5,
