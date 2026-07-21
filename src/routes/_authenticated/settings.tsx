@@ -36,6 +36,7 @@ function SettingsPage() {
       </div>
       <PortalModulesCard />
       <GeneralSettings />
+      <PosMastersCard />
       <BrandingCard />
       <MealWindowsCard />
       <UnitsCard />
@@ -43,6 +44,7 @@ function SettingsPage() {
     </div>
   );
 }
+
 
 function BrandingCard() {
   const qc = useQueryClient();
