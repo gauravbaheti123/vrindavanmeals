@@ -315,6 +315,7 @@ function RecordPaymentModal({ row, defaultAmount, onClose, onSaved }: {
     if (!amount || Number(amount) <= 0) { toast.error("Enter a valid amount"); return; }
     setSaving(true);
     const { data: userRes } = await supabase.auth.getUser();
+    const razorpayRef = mode === "razorpay" && note.trim() ? { razorpay_payment_id: note.trim() } : {};
     const { error } = await supabase.from("payments").insert({
       student_id: row.student_id,
       subscription_id: row.sub_id,
@@ -323,7 +324,7 @@ function RecordPaymentModal({ row, defaultAmount, onClose, onSaved }: {
       status: "success",
       recorded_by: userRes.user?.id,
       created_at: new Date(date + "T" + new Date().toTimeString().slice(0, 8)).toISOString(),
-      reference_note: note || null,
+      ...razorpayRef,
     });
     setSaving(false);
     if (error) { toast.error(error.message); return; }
