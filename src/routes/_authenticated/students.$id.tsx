@@ -109,13 +109,28 @@ function StudentDetail() {
 
   return (
     <div className="space-y-6 max-w-5xl print:max-w-none print:space-y-3">
-      <div className="flex items-center justify-between print:hidden">
+      <div className="flex items-center justify-between print:hidden flex-wrap gap-2">
         <Button asChild variant="ghost" size="sm">
           <Link to="/students"><ArrowLeft className="h-4 w-4 mr-1" />Students</Link>
         </Button>
-        <Button variant="outline" size="sm" onClick={() => window.print()}>
-          <Printer className="h-4 w-4 mr-1" />Print
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          {!s.is_approved && (
+            <Button size="sm" onClick={() => setActivateOpen(true)}>
+              <UserCheck className="h-4 w-4 mr-1" />Activate Student
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={nocLoading}
+            onClick={() => handleIssueNoc()}
+          >
+            <FileText className="h-4 w-4 mr-1" />{nocLoading ? "Preparing…" : "Issue NOC"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-1" />Print
+          </Button>
+        </div>
       </div>
 
       {/* Header */}
