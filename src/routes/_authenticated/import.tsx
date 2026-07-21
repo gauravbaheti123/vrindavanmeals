@@ -542,10 +542,14 @@ function parseWorkbook(file: File): Promise<Parsed> {
         resolve({
           fileName: file.name,
           students, subscriptions, payments,
+          openingBalances: [],
+          openingAsOf: null,
           masterRaw: master.length,
           receiptsRaw: receiptsAoA.length > 0 ? receiptsAoA.length - 1 : 0,
           ledgerRaw: ledger.length,
+          openingRaw: 0,
           skippedStudents, skippedPayments, skippedSubs,
+          skippedOpening: 0,
         });
       } catch (e: any) {
 
