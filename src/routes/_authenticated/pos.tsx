@@ -112,7 +112,7 @@ function POSPage() {
     if (cart.length === 0) return toast.error("Cart is empty");
     if (!paymentMode) return toast.error("Select payment mode");
     setSaving(true);
-    const { data: userData } = await db.auth.getUser();
+    const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
     if (!uid) { setSaving(false); return toast.error("Not signed in"); }
     const { data: sale, error } = await db.from("pos_sales").insert({
