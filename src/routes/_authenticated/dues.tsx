@@ -79,10 +79,10 @@ function DuesPage() {
     queryKey: ["dues-list"],
     queryFn: async () => {
       const monthStart = monthStartISO();
-      const [subsRes, paysMonthRes, lastPaysRes] = await Promise.all([
+      const [subsRes, paysMonthRes, lastPaysRes, obRes] = await Promise.all([
         supabase
           .from("subscriptions")
-          .select("id, student_id, status, start_date, end_date, grace_end_date, unit_id, students!inner(id, full_name, mobile, roll_number, unit_id, is_approved, units(name))")
+          .select("id, student_id, status, start_date, end_date, grace_end_date, unit_id, students!inner(id, full_name, mobile, roll_number, unit_id, is_approved, opening_balance, opening_balance_as_of, units(name))")
           .eq("students.is_approved", true),
         supabase
           .from("payments")
@@ -94,6 +94,11 @@ function DuesPage() {
           .select("student_id, amount, created_at")
           .eq("status", "success")
           .order("created_at", { ascending: false }),
+        supabase
+          .from("students")
+          .select("id, full_name, mobile, roll_number, unit_id, opening_balance, opening_balance_as_of, units(name)")
+          .eq("is_approved", true)
+          .neq("opening_balance", 0),
       ]);
 
       const paidThisMonth = new Set((paysMonthRes.data ?? []).map((p) => p.student_id as string));
@@ -105,7 +110,7 @@ function DuesPage() {
       type Sub = {
         id: string; student_id: string; status: "active" | "grace" | "expired" | "pending";
         start_date: string; end_date: string; grace_end_date: string; unit_id: string | null;
-        students: { id: string; full_name: string; mobile: string | null; roll_number: string | null; unit_id: string | null; units: { name: string } | null };
+        students: { id: string; full_name: string; mobile: string | null; roll_number: string | null; unit_id: string | null; opening_balance: number | null; opening_balance_as_of: string | null; units: { name: string } | null };
       };
       const subs = (subsRes.data ?? []) as unknown as Sub[];
       const today = todayISO();
@@ -118,11 +123,17 @@ function DuesPage() {
       }
 
       const rows: Row[] = [];
+      const covered = new Set<string>();
       for (const s of byStudent.values()) {
         const eff = computeSubscriptionStatus(s);
-        if (paidThisMonth.has(s.student_id)) continue;
-        // Only bill students who owe: active, grace, or expired subs (skip pending — no payment yet expected)
-        if (eff === "pending") continue;
+        const opening = Number(s.students.opening_balance ?? 0);
+        const paidMonth = paidThisMonth.has(s.student_id);
+        // Bill if there's a sub-driven due OR a positive carry-forward.
+        const subDue = !paidMonth && eff !== "pending" ? planPrice : 0;
+        const carry = opening > 0 ? opening : 0;
+        const totalDue = subDue + carry;
+        if (totalDue <= 0) continue;
+        covered.add(s.student_id);
         const lp = lastPayMap.get(s.student_id) ?? null;
         const refDate = lp?.date ? lp.date.slice(0, 10) : s.start_date;
         const days = Math.max(0, Math.floor((Date.parse(today) - Date.parse(refDate)) / 86400000));
@@ -138,7 +149,35 @@ function DuesPage() {
           grace_end_date: s.grace_end_date,
           eff_status: eff,
           last_payment_date: lp?.date ?? null,
-          due_amount: planPrice,
+          due_amount: totalDue,
+          opening_balance: opening,
+          days_overdue: days,
+        });
+      }
+
+      // Students with opening balance but NO subscription row
+      type ObStudent = { id: string; full_name: string; mobile: string | null; roll_number: string | null; unit_id: string | null; opening_balance: number | null; opening_balance_as_of: string | null; units: { name: string } | null };
+      for (const st of ((obRes.data ?? []) as unknown as ObStudent[])) {
+        if (covered.has(st.id)) continue;
+        const opening = Number(st.opening_balance ?? 0);
+        if (opening <= 0) continue;
+        const lp = lastPayMap.get(st.id) ?? null;
+        const refDate = lp?.date ? lp.date.slice(0, 10) : (st.opening_balance_as_of ?? today);
+        const days = Math.max(0, Math.floor((Date.parse(today) - Date.parse(refDate)) / 86400000));
+        rows.push({
+          student_id: st.id,
+          full_name: st.full_name,
+          mobile: st.mobile,
+          roll_number: st.roll_number,
+          unit_name: st.units?.name ?? null,
+          unit_id: st.unit_id,
+          sub_id: null,
+          end_date: st.opening_balance_as_of ?? "",
+          grace_end_date: st.opening_balance_as_of ?? "",
+          eff_status: "expired",
+          last_payment_date: lp?.date ?? null,
+          due_amount: opening,
+          opening_balance: opening,
           days_overdue: days,
         });
       }
