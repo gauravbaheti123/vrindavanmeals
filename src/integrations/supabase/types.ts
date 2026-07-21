@@ -486,6 +486,7 @@ export type Database = {
       }
       subscriptions: {
         Row: {
+          billed_amount: number | null
           created_at: string
           end_date: string
           grace_end_date: string
@@ -497,6 +498,7 @@ export type Database = {
           unit_id: string | null
         }
         Insert: {
+          billed_amount?: number | null
           created_at?: string
           end_date: string
           grace_end_date: string
@@ -508,6 +510,7 @@ export type Database = {
           unit_id?: string | null
         }
         Update: {
+          billed_amount?: number | null
           created_at?: string
           end_date?: string
           grace_end_date?: string
