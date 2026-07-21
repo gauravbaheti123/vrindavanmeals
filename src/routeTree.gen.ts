@@ -18,6 +18,7 @@ import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedStudentsRouteImport } from './routes/_authenticated/students'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedPosMastersRouteImport } from './routes/_authenticated/pos-masters'
 import { Route as AuthenticatedPosRouteImport } from './routes/_authenticated/pos'
 import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
 import { Route as AuthenticatedDuesRouteImport } from './routes/_authenticated/dues'
@@ -79,6 +80,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPosMastersRoute = AuthenticatedPosMastersRouteImport.update({
+  id: '/pos-masters',
+  path: '/pos-masters',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPosRoute = AuthenticatedPosRouteImport.update({
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/dues': typeof AuthenticatedDuesRoute
   '/import': typeof AuthenticatedImportRoute
   '/pos': typeof AuthenticatedPosRoute
+  '/pos-masters': typeof AuthenticatedPosMastersRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/students': typeof AuthenticatedStudentsRouteWithChildren
@@ -220,6 +227,7 @@ export interface FileRoutesByTo {
   '/dues': typeof AuthenticatedDuesRoute
   '/import': typeof AuthenticatedImportRoute
   '/pos': typeof AuthenticatedPosRoute
+  '/pos-masters': typeof AuthenticatedPosMastersRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/users': typeof AuthenticatedUsersRoute
@@ -249,6 +257,7 @@ export interface FileRoutesById {
   '/_authenticated/dues': typeof AuthenticatedDuesRoute
   '/_authenticated/import': typeof AuthenticatedImportRoute
   '/_authenticated/pos': typeof AuthenticatedPosRoute
+  '/_authenticated/pos-masters': typeof AuthenticatedPosMastersRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/students': typeof AuthenticatedStudentsRouteWithChildren
@@ -279,6 +288,7 @@ export interface FileRouteTypes {
     | '/dues'
     | '/import'
     | '/pos'
+    | '/pos-masters'
     | '/reports'
     | '/settings'
     | '/students'
@@ -305,6 +315,7 @@ export interface FileRouteTypes {
     | '/dues'
     | '/import'
     | '/pos'
+    | '/pos-masters'
     | '/reports'
     | '/settings'
     | '/users'
@@ -333,6 +344,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dues'
     | '/_authenticated/import'
     | '/_authenticated/pos'
+    | '/_authenticated/pos-masters'
     | '/_authenticated/reports'
     | '/_authenticated/settings'
     | '/_authenticated/students'
@@ -422,6 +434,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/pos-masters': {
+      id: '/_authenticated/pos-masters'
+      path: '/pos-masters'
+      fullPath: '/pos-masters'
+      preLoaderRoute: typeof AuthenticatedPosMastersRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/pos': {
@@ -609,6 +628,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDuesRoute: typeof AuthenticatedDuesRoute
   AuthenticatedImportRoute: typeof AuthenticatedImportRoute
   AuthenticatedPosRoute: typeof AuthenticatedPosRoute
+  AuthenticatedPosMastersRoute: typeof AuthenticatedPosMastersRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedStudentsRoute: typeof AuthenticatedStudentsRouteWithChildren
@@ -627,6 +647,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDuesRoute: AuthenticatedDuesRoute,
   AuthenticatedImportRoute: AuthenticatedImportRoute,
   AuthenticatedPosRoute: AuthenticatedPosRoute,
+  AuthenticatedPosMastersRoute: AuthenticatedPosMastersRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedStudentsRoute: AuthenticatedStudentsRouteWithChildren,
