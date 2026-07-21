@@ -560,6 +560,55 @@ function parseWorkbook(file: File): Promise<Parsed> {
   });
 }
 
+function downloadWorkbookTemplate(kind: "clean" | "opening" | "legacy") {
+  const wb = XLSX.utils.book_new();
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (kind === "clean") {
+    const students = [["MESS NO", "STUDENT NAME", "ROOM NO", "JOINING DATE", "EXIT DATE", "STATUS", "MOBILE"],
+      ["MESS-001", "Sample Student", "A-101", "2026-07-01", "", "ACTIVE", "9876543210"]];
+    const payments = [["PAYMENT DATE", "MESS NO", "AMOUNT", "PAYMENT MODE", "REMARKS"],
+      ["2026-07-05", "MESS-001", 3500, "UPI", "July fees"]];
+    const subs = [["MESS NO", "STUDENT NAME", "START DATE", "END DATE", "PAYMENT STATUS", "SUB STATUS"],
+      ["MESS-001", "Sample Student", "2026-07-01", "2026-07-31", "PAID", "ACTIVE"]];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(students), "Students");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(payments), "Payments");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(subs), "Subscriptions");
+    XLSX.writeFile(wb, `Vrindavan_Meals_Clean_Template_${today}.xlsx`);
+    return;
+  }
+
+  if (kind === "opening") {
+    const students = [["MESS NO", "STUDENT NAME", "ROOM NO", "JOINING DATE", "EXIT DATE", "STATUS", "MOBILE"],
+      ["MESS-001", "Sample Student", "A-101", "2025-08-01", "", "ACTIVE", "9876543210"],
+      ["MESS-002", "Second Student", "A-102", "2025-09-15", "", "ACTIVE", "9876500000"]];
+    const opening = [["MESS NO", "STUDENT NAME", "OPENING BALANCE"],
+      ["MESS-001", "Sample Student", 1200],
+      ["MESS-002", "Second Student", -500]];
+    const txns = [["PAYMENT DATE", "MESS NO", "AMOUNT", "PAYMENT MODE", "REMARKS"],
+      ["2026-07-05", "MESS-001", 3500, "UPI", "July fees"],
+      ["2026-07-10", "MESS-002", 3500, "CASH", "July fees"]];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(students), "Student Master");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(opening), "Opening Balance as of 30 June 2026");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(txns), "Transactions from July 2026 onwards");
+    XLSX.writeFile(wb, `Vrindavan_Meals_OpeningBalance_Template_${today}.xlsx`);
+    return;
+  }
+
+  // legacy
+  const master = [["MESS NO", "STUDENT NAME", "ROOM NO", "JOINING DATE", "EXIT DATE", "STATUS", "MOBILE"],
+    ["MESS-001", "Sample Student", "A-101", "2026-07-01", "", "ACTIVE", "9876543210"]];
+  const receipts = [["RECEIPT NO", "DATE", "MESS NO", "STUDENT NAME", "AMOUNT", "MODE", "PERIOD FROM", "PERIOD TO", "REMARKS", "COL10", "COL11", "COL12"],
+    [1, "2026-07-05", "MESS-001", "Sample Student", 3500, "UPI", "2026-07-01", "2026-07-31", "July fees", "", "", ""]];
+  const ledger = [["MESS NO", "STUDENT NAME", "START DATE", "END DATE", "AMOUNT", "STATUS"],
+    ["MESS-001", "Sample Student", "2026-07-01", "2026-07-31", 3500, "PAID"]];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(master), "Master");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(receipts), "Receipts");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ledger), "STUDENT LEDGER");
+  XLSX.writeFile(wb, `Vrindavan_Meals_Legacy_Template_${today}.xlsx`);
+}
+
+
 function ExcelWorkbookTab() {
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [result, setResult] = useState<any>(null);
@@ -600,7 +649,7 @@ function ExcelWorkbookTab() {
 
   return (
     <Card className="mt-4"><CardContent className="p-6 space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <label className="inline-flex">
           <input type="file" accept=".xlsx,.xls" className="hidden"
             onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
@@ -611,7 +660,19 @@ function ExcelWorkbookTab() {
             </span>
           </Button>
         </label>
+        <div className="h-6 w-px bg-border mx-1" />
+        <span className="text-xs text-muted-foreground">Templates:</span>
+        <Button variant="outline" size="sm" onClick={() => downloadWorkbookTemplate("opening")}>
+          <Download className="h-4 w-4 mr-2" />With Opening Balance
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => downloadWorkbookTemplate("clean")}>
+          <Download className="h-4 w-4 mr-2" />Clean
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => downloadWorkbookTemplate("legacy")}>
+          <Download className="h-4 w-4 mr-2" />Legacy
+        </Button>
       </div>
+
       <div className="text-xs text-muted-foreground space-y-1">
         <div><strong>Supported formats</strong> (auto-detected by sheet names):</div>
         <ul className="list-disc pl-5 space-y-0.5">
