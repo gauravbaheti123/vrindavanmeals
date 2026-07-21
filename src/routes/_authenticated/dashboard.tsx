@@ -9,6 +9,7 @@ import {
   Utensils, RefreshCw, ArrowRight,
 } from "lucide-react";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
+import { fetchDuesRows } from "@/lib/dues";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Vrindavan Meals" }] }),
@@ -53,7 +54,7 @@ function Dashboard() {
   const planPrice = Number(plan?.price ?? 3000);
 
   const { data: agg } = useQuery({
-    queryKey: ["dashboard-agg-v2", unitId],
+    queryKey: ["dashboard-agg-v2", unitId, planPrice],
     refetchInterval: REFRESH_MS,
     queryFn: async () => {
       const today = todayISO();
@@ -101,7 +102,7 @@ function Dashboard() {
         acc[p.mode] = (acc[p.mode] ?? 0) + Number(p.amount);
         return acc;
       }, {});
-      const paidStudentIds = new Set(pays.map((p) => p.student_id));
+      
 
       type Sub = {
         id: string; student_id: string; status: "active" | "grace" | "expired" | "pending";
@@ -113,11 +114,11 @@ function Dashboard() {
       const grace = eff.filter((s) => s.eff === "grace").length;
       const expired = eff.filter((s) => s.eff === "expired").length;
 
-      const unpaid = eff.filter(
-        (s) => (s.eff === "active" || s.eff === "grace" || s.eff === "expired") && !paidStudentIds.has(s.student_id),
-      );
-      const uniqUnpaidStudents = new Set(unpaid.map((u) => u.student_id));
-      const outstandingAmount = uniqUnpaidStudents.size * planPrice;
+      // Single source of truth — same formula as /dues page
+      const duesRows = await fetchDuesRows(planPrice);
+      const scopedDues = unitId === "all" ? duesRows : duesRows.filter((r) => r.unit_id === unitId);
+      const outstandingAmount = scopedDues.reduce((s, r) => s + r.due_amount, 0);
+      const uniqUnpaidStudents = new Set(scopedDues.map((r) => r.student_id));
 
       const expiring = eff.filter(
         (s) => s.eff === "active" && s.end_date >= today && s.end_date <= in5,
