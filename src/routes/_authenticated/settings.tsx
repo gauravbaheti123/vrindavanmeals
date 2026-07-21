@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pencil, Plus, Save } from "lucide-react";
+import { Pencil, Plus, Save, Upload, Fingerprint, Users, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
 
@@ -34,6 +34,7 @@ function SettingsPage() {
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Manage system-wide preferences.</p>
       </div>
+      <PortalModulesCard />
       <GeneralSettings />
       <MealWindowsCard />
       <UnitsCard />
@@ -95,6 +96,37 @@ function IntegrationsCard() {
           </Button>
           <p className="text-xs text-muted-foreground">Requires <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> and <code>GOOGLE_DRIVE_FOLDER_ID</code> in secrets. Scheduled every Sunday 2:00 AM.</p>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PortalModulesCard() {
+  const items = [
+    { title: "Import Data", desc: "Bulk upload students, subscriptions, payments, attendance", icon: Upload, to: "/import" },
+    { title: "Biometric Mapping", desc: "Map biometric IDs to students", icon: Fingerprint, to: "/biometric" },
+    { title: "Users & Roles", desc: "Manage staff and role permissions", icon: Users, to: "/users" },
+  ];
+  return (
+    <Card>
+      <CardHeader><CardTitle>Portal Modules</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        {items.map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            className="flex items-center gap-3 p-3 rounded-md border hover:bg-muted/50 transition-colors"
+          >
+            <div className="bg-primary/10 p-2 rounded-md">
+              <item.icon className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <div className="font-medium">{item.title}</div>
+              <div className="text-xs text-muted-foreground">{item.desc}</div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
+        ))}
       </CardContent>
     </Card>
   );
