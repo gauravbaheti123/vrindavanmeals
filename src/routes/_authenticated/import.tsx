@@ -611,7 +611,14 @@ function ExcelWorkbookTab() {
             </span>
           </Button>
         </label>
-        <span className="text-xs text-muted-foreground">Expected sheets: Master, Receipts, STUDENT LEDGER</span>
+      </div>
+      <div className="text-xs text-muted-foreground space-y-1">
+        <div><strong>Supported formats</strong> (auto-detected by sheet names):</div>
+        <ul className="list-disc pl-5 space-y-0.5">
+          <li><strong>Clean (recommended)</strong>: <code>Students</code> · <code>Payments</code> · <code>Subscriptions</code></li>
+          <li><strong>With Opening Balance</strong>: <code>Student Master</code> · <code>Opening Balance as of &lt;date&gt;</code> · <code>Transactions from &lt;month&gt; onwards</code></li>
+          <li><strong>Legacy</strong>: <code>Master</code> · <code>Receipts</code> · <code>STUDENT LEDGER</code></li>
+        </ul>
       </div>
 
       {parsed && !result && (
