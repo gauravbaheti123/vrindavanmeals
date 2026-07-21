@@ -80,9 +80,13 @@ function StudentDetail() {
     if (!data) return { paid: 0, due: 0, advance: 0, last: null as Payment | null, billed: 0, opening: 0, openingAsOf: null as string | null };
     const paid = data.pays.filter((p) => p.status === "success").reduce((s, p) => s + Number(p.amount), 0);
     const price = Number(data.plans[0]?.price ?? 3000);
-    const opening = Number((data.student as any)?.opening_balance ?? 0);
-    const openingAsOf = ((data.student as any)?.opening_balance_as_of ?? null) as string | null;
-    const billed = data.subs.length * price + opening;
+    const opening = Number((data.student as unknown as { opening_balance?: number })?.opening_balance ?? 0);
+    const openingAsOf = ((data.student as unknown as { opening_balance_as_of?: string })?.opening_balance_as_of ?? null) as string | null;
+    const subsBilled = data.subs.reduce((sum, sub) => {
+      const b = (sub as unknown as { billed_amount?: number | null }).billed_amount;
+      return sum + Number(b ?? price);
+    }, 0);
+    const billed = subsBilled + opening;
     const balance = billed - paid;
     return {
       paid,
