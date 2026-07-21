@@ -110,6 +110,7 @@ function StudentDetail() {
       const { data: settingsRows } = await supabase.from("system_settings").select("key,value");
       const settings = Object.fromEntries((settingsRows ?? []).map((r) => [r.key, r.value])) as Record<string, string>;
       const st = data.student;
+      if (!st) throw new Error("Student not loaded");
       const doc = generateNocPdf(
         {
           orgName: settings.brand_org_name || "Vrindavan Meals",
