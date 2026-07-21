@@ -23,17 +23,10 @@ interface PosPayMode { id: string; label: string; is_active: boolean; sort_order
 function PosMastersPage() {
   const { roles } = useCurrentUser();
   const flags = roleFlags(roles);
-  if (!flags.isSuperAdmin) {
-    return (
-      <div className="max-w-md mx-auto mt-16 text-center space-y-2">
-        <h2 className="text-xl font-semibold">Restricted</h2>
-        <p className="text-muted-foreground">Only Super Admins can access POS Masters.</p>
-      </div>
-    );
-  }
 
   const qc = useQueryClient();
   const db = supabase as unknown as { from: (t: string) => ReturnType<typeof supabase.from> };
+
 
   const { data: cats = [] } = useQuery({
     queryKey: ["settings-pos-cats"],
@@ -115,6 +108,16 @@ function PosMastersPage() {
     qc.invalidateQueries({ queryKey: ["settings-pos-modes"] });
     qc.invalidateQueries({ queryKey: ["pos-modes"] });
   }
+
+  if (!flags.isSuperAdmin) {
+    return (
+      <div className="max-w-md mx-auto mt-16 text-center space-y-2">
+        <h2 className="text-xl font-semibold">Restricted</h2>
+        <p className="text-muted-foreground">Only Super Admins can access POS Masters.</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="space-y-6 max-w-4xl">
