@@ -33,7 +33,7 @@ export async function fetchDuesRows(planPrice: number): Promise<DuesRow[]> {
       .eq("is_approved", true),
     supabase
       .from("subscriptions")
-      .select("id, student_id, status, start_date, end_date, grace_end_date"),
+      .select("id, student_id, status, start_date, end_date, grace_end_date, billed_amount"),
     supabase
       .from("payments")
       .select("student_id, amount, created_at")
