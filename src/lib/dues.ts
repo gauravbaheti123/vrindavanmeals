@@ -42,7 +42,7 @@ export async function fetchDuesRows(planPrice: number): Promise<DuesRow[]> {
   ]);
 
   type St = { id: string; full_name: string; mobile: string | null; roll_number: string | null; unit_id: string | null; opening_balance: number | null; opening_balance_as_of: string | null; units: { name: string } | null };
-  type Sub = { id: string; student_id: string; status: "active" | "grace" | "expired" | "pending"; start_date: string; end_date: string; grace_end_date: string };
+  type Sub = { id: string; student_id: string; status: "active" | "grace" | "expired" | "pending"; start_date: string; end_date: string; grace_end_date: string; billed_amount: number | null };
 
   const students = (studentsRes.data ?? []) as unknown as St[];
   const subs = (subsRes.data ?? []) as unknown as Sub[];
