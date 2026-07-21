@@ -455,6 +455,7 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       students: { total: data.students.length, imported: 0, skipped: 0 },
       subscriptions: { total: data.subscriptions.length, imported: 0, skipped: 0 },
       payments: { total: data.payments.length, imported: 0, skipped: 0, total_amount: 0 },
+      opening_balances: { total: data.opening_balances.length, applied: 0, total_amount: 0 },
     };
 
     // ---------- STUDENTS ----------
