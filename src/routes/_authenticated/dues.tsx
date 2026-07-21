@@ -36,12 +36,13 @@ type Row = {
   roll_number: string | null;
   unit_name: string | null;
   unit_id: string | null;
-  sub_id: string;
+  sub_id: string | null;
   end_date: string;
   grace_end_date: string;
   eff_status: "active" | "grace" | "expired" | "pending";
   last_payment_date: string | null;
   due_amount: number;
+  opening_balance: number;
   days_overdue: number;
 };
 
