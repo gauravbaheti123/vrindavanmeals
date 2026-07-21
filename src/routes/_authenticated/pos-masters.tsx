@@ -107,6 +107,8 @@ function PosMastersPage() {
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["settings-pos-modes"] });
     qc.invalidateQueries({ queryKey: ["pos-modes"] });
+  }
+
   if (!flags.isSuperAdmin) {
     return (
       <div className="max-w-md mx-auto mt-16 text-center space-y-2">
