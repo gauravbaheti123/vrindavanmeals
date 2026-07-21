@@ -36,10 +36,128 @@ function SettingsPage() {
       </div>
       <PortalModulesCard />
       <GeneralSettings />
+      <BrandingCard />
       <MealWindowsCard />
       <UnitsCard />
       <IntegrationsCard />
     </div>
+  );
+}
+
+function BrandingCard() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["system-settings"],
+    queryFn: async () => {
+      const { data } = await supabase.from("system_settings").select("key,value");
+      return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
+    },
+  });
+  const [form, setForm] = useState({
+    brand_org_name: "",
+    brand_address: "",
+    brand_contact: "",
+    brand_signature_line: "",
+    brand_logo_url: "",
+    brand_stamp_url: "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!data) return;
+    setForm({
+      brand_org_name: data.brand_org_name ?? "Vrindavan Meals",
+      brand_address: data.brand_address ?? "",
+      brand_contact: data.brand_contact ?? "",
+      brand_signature_line: data.brand_signature_line ?? "Authorised Signatory",
+      brand_logo_url: data.brand_logo_url ?? "",
+      brand_stamp_url: data.brand_stamp_url ?? "",
+    });
+  }, [data]);
+
+  const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  async function fileToDataUrl(file: File): Promise<string> {
+    if (file.size > 500 * 1024) throw new Error("Image must be under 500 KB");
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error("Could not read image"));
+      r.readAsDataURL(file);
+    });
+  }
+
+  async function onUpload(key: "brand_logo_url" | "brand_stamp_url", file: File | null) {
+    if (!file) return;
+    try {
+      const url = await fileToDataUrl(file);
+      set(key, url);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed");
+    }
+  }
+
+  async function save() {
+    setSaving(true);
+    const rows = Object.entries(form).map(([key, value]) => ({ key, value }));
+    const { error } = await supabase.from("system_settings").upsert(rows, { onConflict: "key" });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Branding updated");
+    qc.invalidateQueries({ queryKey: ["system-settings"] });
+  }
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Branding (NOC & Letterhead)</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Organisation Name</Label>
+            <Input value={form.brand_org_name} onChange={(e) => set("brand_org_name", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Contact Number</Label>
+            <Input value={form.brand_contact} onChange={(e) => set("brand_contact", e.target.value)} placeholder="+91 …" />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label>Address</Label>
+            <Input value={form.brand_address} onChange={(e) => set("brand_address", e.target.value)} placeholder="Street, City, State, PIN" />
+          </div>
+          <div className="space-y-2">
+            <Label>Signature / Authority Line</Label>
+            <Input value={form.brand_signature_line} onChange={(e) => set("brand_signature_line", e.target.value)} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <div className="space-y-2">
+            <Label>Logo (PNG/JPG, ≤ 500 KB)</Label>
+            <Input type="file" accept="image/png,image/jpeg" onChange={(e) => onUpload("brand_logo_url", e.target.files?.[0] ?? null)} />
+            {form.brand_logo_url && (
+              <div className="flex items-center gap-3 pt-1">
+                <img src={form.brand_logo_url} alt="Logo preview" className="h-14 w-14 object-contain border rounded bg-white p-1" />
+                <Button size="sm" variant="ghost" onClick={() => set("brand_logo_url", "")}>Remove</Button>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>Signature / Stamp Image (optional)</Label>
+            <Input type="file" accept="image/png,image/jpeg" onChange={(e) => onUpload("brand_stamp_url", e.target.files?.[0] ?? null)} />
+            {form.brand_stamp_url && (
+              <div className="flex items-center gap-3 pt-1">
+                <img src={form.brand_stamp_url} alt="Stamp preview" className="h-14 w-24 object-contain border rounded bg-white p-1" />
+                <Button size="sm" variant="ghost" onClick={() => set("brand_stamp_url", "")}>Remove</Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Button onClick={save} disabled={saving}><Save className="h-4 w-4 mr-2" />{saving ? "Saving…" : "Save Branding"}</Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

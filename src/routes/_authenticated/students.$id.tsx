@@ -16,9 +16,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Fingerprint, Pencil, Printer, Plus, Trash2, IndianRupee, X } from "lucide-react";
+import { ArrowLeft, Fingerprint, Pencil, Printer, Plus, Trash2, IndianRupee, X, FileText, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
+import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from "@/lib/billing";
+import { generateNocPdf } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/_authenticated/students/$id")({
@@ -65,6 +67,9 @@ function StudentDetail() {
   const [editSub, setEditSub] = useState<Subscription | null>(null);
   const [newSub, setNewSub] = useState(false);
   const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment } | null>(null);
+  const [activateOpen, setActivateOpen] = useState(false);
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [nocLoading, setNocLoading] = useState(false);
 
   const refresh = () => {
     refetch();
@@ -75,9 +80,13 @@ function StudentDetail() {
     if (!data) return { paid: 0, due: 0, advance: 0, last: null as Payment | null, billed: 0, opening: 0, openingAsOf: null as string | null };
     const paid = data.pays.filter((p) => p.status === "success").reduce((s, p) => s + Number(p.amount), 0);
     const price = Number(data.plans[0]?.price ?? 3000);
-    const opening = Number((data.student as any)?.opening_balance ?? 0);
-    const openingAsOf = ((data.student as any)?.opening_balance_as_of ?? null) as string | null;
-    const billed = data.subs.length * price + opening;
+    const opening = Number((data.student as unknown as { opening_balance?: number })?.opening_balance ?? 0);
+    const openingAsOf = ((data.student as unknown as { opening_balance_as_of?: string })?.opening_balance_as_of ?? null) as string | null;
+    const subsBilled = data.subs.reduce((sum, sub) => {
+      const b = (sub as unknown as { billed_amount?: number | null }).billed_amount;
+      return sum + Number(b ?? price);
+    }, 0);
+    const billed = subsBilled + opening;
     const balance = billed - paid;
     return {
       paid,
@@ -90,6 +99,50 @@ function StudentDetail() {
     };
   }, [data]);
 
+  async function handleIssueNoc() {
+    if (!data) return;
+    if (summary.due > 0) {
+      toast.error(`Clear outstanding payment before issuing NOC — current due ${inr(summary.due)}`);
+      return;
+    }
+    setNocLoading(true);
+    try {
+      const { data: settingsRows } = await supabase.from("system_settings").select("key,value");
+      const settings = Object.fromEntries((settingsRows ?? []).map((r) => [r.key, r.value])) as Record<string, string>;
+      const st = data.student;
+      if (!st) throw new Error("Student not loaded");
+      const doc = generateNocPdf(
+        {
+          orgName: settings.brand_org_name || "Vrindavan Meals",
+          address: settings.brand_address || "",
+          contact: settings.brand_contact || "",
+          signatureLine: settings.brand_signature_line || "Authorised Signatory",
+          logoDataUrl: settings.brand_logo_url || null,
+          stampDataUrl: settings.brand_stamp_url || null,
+        },
+        {
+          studentName: st.full_name,
+          messNo: st.roll_number,
+          room: st.hostel_room,
+          unitName: st.units?.name ?? null,
+          mobile: st.mobile,
+          subscriptionPeriods: data.subs
+            .slice()
+            .sort((a, b) => (a.start_date < b.start_date ? -1 : 1))
+            .map((sub) => ({ start: sub.start_date, end: sub.end_date })),
+          issueDate: new Date().toISOString().slice(0, 10),
+        },
+      );
+      const safeName = st.full_name.replace(/[^a-z0-9]+/gi, "_");
+      doc.save(`NOC_${safeName}.pdf`);
+      toast.success("NOC generated");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not generate NOC");
+    } finally {
+      setNocLoading(false);
+    }
+  }
+
   if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!data?.student) return <div>Student not found.</div>;
 
@@ -100,13 +153,28 @@ function StudentDetail() {
 
   return (
     <div className="space-y-6 max-w-5xl print:max-w-none print:space-y-3">
-      <div className="flex items-center justify-between print:hidden">
+      <div className="flex items-center justify-between print:hidden flex-wrap gap-2">
         <Button asChild variant="ghost" size="sm">
           <Link to="/students"><ArrowLeft className="h-4 w-4 mr-1" />Students</Link>
         </Button>
-        <Button variant="outline" size="sm" onClick={() => window.print()}>
-          <Printer className="h-4 w-4 mr-1" />Print
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          {!s.is_approved && (
+            <Button size="sm" onClick={() => setActivateOpen(true)}>
+              <UserCheck className="h-4 w-4 mr-1" />Activate Student
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={nocLoading}
+            onClick={() => handleIssueNoc()}
+          >
+            <FileText className="h-4 w-4 mr-1" />{nocLoading ? "Preparing…" : "Issue NOC"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-1" />Print
+          </Button>
+        </div>
       </div>
 
       {/* Header */}
@@ -165,44 +233,18 @@ function StudentDetail() {
             <Row k="Address" v={s.address} />
             <Row k="Document" v={s.doc_type ? `${s.doc_type} — ${s.doc_number ?? ""}` : null} />
 
-            <div className="pt-3 mt-3 border-t print:hidden">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" variant="outline" className="text-destructive hover:text-destructive">
-                    <Trash2 className="h-3 w-3 mr-1" />{s.is_approved ? "Deactivate Student" : "Delete Student"}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{s.is_approved ? "Deactivate this student?" : "Delete this student?"}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {s.is_approved
-                        ? "The student will be marked inactive and hidden from lists. Historical data is preserved."
-                        : "This permanently removes the pending student record. Their payments and subscriptions will remain."}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={async () => {
-                        if (s.is_approved) {
-                          const { error } = await supabase.from("students").update({ is_approved: false }).eq("id", s.id);
-                          if (error) return toast.error(error.message);
-                          toast.success("Student deactivated");
-                        } else {
-                          const { error } = await supabase.from("students").delete().eq("id", s.id);
-                          if (error) return toast.error(error.message);
-                          toast.success("Student deleted");
-                        }
-                        refresh();
-                      }}
-                    >
-                      Confirm
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
+            {s.is_approved && (
+              <div className="pt-3 mt-3 border-t print:hidden">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setDeactivateOpen(true)}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />Deactivate Student
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -400,6 +442,23 @@ function StudentDetail() {
           onSaved={() => { setPayModal(null); refresh(); }}
         />
       )}
+      {activateOpen && (
+        <ActivateStudentModal
+          student={s}
+          plan={data.plans[0]}
+          onClose={() => setActivateOpen(false)}
+          onSaved={() => { setActivateOpen(false); refresh(); }}
+        />
+      )}
+      {deactivateOpen && (
+        <DeactivateStudentModal
+          student={s}
+          advance={summary.advance}
+          plan={data.plans[0]}
+          onClose={() => setDeactivateOpen(false)}
+          onSaved={() => { setDeactivateOpen(false); refresh(); }}
+        />
+      )}
     </div>
   );
 }
@@ -520,26 +579,31 @@ function SubscriptionModal({
   const [endDate, setEndDate] = useState(existing?.end_date ?? "");
   const [graceEnd, setGraceEnd] = useState(existing?.grace_end_date ?? "");
   const [status, setStatus] = useState<Database["public"]["Enums"]["subscription_status"]>(existing?.status ?? "active");
+  const [billedAmount, setBilledAmount] = useState<string>(
+    existing ? String((existing as unknown as { billed_amount?: number | null }).billed_amount ?? "") : "",
+  );
   const [saving, setSaving] = useState(false);
 
-  // Auto-fill end + grace when plan or start changes (for new only)
+  const plan = plans.find((p) => p.id === planId);
+  const monthlyPrice = Number(plan?.price ?? 3000);
+  const slice = useMemo(() => computeActivationBilling(startDate, monthlyPrice), [startDate, monthlyPrice]);
+
+  // Auto-fill end/grace/amount from 15th-pivot rule (new only)
   useEffect(() => {
     if (existing) return;
-    const plan = plans.find((p) => p.id === planId);
-    if (!plan) return;
-    const start = new Date(startDate);
-    const end = new Date(start); end.setDate(end.getDate() + plan.duration_days - 1);
-    const grace = new Date(end); grace.setDate(grace.getDate() + 5);
-    setEndDate(end.toISOString().slice(0, 10));
-    setGraceEnd(grace.toISOString().slice(0, 10));
-  }, [planId, startDate, plans, existing]);
+    setEndDate(slice.endDate);
+    setGraceEnd(addDaysISO(slice.endDate, 5));
+    setBilledAmount(String(slice.amount));
+  }, [slice.endDate, slice.amount, existing]);
 
   async function save() {
     if (!planId || !startDate || !endDate || !graceEnd) return toast.error("All fields required");
+    const amt = billedAmount === "" ? monthlyPrice : Number(billedAmount);
+    if (Number.isNaN(amt) || amt < 0) return toast.error("Invalid billed amount");
     setSaving(true);
     if (existing) {
       const { error } = await supabase.from("subscriptions").update({
-        plan_id: planId, start_date: startDate, end_date: endDate, grace_end_date: graceEnd, status,
+        plan_id: planId, start_date: startDate, end_date: endDate, grace_end_date: graceEnd, status, billed_amount: amt,
       }).eq("id", existing.id);
       setSaving(false);
       if (error) return toast.error(error.message);
@@ -547,7 +611,7 @@ function SubscriptionModal({
     } else {
       const { error } = await supabase.from("subscriptions").insert({
         student_id: studentId, plan_id: planId, start_date: startDate,
-        end_date: endDate, grace_end_date: graceEnd, status, unit_id: unitId,
+        end_date: endDate, grace_end_date: graceEnd, status, unit_id: unitId, billed_amount: amt,
       });
       setSaving(false);
       if (error) return toast.error(error.message);
@@ -574,16 +638,26 @@ function SubscriptionModal({
             <Field label="End Date"><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></Field>
             <Field label="Grace Until"><Input type="date" value={graceEnd} onChange={(e) => setGraceEnd(e.target.value)} /></Field>
           </div>
-          <Field label="Status">
-            <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {(["active", "grace", "expired", "pending"] as const).map((v) => (
-                  <SelectItem key={v} value={v} className="capitalize">{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Billed Amount (₹)">
+              <Input type="number" value={billedAmount} onChange={(e) => setBilledAmount(e.target.value)} />
+            </Field>
+            <Field label="Status">
+              <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(["active", "grace", "expired", "pending"] as const).map((v) => (
+                    <SelectItem key={v} value={v} className="capitalize">{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          {!existing && (
+            <div className="rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
+              15th-pivot: {slice.isFullMonth ? "Full month" : "Half month"} · Ends {slice.endDate} · Auto ₹{slice.amount.toLocaleString("en-IN")}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
@@ -655,6 +729,183 @@ function PaymentModal({
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ---------------- Activate Student Modal ---------------- */
+
+function ActivateStudentModal({
+  student, plan, onClose, onSaved,
+}: {
+  student: Student;
+  plan: Database["public"]["Tables"]["subscription_plans"]["Row"] | undefined;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [joinDate, setJoinDate] = useState(todayISO());
+  const [saving, setSaving] = useState(false);
+  const monthlyPrice = Number(plan?.price ?? 3000);
+  const slice = useMemo(() => computeActivationBilling(joinDate, monthlyPrice), [joinDate, monthlyPrice]);
+
+  async function save() {
+    if (!plan) return toast.error("No active plan configured");
+    setSaving(true);
+    const { error: upErr } = await supabase.from("students").update({ is_approved: true }).eq("id", student.id);
+    if (upErr) { setSaving(false); return toast.error(upErr.message); }
+    const { error: subErr } = await supabase.from("subscriptions").insert({
+      student_id: student.id,
+      plan_id: plan.id,
+      unit_id: student.unit_id,
+      start_date: slice.startDate,
+      end_date: slice.endDate,
+      grace_end_date: addDaysISO(slice.endDate, 5),
+      status: "active",
+      billed_amount: slice.amount,
+    });
+    setSaving(false);
+    if (subErr) return toast.error(subErr.message);
+    toast.success(`Activated — ${slice.isFullMonth ? "Full" : "Half"} month · ₹${slice.amount.toLocaleString("en-IN")}`);
+    onSaved();
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Activate Student</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Choose the join/activation date. Billing applies the 15th-pivot rule:
+            day 1–15 = full month, day 16–EOM = half month. Subscription runs till last day of that month.
+          </p>
+          <Field label="Join / Activation Date">
+            <Input type="date" value={joinDate} onChange={(e) => setJoinDate(e.target.value)} />
+          </Field>
+          <div className="rounded-md border bg-muted/40 p-3 text-sm">
+            <div className="flex justify-between"><span>Rule</span><span className="font-medium">{slice.isFullMonth ? "Full month (day ≤ 15)" : "Half month (day 16 – EOM)"}</span></div>
+            <div className="flex justify-between"><span>Period</span><span className="font-medium">{slice.startDate} → {slice.endDate}</span></div>
+            <div className="flex justify-between pt-1 border-t mt-1"><span className="text-muted-foreground">Amount to bill</span><span className="font-bold">{inr(slice.amount)}</span></div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? "Activating…" : "Activate & Bill"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ---------------- Deactivate Student Modal ---------------- */
+
+function DeactivateStudentModal({
+  student, advance, plan, onClose, onSaved,
+}: {
+  student: Student;
+  advance: number;
+  plan: Database["public"]["Tables"]["subscription_plans"]["Row"] | undefined;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [deactivateDate, setDeactivateDate] = useState(todayISO());
+  const [action, setAction] = useState<"none" | "credit" | "refund">("none");
+  const [refundMode, setRefundMode] = useState<PaymentMode>("cash");
+  const [saving, setSaving] = useState(false);
+  const monthlyPrice = Number(plan?.price ?? 3000);
+  const refundable = useMemo(
+    () => computeDeactivationRefund(deactivateDate, monthlyPrice, advance),
+    [deactivateDate, monthlyPrice, advance],
+  );
+
+  async function save() {
+    setSaving(true);
+    try {
+      if (action === "refund" && refundable > 0) {
+        const { data: userRes } = await supabase.auth.getUser();
+        const { error } = await supabase.from("payments").insert({
+          student_id: student.id,
+          subscription_id: null,
+          amount: -refundable,
+          mode: refundMode,
+          status: "success",
+          recorded_by: userRes.user?.id,
+          razorpay_payment_id: `REFUND on deactivation ${deactivateDate}`,
+          created_at: new Date(deactivateDate + "T12:00:00").toISOString(),
+        });
+        if (error) throw new Error(error.message);
+      }
+      // "credit" leaves the advance as-is (still visible on ledger). "none" also leaves it.
+      const { error: dErr } = await supabase.from("students").update({ is_approved: false }).eq("id", student.id);
+      if (dErr) throw new Error(dErr.message);
+      toast.success("Student deactivated");
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to deactivate");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Deactivate Student</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            15th-pivot mirror: exit day 1–15 → liable half month (₹{(monthlyPrice / 2).toLocaleString("en-IN")}) →
+            up to that portion of advance refundable. Exit day 16–EOM → liable full month → no refund.
+          </p>
+          <Field label="Deactivation Date">
+            <Input type="date" value={deactivateDate} onChange={(e) => setDeactivateDate(e.target.value)} />
+          </Field>
+          <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
+            <div className="flex justify-between"><span>Current Advance</span><span className="font-medium">{inr(advance)}</span></div>
+            <div className="flex justify-between"><span>Refundable</span><span className="font-bold text-success">{inr(refundable)}</span></div>
+          </div>
+          {refundable > 0 && (
+            <div className="space-y-2">
+              <Label className="text-xs">Refundable amount — choose action</Label>
+              <RadioGroup value={action} onValueChange={(v) => setAction(v as typeof action)} className="space-y-1">
+                <label className={`flex items-start gap-2 border rounded-md px-3 py-2 cursor-pointer ${action === "credit" ? "border-primary bg-primary/5" : ""}`}>
+                  <RadioGroupItem value="credit" className="mt-1" />
+                  <div>
+                    <div className="font-medium text-sm">Record as Credit</div>
+                    <div className="text-xs text-muted-foreground">Keep {inr(refundable)} as advance on the ledger.</div>
+                  </div>
+                </label>
+                <label className={`flex items-start gap-2 border rounded-md px-3 py-2 cursor-pointer ${action === "refund" ? "border-primary bg-primary/5" : ""}`}>
+                  <RadioGroupItem value="refund" className="mt-1" />
+                  <div>
+                    <div className="font-medium text-sm">Record as Cash Refund</div>
+                    <div className="text-xs text-muted-foreground">Add a negative entry in Payment Ledger for {inr(refundable)}.</div>
+                  </div>
+                </label>
+              </RadioGroup>
+              {action === "refund" && (
+                <Field label="Refund Mode">
+                  <RadioGroup value={refundMode} onValueChange={(v) => setRefundMode(v as PaymentMode)} className="grid grid-cols-4 gap-2">
+                    {(["cash", "upi", "card", "razorpay"] as PaymentMode[]).map((m) => (
+                      <label key={m} className={`flex items-center gap-1 border rounded-md px-2 py-1.5 cursor-pointer text-sm capitalize ${refundMode === m ? "border-primary bg-primary/5" : ""}`}>
+                        <RadioGroupItem value={m} />{m}
+                      </label>
+                    ))}
+                  </RadioGroup>
+                </Field>
+              )}
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving || (refundable > 0 && action === "none")}>
+            {saving ? "Saving…" : "Confirm Deactivation"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

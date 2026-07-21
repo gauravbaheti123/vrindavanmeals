@@ -8,17 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { StudentPicker, type StudentOption } from "@/components/student-picker";
 import { toast } from "sonner";
+import { computeActivationBilling, addDaysISO } from "@/lib/billing";
 
 export const Route = createFileRoute("/_authenticated/subscriptions/new")({
   head: () => ({ meta: [{ title: "Assign Subscription — Vrindavan Meals" }] }),
   component: NewSubscription,
 });
-
-function addDays(dateStr: string, days: number) {
-  const d = new Date(dateStr + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 function NewSubscription() {
   const navigate = useNavigate();
@@ -45,10 +40,10 @@ function NewSubscription() {
     queryFn: async () => (await supabase.from("units").select("name").eq("id", student!.unit_id!).maybeSingle()).data?.name ?? "—",
   });
 
-  const durationDays = plan?.duration_days ?? 30;
   const graceDays = Number(settings?.grace_period_days ?? 5);
-  const endDate = useMemo(() => addDays(startDate, durationDays), [startDate, durationDays]);
-  const graceEnd = useMemo(() => addDays(endDate, graceDays), [endDate, graceDays]);
+  const monthlyPrice = Number(plan?.price ?? 3000);
+  const slice = useMemo(() => computeActivationBilling(startDate, monthlyPrice), [startDate, monthlyPrice]);
+  const graceEnd = useMemo(() => addDaysISO(slice.endDate, graceDays), [slice.endDate, graceDays]);
 
   async function save() {
     if (!student) { toast.error("Please select a student"); return; }
@@ -59,14 +54,15 @@ function NewSubscription() {
       student_id: student.id,
       plan_id: plan.id,
       unit_id: student.unit_id,
-      start_date: startDate,
-      end_date: endDate,
+      start_date: slice.startDate,
+      end_date: slice.endDate,
       grace_end_date: graceEnd,
+      billed_amount: slice.amount,
       status: "pending",
     }).select("id").single();
     setSaving(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Subscription assigned");
+    toast.success(`Subscription assigned — ${slice.isFullMonth ? "Full" : "Half"} month · ₹${slice.amount.toLocaleString("en-IN")}`);
     navigate({ to: "/subscriptions/$id", params: { id: data.id } });
   }
 
@@ -74,7 +70,7 @@ function NewSubscription() {
     <div className="max-w-2xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Assign Subscription</h1>
-        <p className="text-muted-foreground">Create a new subscription for an approved student.</p>
+        <p className="text-muted-foreground">15th-pivot billing: 1–15 = full month, 16–EOM = half month. Ends on the last day of that month.</p>
       </div>
       <Card>
         <CardHeader><CardTitle>Details</CardTitle></CardHeader>
@@ -89,21 +85,24 @@ function NewSubscription() {
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label>Start Date</Label>
+              <Label>Start / Join Date</Label>
               <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>End Date</Label>
-              <Input type="date" value={endDate} readOnly />
+              <Label>End Date (EOM)</Label>
+              <Input type="date" value={slice.endDate} readOnly />
             </div>
             <div className="space-y-2">
               <Label>Grace End</Label>
               <Input type="date" value={graceEnd} readOnly />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label>Plan</Label>
-            <Input value={plan ? `${plan.name} — ₹${Number(plan.price).toLocaleString("en-IN")}` : "…"} readOnly />
+          <div className="rounded-md border bg-muted/40 p-3 text-sm">
+            <div className="font-semibold">Billing Preview</div>
+            <div className="text-muted-foreground">
+              {slice.isFullMonth ? "Full month (day ≤ 15)" : "Half month (day 16 – end of month)"} · Plan {plan?.name ?? ""} · ₹{monthlyPrice.toLocaleString("en-IN")}/mo
+            </div>
+            <div className="text-lg font-bold pt-1">Amount to bill: ₹{slice.amount.toLocaleString("en-IN")}</div>
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <Button variant="outline" onClick={() => navigate({ to: "/subscriptions" })}>Cancel</Button>

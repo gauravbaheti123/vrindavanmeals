@@ -33,7 +33,7 @@ export async function fetchDuesRows(planPrice: number): Promise<DuesRow[]> {
       .eq("is_approved", true),
     supabase
       .from("subscriptions")
-      .select("id, student_id, status, start_date, end_date, grace_end_date"),
+      .select("id, student_id, status, start_date, end_date, grace_end_date, billed_amount"),
     supabase
       .from("payments")
       .select("student_id, amount, created_at")
@@ -42,7 +42,7 @@ export async function fetchDuesRows(planPrice: number): Promise<DuesRow[]> {
   ]);
 
   type St = { id: string; full_name: string; mobile: string | null; roll_number: string | null; unit_id: string | null; opening_balance: number | null; opening_balance_as_of: string | null; units: { name: string } | null };
-  type Sub = { id: string; student_id: string; status: "active" | "grace" | "expired" | "pending"; start_date: string; end_date: string; grace_end_date: string };
+  type Sub = { id: string; student_id: string; status: "active" | "grace" | "expired" | "pending"; start_date: string; end_date: string; grace_end_date: string; billed_amount: number | null };
 
   const students = (studentsRes.data ?? []) as unknown as St[];
   const subs = (subsRes.data ?? []) as unknown as Sub[];
@@ -69,7 +69,8 @@ export async function fetchDuesRows(planPrice: number): Promise<DuesRow[]> {
     const stSubs = subsByStudent.get(st.id) ?? [];
     const opening = Number(st.opening_balance ?? 0);
     const paid = paidByStudent.get(st.id) ?? 0;
-    const billed = stSubs.length * planPrice + opening;
+    const subsBilled = stSubs.reduce((sum, sub) => sum + Number(sub.billed_amount ?? planPrice), 0);
+    const billed = subsBilled + opening;
     const due = billed - paid;
     if (due <= 0) continue;
 
