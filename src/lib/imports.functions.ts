@@ -415,11 +415,18 @@ const ExcelPayRow = z.object({
   reference_note: z.string().nullable().optional(),
 });
 
+const OpeningBalanceRow = z.object({
+  mess_no: z.string(),
+  opening_balance: z.number(),
+  as_of: z.string(),
+});
+
 const ExcelWorkbookSchema = z.object({
   file_name: z.string().default("workbook.xlsx"),
   students: z.array(ExcelStudentRow).max(10000),
   subscriptions: z.array(ExcelSubRow).max(10000),
   payments: z.array(ExcelPayRow).max(20000),
+  opening_balances: z.array(OpeningBalanceRow).max(10000).optional().default([]),
 });
 
 export const importExcelWorkbook = createServerFn({ method: "POST" })
