@@ -33,7 +33,8 @@ type ReportKey =
   | "p.collection" | "p.monthly" | "p.outstanding" | "p.advance" | "p.mode"
   | "a.daily" | "a.monthly" | "a.trend" | "a.manual" | "a.unmapped"
   | "sub.status" | "sub.enrol" | "sub.renew"
-  | "ledger" | "fin.gst" | "fin.rev" | "reprint";
+  | "ledger" | "fin.gst" | "fin.rev" | "reprint"
+  | "pos.items";
 
 interface NavGroup { label: string; icon: React.ComponentType<{ className?: string }>; items: { key: ReportKey; label: string }[]; }
 const NAV: NavGroup[] = [
@@ -68,6 +69,9 @@ const NAV: NavGroup[] = [
     { key: "fin.gst", label: "🧾 GST Report" },
     { key: "fin.rev", label: "Revenue Dashboard" },
     { key: "reprint", label: "🖨️ Reprint Log" },
+  ]},
+  { label: "POS", icon: Receipt, items: [
+    { key: "pos.items", label: "Item Sales" },
   ]},
 ];
 
@@ -182,8 +186,48 @@ function ReportRouter({ active, from, to, unit }: { active: ReportKey; from: str
     case "fin.gst": return <GSTReport />;
     case "fin.rev": return <RevenueReport />;
     case "reprint": return <ReprintLog from={from} to={to} />;
+    case "pos.items": return <PosItemSales from={from} to={to} />;
   }
 }
+
+function PosItemSales({ from, to }: { from: string; to: string }) {
+  const db = supabase as unknown as { from: (t: string) => ReturnType<typeof supabase.from> };
+  const { data = [] } = useQuery({
+    queryKey: ["pos-item-sales", from, to],
+    queryFn: async () => {
+      const { data } = await db
+        .from("pos_sale_items")
+        .select("item_name, quantity, line_total, pos_sales!inner(sold_at)")
+        .gte("pos_sales.sold_at", from)
+        .lte("pos_sales.sold_at", to + "T23:59:59");
+      return (data ?? []) as unknown as { item_name: string; quantity: number; line_total: number }[];
+    },
+  });
+  const agg = useMemo(() => {
+    const map = new Map<string, { qty: number; revenue: number }>();
+    data.forEach((r) => {
+      const cur = map.get(r.item_name) ?? { qty: 0, revenue: 0 };
+      cur.qty += Number(r.quantity); cur.revenue += Number(r.line_total);
+      map.set(r.item_name, cur);
+    });
+    return Array.from(map.entries()).map(([name, v]) => ({ name, qty: v.qty, revenue: v.revenue }))
+      .sort((a, b) => b.revenue - a.revenue);
+  }, [data]);
+  const cols = ["Item", "Qty Sold", "Revenue"];
+  const rows = agg.map((r) => [r.name, r.qty, fmtINR(r.revenue)]);
+  const totalRev = agg.reduce((s, r) => s + r.revenue, 0);
+  return (
+    <div className="space-y-3">
+      <ExportBar
+        onPdf={() => exportPdf({ title: "POS Item Sales", subtitle: `${from} → ${to}`, columns: cols, rows, filename: "pos-item-sales" })}
+        onExcel={() => exportExcel({ title: "POS Item Sales", columns: cols, rows, filename: "pos-item-sales" })}
+      />
+      <div className="text-sm text-muted-foreground">Total POS revenue: <b className="text-foreground">{fmtINR(totalRev)}</b></div>
+      <DataTable cols={cols} rows={rows} empty="No POS sales in this range." />
+    </div>
+  );
+}
+
 
 function ExportBar({ onPdf, onExcel }: { onPdf: () => void; onExcel: () => void }) {
   return (
