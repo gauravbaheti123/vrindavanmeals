@@ -575,6 +575,7 @@ function ExcelWorkbookTab() {
           students: parsed.students,
           subscriptions: parsed.subscriptions,
           payments: parsed.payments,
+          opening_balances: parsed.openingBalances,
         },
       });
     },
