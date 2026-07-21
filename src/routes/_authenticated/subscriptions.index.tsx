@@ -58,6 +58,18 @@ function SubscriptionList() {
     });
   }, [subs, status, q]);
 
+  const exportColumns = ["Student", "Unit", "Plan", "Start", "End", "Grace End", "Status"];
+  const exportRows = rows.map((r) => [
+    r.students?.full_name ?? "",
+    r.units?.name ?? "",
+    r.subscription_plans?.name ?? "",
+    r.start_date,
+    r.end_date,
+    r.grace_end_date,
+    STATUS_LABEL[r.effective],
+  ]);
+  const exportTitle = `Subscriptions — ${new Date().toLocaleDateString("en-IN")}`;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -65,9 +77,17 @@ function SubscriptionList() {
           <h1 className="text-3xl font-bold">Subscriptions</h1>
           <p className="text-muted-foreground">Track and manage student meal subscriptions.</p>
         </div>
-        <Button asChild>
-          <Link to="/subscriptions/new"><Plus className="h-4 w-4 mr-2" />Assign Subscription</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => exportPdf({ title: exportTitle, columns: exportColumns, rows: exportRows, filename: "subscriptions" })}>
+            <FileText className="h-4 w-4 mr-1" />PDF
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => exportExcel({ title: "Subscriptions", columns: exportColumns, rows: exportRows, filename: "subscriptions" })}>
+            <Download className="h-4 w-4 mr-1" />Excel
+          </Button>
+          <Button asChild>
+            <Link to="/subscriptions/new"><Plus className="h-4 w-4 mr-2" />Assign Subscription</Link>
+          </Button>
+        </div>
       </div>
 
       <Card className="p-4 flex flex-wrap gap-3 items-center">

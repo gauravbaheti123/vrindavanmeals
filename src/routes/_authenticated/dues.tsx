@@ -173,12 +173,33 @@ function DuesPage() {
 
   const totalOutstanding = filtered.reduce((s, r) => s + r.due_amount, 0);
 
+  const exportColumns = ["Mess No", "Student", "Mobile", "Unit", "Due", "Last Payment", "Days Overdue", "Status"];
+  const exportRows = filtered.map((r) => [
+    r.roll_number ?? "",
+    r.full_name,
+    r.mobile ?? "",
+    r.unit_name ?? "",
+    r.due_amount,
+    r.last_payment_date ? r.last_payment_date.slice(0, 10) : "",
+    r.days_overdue,
+    r.eff_status,
+  ]);
+  const exportTitle = `Dues & Ledger — ${new Date().toLocaleDateString("en-IN")}`;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Dues & Ledger</h1>
           <p className="text-sm text-muted-foreground">Students who owe money — sorted by days overdue.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => exportPdf({ title: exportTitle, columns: exportColumns, rows: exportRows, filename: "dues-ledger" })}>
+            <FileText className="h-4 w-4 mr-1" />PDF
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => exportExcel({ title: "Dues Ledger", columns: exportColumns, rows: exportRows, filename: "dues-ledger" })}>
+            <Download className="h-4 w-4 mr-1" />Excel
+          </Button>
         </div>
       </div>
 
