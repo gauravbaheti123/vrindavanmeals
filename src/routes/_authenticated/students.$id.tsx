@@ -67,6 +67,9 @@ function StudentDetail() {
   const [editSub, setEditSub] = useState<Subscription | null>(null);
   const [newSub, setNewSub] = useState(false);
   const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment } | null>(null);
+  const [activateOpen, setActivateOpen] = useState(false);
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [nocLoading, setNocLoading] = useState(false);
 
   const refresh = () => {
     refetch();
