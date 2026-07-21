@@ -69,7 +69,8 @@ export async function fetchDuesRows(planPrice: number): Promise<DuesRow[]> {
     const stSubs = subsByStudent.get(st.id) ?? [];
     const opening = Number(st.opening_balance ?? 0);
     const paid = paidByStudent.get(st.id) ?? 0;
-    const billed = stSubs.length * planPrice + opening;
+    const subsBilled = stSubs.reduce((sum, sub) => sum + Number(sub.billed_amount ?? planPrice), 0);
+    const billed = subsBilled + opening;
     const due = billed - paid;
     if (due <= 0) continue;
 
