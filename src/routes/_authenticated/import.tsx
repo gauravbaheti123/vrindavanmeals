@@ -623,11 +623,25 @@ function ExcelWorkbookTab() {
 
       {parsed && !result && (
         <>
-          <div className="grid grid-cols-3 gap-3">
-            <PanelStat label="Master (Students)" total={parsed.masterRaw} valid={parsed.students.length} skipped={parsed.skippedStudents} />
-            <PanelStat label="Receipts (Payments)" total={parsed.receiptsRaw} valid={parsed.payments.length} skipped={parsed.skippedPayments} />
-            <PanelStat label="Ledger (Subscriptions)" total={parsed.ledgerRaw} valid={parsed.subscriptions.length} skipped={parsed.skippedSubs} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <PanelStat label="Students" total={parsed.masterRaw} valid={parsed.students.length} skipped={parsed.skippedStudents} />
+            <PanelStat label="Payments" total={parsed.receiptsRaw} valid={parsed.payments.length} skipped={parsed.skippedPayments} />
+            <PanelStat label="Subscriptions" total={parsed.ledgerRaw} valid={parsed.subscriptions.length} skipped={parsed.skippedSubs} />
+            <PanelStat
+              label={parsed.openingAsOf ? `Opening Balances (as of ${parsed.openingAsOf})` : "Opening Balances"}
+              total={parsed.openingRaw}
+              valid={parsed.openingBalances.length}
+              skipped={parsed.skippedOpening}
+            />
           </div>
+          {parsed.openingBalances.length > 0 && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Carry-forward total: ₹{parsed.openingBalances.reduce((s, r) => s + r.opening_balance, 0).toLocaleString("en-IN")}</strong> across {parsed.openingBalances.length} students. Positive = student owes; negative = advance. Will be written to each student's opening balance and shown in Dues & Ledger.
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Alert>
             <AlertTriangle className="h-4 w-4" />
