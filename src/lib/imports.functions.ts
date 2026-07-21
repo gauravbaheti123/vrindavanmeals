@@ -388,55 +388,57 @@ export const importAttendance = createServerFn({ method: "POST" })
     return { ok: true, ...result, log_id };
   });
 
-// ============ Excel workbook (multi-sheet) importer ============
-// Accepts pre-parsed rows from client-side SheetJS parse of the legacy
-// Vrindavan_Meals.xlsx format (sheets: Master, Receipts, STUDENT LEDGER).
+// ============ Excel workbook (unified 2-sheet importer) ============
+// Sheet 1 = Students, Sheet 2 = Transactions.
+// Match key: MOBILE (unique). Existing students are updated in place.
 
-const ExcelStudentRow = z.object({
-  mess_no: z.string(),                  // "MESS-001"
-  full_name: z.string(),
-  mobile: z.string().nullable().optional(),
-  hostel_room: z.string().nullable().optional(),
-  joining_date: z.string().nullable().optional(),   // ISO YYYY-MM-DD
-  exit_date: z.string().nullable().optional(),
-  is_inactive: z.boolean().optional(),
-});
-const ExcelSubRow = z.object({
-  mess_no: z.string(),
-  start_date: z.string(),               // ISO YYYY-MM-DD
-  end_date: z.string().nullable().optional(),
-  is_inactive: z.boolean().optional(),
-});
-const ExcelPayRow = z.object({
-  mess_no: z.string(),
-  amount: z.number(),
-  mode: z.enum(["cash", "upi", "card", "razorpay"]),
-  paid_at: z.string(),                  // ISO YYYY-MM-DD
-  reference_note: z.string().nullable().optional(),
+const UStudentRow = z.object({
+  full_name: z.string().min(1),
+  mobile: z.string().min(1),
+  mess_no: z.string().nullable().optional(),
+  unit_name: z.string().nullable().optional(),
+  room: z.string().nullable().optional(),
+  opening_balance: z.number().nullable().optional(),
+  course: z.string().nullable().optional(),
+  parent_mobile: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  blood_group: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
 });
 
-const OpeningBalanceRow = z.object({
-  mess_no: z.string(),
-  opening_balance: z.number(),
-  as_of: z.string(),
+const UTxnRow = z.object({
+  mobile: z.string().min(1),
+  name: z.string().nullable().optional(),
+  date: z.string().nullable().optional(),
+  amount: z.number().nullable().optional(),
+  mode: z.enum(["cash", "upi", "card", "razorpay"]).nullable().optional(),
+  sub_start: z.string().nullable().optional(),
+  sub_end: z.string().nullable().optional(),
 });
 
-const ExcelWorkbookSchema = z.object({
+const UnifiedWorkbookSchema = z.object({
   file_name: z.string().default("workbook.xlsx"),
-  students: z.array(ExcelStudentRow).max(10000),
-  subscriptions: z.array(ExcelSubRow).max(10000),
-  payments: z.array(ExcelPayRow).max(20000),
-  opening_balances: z.array(OpeningBalanceRow).max(10000).optional().default([]),
+  students: z.array(UStudentRow).max(20000),
+  transactions: z.array(UTxnRow).max(30000),
 });
+
+function monthBounds(iso: string): { start: string; end: string } {
+  const d = new Date(iso + "T00:00:00");
+  const start = new Date(d.getFullYear(), d.getMonth(), 1);
+  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  const fmt = (x: Date) => x.toISOString().slice(0, 10);
+  return { start: fmt(start), end: fmt(end) };
+}
 
 export const importExcelWorkbook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((raw: unknown) => ExcelWorkbookSchema.parse(raw))
+  .inputValidator((raw: unknown) => UnifiedWorkbookSchema.parse(raw))
   .handler(async ({ data, context }) => {
     await assertAdminOrManager(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: units } = await supabaseAdmin.from("units").select("id,name");
+    const unitMap = new Map((units ?? []).map((u) => [u.name.trim().toLowerCase(), u.id]));
     const defaultUnitId =
       units?.find((u) => u.name.trim().toLowerCase() === "unit 1")?.id ?? units?.[0]?.id;
     if (!defaultUnitId) throw new Error("No units configured");
@@ -452,144 +454,187 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
 
     const errors: Array<{ section: string; row: number; reason: string }> = [];
     const summary = {
-      students: { total: data.students.length, imported: 0, skipped: 0 },
-      subscriptions: { total: data.subscriptions.length, imported: 0, skipped: 0 },
-      payments: { total: data.payments.length, imported: 0, skipped: 0, total_amount: 0 },
-      opening_balances: { total: data.opening_balances.length, applied: 0, total_amount: 0 },
+      students: { total: data.students.length, imported: 0, updated: 0, skipped: 0 },
+      subscriptions: { total: 0, imported: 0, skipped: 0 },
+      payments: { total: 0, imported: 0, skipped: 0, total_amount: 0 },
     };
 
-    // ---------- STUDENTS ----------
-    // Pre-fetch existing by roll_number
-    const rolls = Array.from(new Set(data.students.map((s) => s.mess_no)));
-    const { data: existingStudents } = await supabaseAdmin
-      .from("students").select("id,roll_number").in("roll_number", rolls);
-    const rollToId = new Map<string, string>(
-      (existingStudents ?? []).map((s) => [s.roll_number as string, s.id]),
-    );
+    const allMobiles = Array.from(new Set([
+      ...data.students.map((s) => normalizeMobile(s.mobile)),
+      ...data.transactions.map((t) => normalizeMobile(t.mobile)),
+    ].filter(Boolean)));
 
-    const studentsToInsert: any[] = [];
-    data.students.forEach((s, idx) => {
-      if (rollToId.has(s.mess_no)) { summary.students.skipped++; return; }
-      const mobile = (s.mobile || "").trim() || `NA-${s.mess_no}`;
-      studentsToInsert.push({
-        full_name: s.full_name,
-        mobile,
-        roll_number: s.mess_no,
-        hostel_room: s.hostel_room || null,
-        unit_id: defaultUnitId,
-        is_approved: true,
-        __idx: idx,
-      });
-    });
-    for (let i = 0; i < studentsToInsert.length; i += 50) {
-      const batch = studentsToInsert.slice(i, i + 50).map(({ __idx, ...rest }) => rest);
-      const { data: inserted, error } = await supabaseAdmin
-        .from("students").insert(batch).select("id,roll_number");
-      if (error) {
-        errors.push({ section: "students", row: i + 2, reason: `Batch failed: ${error.message}` });
-      } else {
-        summary.students.imported += inserted?.length ?? 0;
-        (inserted ?? []).forEach((r) => rollToId.set(r.roll_number as string, r.id));
-      }
+    const { data: existing } = await supabaseAdmin
+      .from("students").select("id,mobile,roll_number").in("mobile", allMobiles);
+    const mobileToId = new Map<string, string>();
+    (existing ?? []).forEach((s) => { if (s.mobile) mobileToId.set(s.mobile, s.id); });
+
+    const { data: maxRow } = await supabaseAdmin
+      .from("students").select("roll_number")
+      .like("roll_number", "MESS-%").order("roll_number", { ascending: false }).limit(1);
+    let messCounter = 0;
+    if (maxRow?.[0]?.roll_number) {
+      const m = String(maxRow[0].roll_number).match(/MESS-(\d+)/);
+      if (m) messCounter = Number(m[1]);
     }
+    const nextMess = () => `MESS-${String(++messCounter).padStart(3, "0")}`;
 
-    // ---------- SUBSCRIPTIONS ----------
-    const subsToInsert: any[] = [];
-    const today = new Date().toISOString().slice(0, 10);
-    data.subscriptions.forEach((s, idx) => {
+    // ---------- STUDENTS (Sheet 1) ----------
+    for (let idx = 0; idx < data.students.length; idx++) {
+      const s = data.students[idx];
       const rowNum = idx + 2;
-      const studentId = rollToId.get(s.mess_no);
-      if (!studentId) {
-        errors.push({ section: "subscriptions", row: rowNum, reason: `Unknown mess_no ${s.mess_no}` });
-        return;
-      }
-      let end = s.end_date;
-      if (!end) {
-        const d = new Date(s.start_date + "T00:00:00");
-        d.setDate(d.getDate() + 30);
-        end = d.toISOString().slice(0, 10);
-      }
-      const grace = new Date(end + "T00:00:00");
-      grace.setDate(grace.getDate() + graceDays);
-      const graceEnd = grace.toISOString().slice(0, 10);
-      let status: "active" | "expired" | "grace" | "pending" = "active";
-      if (s.is_inactive) status = "expired";
-      else if (end < today) status = today <= graceEnd ? "grace" : "expired";
-      subsToInsert.push({
-        student_id: studentId,
-        plan_id: planId,
-        unit_id: defaultUnitId,
-        start_date: s.start_date,
-        end_date: end,
-        grace_end_date: graceEnd,
-        status,
-      });
-    });
-    for (let i = 0; i < subsToInsert.length; i += 50) {
-      const batch = subsToInsert.slice(i, i + 50);
-      const { error, data: ins } = await supabaseAdmin
-        .from("subscriptions").insert(batch).select("id");
-      if (error) errors.push({ section: "subscriptions", row: i + 2, reason: `Batch failed: ${error.message}` });
-      else summary.subscriptions.imported += ins?.length ?? 0;
-    }
-
-    // ---------- PAYMENTS ----------
-    const paysToInsert: any[] = [];
-    data.payments.forEach((p, idx) => {
-      const rowNum = idx + 2;
-      const studentId = rollToId.get(p.mess_no);
-      if (!studentId) {
-        errors.push({ section: "payments", row: rowNum, reason: `Unknown mess_no ${p.mess_no}` });
-        return;
-      }
-      if (!p.amount || p.amount <= 0) { summary.payments.skipped++; return; }
-      paysToInsert.push({
-        student_id: studentId,
-        subscription_id: null,
-        amount: p.amount,
-        mode: p.mode,
-        status: "success",
-        recorded_by: context.userId,
-        created_at: new Date(p.paid_at + "T12:00:00Z").toISOString(),
-      });
-      summary.payments.total_amount += p.amount;
-    });
-    for (let i = 0; i < paysToInsert.length; i += 50) {
-      const batch = paysToInsert.slice(i, i + 50);
-      const { error, data: ins } = await supabaseAdmin
-        .from("payments").insert(batch).select("id");
-      if (error) errors.push({ section: "payments", row: i + 2, reason: `Batch failed: ${error.message}` });
-      else summary.payments.imported += ins?.length ?? 0;
-    }
-
-    // ---------- OPENING BALANCES ----------
-    for (const ob of data.opening_balances) {
-      const studentId = rollToId.get(ob.mess_no);
-      if (!studentId) {
-        errors.push({ section: "opening_balances", row: 0, reason: `Unknown mess_no ${ob.mess_no}` });
+      const mobile = normalizeMobile(s.mobile);
+      if (!s.full_name?.trim() || !mobile) {
+        summary.students.skipped++;
+        errors.push({ section: "students", row: rowNum, reason: "Missing name or mobile" });
         continue;
       }
-      const { error } = await supabaseAdmin
-        .from("students")
-        .update({ opening_balance: ob.opening_balance, opening_balance_as_of: ob.as_of })
-        .eq("id", studentId);
-      if (error) {
-        errors.push({ section: "opening_balances", row: 0, reason: `Update failed for ${ob.mess_no}: ${error.message}` });
+      const unitId = s.unit_name
+        ? unitMap.get(s.unit_name.trim().toLowerCase()) ?? defaultUnitId
+        : defaultUnitId;
+
+      const patch: any = {
+        full_name: s.full_name.trim(),
+        hostel_room: s.room?.trim() || null,
+        course: s.course?.trim() || null,
+        parent_mobile: s.parent_mobile ? normalizeMobile(s.parent_mobile) || null : null,
+        email: s.email?.trim() || null,
+        blood_group: s.blood_group?.trim() || null,
+        address: s.address?.trim() || null,
+        opening_balance: s.opening_balance ?? 0,
+      };
+      Object.keys(patch).forEach((k) => { if (patch[k] === null || patch[k] === "") delete patch[k]; });
+
+      const existingId = mobileToId.get(mobile);
+      if (existingId) {
+        const { error } = await supabaseAdmin.from("students").update(patch).eq("id", existingId);
+        if (error) errors.push({ section: "students", row: rowNum, reason: `Update failed: ${error.message}` });
+        else summary.students.updated++;
       } else {
-        summary.opening_balances.applied += 1;
-        summary.opening_balances.total_amount += ob.opening_balance;
+        const roll = s.mess_no?.trim() || nextMess();
+        const { data: ins, error } = await supabaseAdmin.from("students").insert({
+          ...patch,
+          mobile,
+          roll_number: roll,
+          unit_id: unitId,
+          is_approved: true,
+        }).select("id").maybeSingle();
+        if (error || !ins) {
+          errors.push({ section: "students", row: rowNum, reason: `Insert failed: ${error?.message || "unknown"}` });
+        } else {
+          mobileToId.set(mobile, ins.id);
+          summary.students.imported++;
+        }
+      }
+    }
+
+    // ---------- TRANSACTIONS (Sheet 2) ----------
+    for (let idx = 0; idx < data.transactions.length; idx++) {
+      const t = data.transactions[idx];
+      const rowNum = idx + 2;
+      const mobile = normalizeMobile(t.mobile);
+      if (!mobile) {
+        errors.push({ section: "transactions", row: rowNum, reason: "Missing mobile" });
+        continue;
+      }
+      let studentId = mobileToId.get(mobile);
+
+      if (!studentId) {
+        const name = t.name?.trim() || `Student ${mobile}`;
+        const { data: ins, error } = await supabaseAdmin.from("students").insert({
+          full_name: name,
+          mobile,
+          roll_number: nextMess(),
+          unit_id: defaultUnitId,
+          is_approved: true,
+        }).select("id").maybeSingle();
+        if (error || !ins) {
+          errors.push({ section: "transactions", row: rowNum, reason: `Auto-create student failed: ${error?.message}` });
+          continue;
+        }
+        studentId = ins.id;
+        mobileToId.set(mobile, studentId);
+        summary.students.imported++;
+      }
+
+      const hasPayment = !!(t.amount && t.amount > 0);
+      const hasSubDates = !!(t.sub_start || t.sub_end);
+
+      if (!hasPayment && !hasSubDates) {
+        summary.payments.skipped++;
+        continue;
+      }
+
+      const payDate = t.date || t.sub_start || new Date().toISOString().slice(0, 10);
+      const anchor = t.sub_start || t.date || payDate;
+      const bounds = monthBounds(anchor);
+      const subStart = t.sub_start || bounds.start;
+      const subEnd = t.sub_end || bounds.end;
+
+      let subscription_id: string | null = null;
+      {
+        const { data: existSub } = await supabaseAdmin
+          .from("subscriptions").select("id")
+          .eq("student_id", studentId).eq("start_date", subStart).maybeSingle();
+        if (existSub) {
+          subscription_id = existSub.id;
+          summary.subscriptions.skipped++;
+        } else {
+          const grace = new Date(subEnd + "T00:00:00");
+          grace.setDate(grace.getDate() + graceDays);
+          const graceEnd = grace.toISOString().slice(0, 10);
+          const today = new Date().toISOString().slice(0, 10);
+          let status: "active" | "expired" | "grace" | "pending" = "active";
+          if (subEnd < today) status = today <= graceEnd ? "grace" : "expired";
+          const { data: subIns, error: subErr } = await supabaseAdmin.from("subscriptions").insert({
+            student_id: studentId,
+            plan_id: planId,
+            unit_id: defaultUnitId,
+            start_date: subStart,
+            end_date: subEnd,
+            grace_end_date: graceEnd,
+            status,
+          }).select("id").maybeSingle();
+          if (subErr) {
+            errors.push({ section: "transactions", row: rowNum, reason: `Sub failed: ${subErr.message}` });
+          } else if (subIns) {
+            subscription_id = subIns.id;
+            summary.subscriptions.imported++;
+          }
+        }
+        summary.subscriptions.total++;
+      }
+
+      if (hasPayment) {
+        const mode = t.mode || "upi";
+        const { error } = await supabaseAdmin.from("payments").insert({
+          student_id: studentId,
+          subscription_id,
+          amount: t.amount!,
+          mode,
+          status: "success",
+          recorded_by: context.userId,
+          created_at: new Date(payDate + "T12:00:00Z").toISOString(),
+        });
+        if (error) {
+          errors.push({ section: "transactions", row: rowNum, reason: `Payment failed: ${error.message}` });
+        } else {
+          summary.payments.imported++;
+          summary.payments.total_amount += t.amount!;
+        }
+        summary.payments.total++;
       }
     }
 
     await logImport(supabaseAdmin, context.userId, "excel_workbook", data.file_name, {
-
-      total: summary.students.total + summary.subscriptions.total + summary.payments.total,
-      imported: summary.students.imported + summary.subscriptions.imported + summary.payments.imported,
-      skipped: summary.students.skipped + summary.subscriptions.skipped + summary.payments.skipped,
+      total: summary.students.total + summary.payments.total,
+      imported: summary.students.imported + summary.students.updated + summary.payments.imported,
+      skipped: summary.students.skipped + summary.payments.skipped,
       errors: errors.length,
       errorRows: errors.map((e) => ({ row: e.row, reason: `[${e.section}] ${e.reason}`, data: null })),
     });
 
     return { ok: true, summary, errors };
   });
+
 
