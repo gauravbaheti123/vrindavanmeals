@@ -107,7 +107,15 @@ function PosMastersPage() {
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["settings-pos-modes"] });
     qc.invalidateQueries({ queryKey: ["pos-modes"] });
+  if (!flags.isSuperAdmin) {
+    return (
+      <div className="max-w-md mx-auto mt-16 text-center space-y-2">
+        <h2 className="text-xl font-semibold">Restricted</h2>
+        <p className="text-muted-foreground">Only Super Admins can access POS Masters.</p>
+      </div>
+    );
   }
+
 
   return (
     <div className="space-y-6 max-w-4xl">
