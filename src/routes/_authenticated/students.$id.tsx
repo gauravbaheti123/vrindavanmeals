@@ -72,16 +72,20 @@ function StudentDetail() {
   };
 
   const summary = useMemo(() => {
-    if (!data) return { paid: 0, due: 0, advance: 0, last: null as Payment | null, billed: 0 };
+    if (!data) return { paid: 0, due: 0, advance: 0, last: null as Payment | null, billed: 0, opening: 0, openingAsOf: null as string | null };
     const paid = data.pays.filter((p) => p.status === "success").reduce((s, p) => s + Number(p.amount), 0);
     const price = Number(data.plans[0]?.price ?? 3000);
-    const billed = data.subs.length * price;
+    const opening = Number((data.student as any)?.opening_balance ?? 0);
+    const openingAsOf = ((data.student as any)?.opening_balance_as_of ?? null) as string | null;
+    const billed = data.subs.length * price + opening;
     const balance = billed - paid;
     return {
       paid,
       due: Math.max(0, balance),
       advance: Math.max(0, -balance),
       billed,
+      opening,
+      openingAsOf,
       last: data.pays.filter((p) => p.status === "success").slice(-1)[0] ?? null,
     };
   }, [data]);
@@ -260,7 +264,18 @@ function StudentDetail() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.pays.length === 0 ? (
+              {summary.opening > 0 && (
+                <TableRow className="bg-muted/40">
+                  <TableCell className="text-sm">{summary.openingAsOf ? new Date(summary.openingAsOf).toLocaleDateString("en-IN") : "—"}</TableCell>
+                  <TableCell className="text-sm italic">Opening Balance</TableCell>
+                  <TableCell><Badge variant="secondary">carry-forward</Badge></TableCell>
+                  <TableCell className="text-xs text-muted-foreground">Imported</TableCell>
+                  <TableCell className="text-right font-semibold">{inr(summary.opening)}</TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                  <TableCell className="print:hidden" />
+                </TableRow>
+              )}
+              {data.pays.length === 0 && summary.opening <= 0 ? (
                 <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No payments yet.</TableCell></TableRow>
               ) : (() => {
                 let running = 0;

@@ -271,17 +271,23 @@ function normalizeMode(v: any): "cash" | "upi" | "card" | "razorpay" {
   return "upi";
 }
 
+type OpeningBalance = { mess_no: string; opening_balance: number; as_of: string };
+
 type Parsed = {
   fileName: string;
   students: any[];
   subscriptions: any[];
   payments: any[];
+  openingBalances: OpeningBalance[];
+  openingAsOf: string | null;
   masterRaw: number;
   receiptsRaw: number;
   ledgerRaw: number;
+  openingRaw: number;
   skippedStudents: number;
   skippedPayments: number;
   skippedSubs: number;
+  skippedOpening: number;
 };
 
 function isoOnly(v: any): string | null {
@@ -365,11 +371,44 @@ function parseCleanWorkbook(
   return {
     fileName,
     students, subscriptions, payments,
+    openingBalances: [],
+    openingAsOf: null,
     masterRaw: sRows.length,
     receiptsRaw: pRows.length,
     ledgerRaw: subRows.length,
+    openingRaw: 0,
     skippedStudents, skippedPayments, skippedSubs,
+    skippedOpening: 0,
   };
+}
+
+function parseOpeningBalanceSheet(
+  wb: XLSX.WorkBook,
+  sheetName: string,
+): { rows: OpeningBalance[]; raw: number; skipped: number; asOf: string | null } {
+  // Extract "as of DD MMM YYYY" from sheet name
+  const asOfMatch = sheetName.match(/as\s+of\s+([\d]{1,2})\s*([A-Za-z]+)\s*(\d{4})/i);
+  let asOf: string | null = null;
+  if (asOfMatch) {
+    const months: Record<string, string> = {
+      jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+      jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+    };
+    const m = months[asOfMatch[2].slice(0, 3).toLowerCase()];
+    if (m) asOf = `${asOfMatch[3]}-${m}-${asOfMatch[1].padStart(2, "0")}`;
+  }
+  const raw = XLSX.utils.sheet_to_json<any>(wb.Sheets[sheetName], { raw: true, defval: null });
+  const rows: OpeningBalance[] = [];
+  let skipped = 0;
+  for (const r of raw) {
+    const messNo = padMess(r["MESS NO"] ?? r["Mess No"] ?? r["mess_no"]);
+    const balRaw = r["OPENING BALANCE"] ?? r["Opening Balance"] ?? r["BALANCE"] ?? r["Balance"] ?? r["DUE"] ?? r["Due"];
+    if (!messNo || balRaw == null || balRaw === "") { skipped++; continue; }
+    const bal = Number(balRaw);
+    if (isNaN(bal)) { skipped++; continue; }
+    rows.push({ mess_no: messNo, opening_balance: bal, as_of: asOf ?? new Date().toISOString().slice(0, 10) });
+  }
+  return { rows, raw: raw.length, skipped, asOf };
 }
 
 function parseWorkbook(file: File): Promise<Parsed> {
@@ -383,8 +422,32 @@ function parseWorkbook(file: File): Promise<Parsed> {
         const findSheet = (name: string) =>
           wb.SheetNames.find((n) => n.trim().toLowerCase() === name.toLowerCase());
 
+        // ---------- Opening Balance template detection ----------
+        // Sheets: "Student Master" + "Opening Balance as of <date>" + "Transactions from <month> onwards"
+        const studentMasterSheet = wb.SheetNames.find((n) => /^student\s*master$/i.test(n.trim()));
+        const openingSheet = wb.SheetNames.find((n) => /^opening\s+balance/i.test(n.trim()));
+        const txnSheet = wb.SheetNames.find((n) => /^transactions?/i.test(n.trim()));
+        if (studentMasterSheet && openingSheet && txnSheet) {
+          // Reuse clean parser for student master + transactions (payments).
+          // Subscriptions sheet is optional in this template.
+          const subsSheet = findSheet("Subscriptions") ?? studentMasterSheet;
+          const parsed = parseCleanWorkbook(file.name, wb, studentMasterSheet, txnSheet, subsSheet);
+          if (subsSheet === studentMasterSheet) {
+            parsed.subscriptions = [];
+            parsed.ledgerRaw = 0;
+            parsed.skippedSubs = 0;
+          }
+          const ob = parseOpeningBalanceSheet(wb, openingSheet);
+          parsed.openingBalances = ob.rows;
+          parsed.openingAsOf = ob.asOf;
+          parsed.openingRaw = ob.raw;
+          parsed.skippedOpening = ob.skipped;
+          resolve(parsed);
+          return;
+        }
+
         // ---------- Clean format detection ----------
-        // New "Vrindavan_Meals_Clean.xlsx": sheets Students / Payments / Subscriptions
+        // "Vrindavan_Meals_Clean.xlsx": sheets Students / Payments / Subscriptions
         const cleanStudents = findSheet("Students");
         const cleanPayments = findSheet("Payments");
         const cleanSubs = findSheet("Subscriptions");
@@ -392,6 +455,7 @@ function parseWorkbook(file: File): Promise<Parsed> {
           resolve(parseCleanWorkbook(file.name, wb, cleanStudents, cleanPayments, cleanSubs));
           return;
         }
+
 
         // ---------- Legacy format (Master / Receipts / STUDENT LEDGER) ----------
         const mName = findSheet("Master");
@@ -478,10 +542,14 @@ function parseWorkbook(file: File): Promise<Parsed> {
         resolve({
           fileName: file.name,
           students, subscriptions, payments,
+          openingBalances: [],
+          openingAsOf: null,
           masterRaw: master.length,
           receiptsRaw: receiptsAoA.length > 0 ? receiptsAoA.length - 1 : 0,
           ledgerRaw: ledger.length,
+          openingRaw: 0,
           skippedStudents, skippedPayments, skippedSubs,
+          skippedOpening: 0,
         });
       } catch (e: any) {
 
@@ -507,6 +575,7 @@ function ExcelWorkbookTab() {
           students: parsed.students,
           subscriptions: parsed.subscriptions,
           payments: parsed.payments,
+          opening_balances: parsed.openingBalances,
         },
       });
     },
@@ -542,16 +611,37 @@ function ExcelWorkbookTab() {
             </span>
           </Button>
         </label>
-        <span className="text-xs text-muted-foreground">Expected sheets: Master, Receipts, STUDENT LEDGER</span>
+      </div>
+      <div className="text-xs text-muted-foreground space-y-1">
+        <div><strong>Supported formats</strong> (auto-detected by sheet names):</div>
+        <ul className="list-disc pl-5 space-y-0.5">
+          <li><strong>Clean (recommended)</strong>: <code>Students</code> · <code>Payments</code> · <code>Subscriptions</code></li>
+          <li><strong>With Opening Balance</strong>: <code>Student Master</code> · <code>Opening Balance as of &lt;date&gt;</code> · <code>Transactions from &lt;month&gt; onwards</code></li>
+          <li><strong>Legacy</strong>: <code>Master</code> · <code>Receipts</code> · <code>STUDENT LEDGER</code></li>
+        </ul>
       </div>
 
       {parsed && !result && (
         <>
-          <div className="grid grid-cols-3 gap-3">
-            <PanelStat label="Master (Students)" total={parsed.masterRaw} valid={parsed.students.length} skipped={parsed.skippedStudents} />
-            <PanelStat label="Receipts (Payments)" total={parsed.receiptsRaw} valid={parsed.payments.length} skipped={parsed.skippedPayments} />
-            <PanelStat label="Ledger (Subscriptions)" total={parsed.ledgerRaw} valid={parsed.subscriptions.length} skipped={parsed.skippedSubs} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <PanelStat label="Students" total={parsed.masterRaw} valid={parsed.students.length} skipped={parsed.skippedStudents} />
+            <PanelStat label="Payments" total={parsed.receiptsRaw} valid={parsed.payments.length} skipped={parsed.skippedPayments} />
+            <PanelStat label="Subscriptions" total={parsed.ledgerRaw} valid={parsed.subscriptions.length} skipped={parsed.skippedSubs} />
+            <PanelStat
+              label={parsed.openingAsOf ? `Opening Balances (as of ${parsed.openingAsOf})` : "Opening Balances"}
+              total={parsed.openingRaw}
+              valid={parsed.openingBalances.length}
+              skipped={parsed.skippedOpening}
+            />
           </div>
+          {parsed.openingBalances.length > 0 && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Carry-forward total: ₹{parsed.openingBalances.reduce((s, r) => s + r.opening_balance, 0).toLocaleString("en-IN")}</strong> across {parsed.openingBalances.length} students. Positive = student owes; negative = advance. Will be written to each student's opening balance and shown in Dues & Ledger.
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Alert>
             <AlertTriangle className="h-4 w-4" />

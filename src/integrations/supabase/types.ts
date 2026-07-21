@@ -390,6 +390,8 @@ export type Database = {
           id: string
           is_approved: boolean
           mobile: string
+          opening_balance: number
+          opening_balance_as_of: string | null
           parent_mobile: string | null
           photo_url: string | null
           roll_number: string | null
@@ -411,6 +413,8 @@ export type Database = {
           id?: string
           is_approved?: boolean
           mobile: string
+          opening_balance?: number
+          opening_balance_as_of?: string | null
           parent_mobile?: string | null
           photo_url?: string | null
           roll_number?: string | null
@@ -432,6 +436,8 @@ export type Database = {
           id?: string
           is_approved?: boolean
           mobile?: string
+          opening_balance?: number
+          opening_balance_as_of?: string | null
           parent_mobile?: string | null
           photo_url?: string | null
           roll_number?: string | null

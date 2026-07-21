@@ -415,11 +415,18 @@ const ExcelPayRow = z.object({
   reference_note: z.string().nullable().optional(),
 });
 
+const OpeningBalanceRow = z.object({
+  mess_no: z.string(),
+  opening_balance: z.number(),
+  as_of: z.string(),
+});
+
 const ExcelWorkbookSchema = z.object({
   file_name: z.string().default("workbook.xlsx"),
   students: z.array(ExcelStudentRow).max(10000),
   subscriptions: z.array(ExcelSubRow).max(10000),
   payments: z.array(ExcelPayRow).max(20000),
+  opening_balances: z.array(OpeningBalanceRow).max(10000).optional().default([]),
 });
 
 export const importExcelWorkbook = createServerFn({ method: "POST" })
@@ -448,6 +455,7 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       students: { total: data.students.length, imported: 0, skipped: 0 },
       subscriptions: { total: data.subscriptions.length, imported: 0, skipped: 0 },
       payments: { total: data.payments.length, imported: 0, skipped: 0, total_amount: 0 },
+      opening_balances: { total: data.opening_balances.length, applied: 0, total_amount: 0 },
     };
 
     // ---------- STUDENTS ----------
@@ -554,7 +562,27 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       else summary.payments.imported += ins?.length ?? 0;
     }
 
+    // ---------- OPENING BALANCES ----------
+    for (const ob of data.opening_balances) {
+      const studentId = rollToId.get(ob.mess_no);
+      if (!studentId) {
+        errors.push({ section: "opening_balances", row: 0, reason: `Unknown mess_no ${ob.mess_no}` });
+        continue;
+      }
+      const { error } = await supabaseAdmin
+        .from("students")
+        .update({ opening_balance: ob.opening_balance, opening_balance_as_of: ob.as_of })
+        .eq("id", studentId);
+      if (error) {
+        errors.push({ section: "opening_balances", row: 0, reason: `Update failed for ${ob.mess_no}: ${error.message}` });
+      } else {
+        summary.opening_balances.applied += 1;
+        summary.opening_balances.total_amount += ob.opening_balance;
+      }
+    }
+
     await logImport(supabaseAdmin, context.userId, "excel_workbook", data.file_name, {
+
       total: summary.students.total + summary.subscriptions.total + summary.payments.total,
       imported: summary.students.imported + summary.subscriptions.imported + summary.payments.imported,
       skipped: summary.students.skipped + summary.subscriptions.skipped + summary.payments.skipped,
