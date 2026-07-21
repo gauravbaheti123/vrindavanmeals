@@ -600,7 +600,7 @@ function ExcelWorkbookTab() {
 
   return (
     <Card className="mt-4"><CardContent className="p-6 space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <label className="inline-flex">
           <input type="file" accept=".xlsx,.xls" className="hidden"
             onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
@@ -611,7 +611,19 @@ function ExcelWorkbookTab() {
             </span>
           </Button>
         </label>
+        <div className="h-6 w-px bg-border mx-1" />
+        <span className="text-xs text-muted-foreground">Templates:</span>
+        <Button variant="outline" size="sm" onClick={() => downloadWorkbookTemplate("opening")}>
+          <Download className="h-4 w-4 mr-2" />With Opening Balance
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => downloadWorkbookTemplate("clean")}>
+          <Download className="h-4 w-4 mr-2" />Clean
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => downloadWorkbookTemplate("legacy")}>
+          <Download className="h-4 w-4 mr-2" />Legacy
+        </Button>
       </div>
+
       <div className="text-xs text-muted-foreground space-y-1">
         <div><strong>Supported formats</strong> (auto-detected by sheet names):</div>
         <ul className="list-disc pl-5 space-y-0.5">
