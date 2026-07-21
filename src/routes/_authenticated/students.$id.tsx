@@ -233,44 +233,18 @@ function StudentDetail() {
             <Row k="Address" v={s.address} />
             <Row k="Document" v={s.doc_type ? `${s.doc_type} — ${s.doc_number ?? ""}` : null} />
 
-            <div className="pt-3 mt-3 border-t print:hidden">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" variant="outline" className="text-destructive hover:text-destructive">
-                    <Trash2 className="h-3 w-3 mr-1" />{s.is_approved ? "Deactivate Student" : "Delete Student"}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{s.is_approved ? "Deactivate this student?" : "Delete this student?"}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {s.is_approved
-                        ? "The student will be marked inactive and hidden from lists. Historical data is preserved."
-                        : "This permanently removes the pending student record. Their payments and subscriptions will remain."}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={async () => {
-                        if (s.is_approved) {
-                          const { error } = await supabase.from("students").update({ is_approved: false }).eq("id", s.id);
-                          if (error) return toast.error(error.message);
-                          toast.success("Student deactivated");
-                        } else {
-                          const { error } = await supabase.from("students").delete().eq("id", s.id);
-                          if (error) return toast.error(error.message);
-                          toast.success("Student deleted");
-                        }
-                        refresh();
-                      }}
-                    >
-                      Confirm
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
+            {s.is_approved && (
+              <div className="pt-3 mt-3 border-t print:hidden">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setDeactivateOpen(true)}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />Deactivate Student
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
