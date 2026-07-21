@@ -560,9 +560,26 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
         .from("payments").insert(batch).select("id");
       if (error) errors.push({ section: "payments", row: i + 2, reason: `Batch failed: ${error.message}` });
       else summary.payments.imported += ins?.length ?? 0;
+
+    // ---------- OPENING BALANCES ----------
+    for (const ob of data.opening_balances) {
+      const studentId = rollToId.get(ob.mess_no);
+      if (!studentId) {
+        errors.push({ section: "opening_balances", row: 0, reason: `Unknown mess_no ${ob.mess_no}` });
+        continue;
+      }
+      const { error } = await supabaseAdmin
+        .from("students")
+        .update({ opening_balance: ob.opening_balance, opening_balance_as_of: ob.as_of })
+        .eq("id", studentId);
+      if (error) {
+        errors.push({ section: "opening_balances", row: 0, reason: `Update failed for ${ob.mess_no}: ${error.message}` });
+      } else {
+        summary.opening_balances.applied += 1;
+        summary.opening_balances.total_amount += ob.opening_balance;
+      }
     }
 
-    await logImport(supabaseAdmin, context.userId, "excel_workbook", data.file_name, {
       total: summary.students.total + summary.subscriptions.total + summary.payments.total,
       imported: summary.students.imported + summary.subscriptions.imported + summary.payments.imported,
       skipped: summary.students.skipped + summary.subscriptions.skipped + summary.payments.skipped,
