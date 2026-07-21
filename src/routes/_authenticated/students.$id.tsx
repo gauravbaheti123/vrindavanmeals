@@ -99,6 +99,49 @@ function StudentDetail() {
     };
   }, [data]);
 
+  async function handleIssueNoc() {
+    if (!data) return;
+    if (summary.due > 0) {
+      toast.error(`Clear outstanding payment before issuing NOC — current due ${inr(summary.due)}`);
+      return;
+    }
+    setNocLoading(true);
+    try {
+      const { data: settingsRows } = await supabase.from("system_settings").select("key,value");
+      const settings = Object.fromEntries((settingsRows ?? []).map((r) => [r.key, r.value])) as Record<string, string>;
+      const st = data.student;
+      const doc = generateNocPdf(
+        {
+          orgName: settings.brand_org_name || "Vrindavan Meals",
+          address: settings.brand_address || "",
+          contact: settings.brand_contact || "",
+          signatureLine: settings.brand_signature_line || "Authorised Signatory",
+          logoDataUrl: settings.brand_logo_url || null,
+          stampDataUrl: settings.brand_stamp_url || null,
+        },
+        {
+          studentName: st.full_name,
+          messNo: st.roll_number,
+          room: st.hostel_room,
+          unitName: st.units?.name ?? null,
+          mobile: st.mobile,
+          subscriptionPeriods: data.subs
+            .slice()
+            .sort((a, b) => (a.start_date < b.start_date ? -1 : 1))
+            .map((sub) => ({ start: sub.start_date, end: sub.end_date })),
+          issueDate: new Date().toISOString().slice(0, 10),
+        },
+      );
+      const safeName = st.full_name.replace(/[^a-z0-9]+/gi, "_");
+      doc.save(`NOC_${safeName}.pdf`);
+      toast.success("NOC generated");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not generate NOC");
+    } finally {
+      setNocLoading(false);
+    }
+  }
+
   if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!data?.student) return <div>Student not found.</div>;
 
