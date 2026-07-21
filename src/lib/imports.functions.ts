@@ -560,6 +560,7 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
         .from("payments").insert(batch).select("id");
       if (error) errors.push({ section: "payments", row: i + 2, reason: `Batch failed: ${error.message}` });
       else summary.payments.imported += ins?.length ?? 0;
+    }
 
     // ---------- OPENING BALANCES ----------
     for (const ob of data.opening_balances) {
@@ -579,6 +580,8 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
         summary.opening_balances.total_amount += ob.opening_balance;
       }
     }
+
+    await logImport(supabaseAdmin, context.userId, "excel_workbook", data.file_name, {
 
       total: summary.students.total + summary.subscriptions.total + summary.payments.total,
       imported: summary.students.imported + summary.subscriptions.imported + summary.payments.imported,
