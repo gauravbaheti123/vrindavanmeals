@@ -271,17 +271,23 @@ function normalizeMode(v: any): "cash" | "upi" | "card" | "razorpay" {
   return "upi";
 }
 
+type OpeningBalance = { mess_no: string; opening_balance: number; as_of: string };
+
 type Parsed = {
   fileName: string;
   students: any[];
   subscriptions: any[];
   payments: any[];
+  openingBalances: OpeningBalance[];
+  openingAsOf: string | null;
   masterRaw: number;
   receiptsRaw: number;
   ledgerRaw: number;
+  openingRaw: number;
   skippedStudents: number;
   skippedPayments: number;
   skippedSubs: number;
+  skippedOpening: number;
 };
 
 function isoOnly(v: any): string | null {
