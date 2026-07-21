@@ -54,7 +54,7 @@ function Dashboard() {
   const planPrice = Number(plan?.price ?? 3000);
 
   const { data: agg } = useQuery({
-    queryKey: ["dashboard-agg-v2", unitId],
+    queryKey: ["dashboard-agg-v2", unitId, planPrice],
     refetchInterval: REFRESH_MS,
     queryFn: async () => {
       const today = todayISO();
@@ -102,7 +102,7 @@ function Dashboard() {
         acc[p.mode] = (acc[p.mode] ?? 0) + Number(p.amount);
         return acc;
       }, {});
-      const paidStudentIds = new Set(pays.map((p) => p.student_id));
+      
 
       type Sub = {
         id: string; student_id: string; status: "active" | "grace" | "expired" | "pending";
