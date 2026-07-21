@@ -422,8 +422,32 @@ function parseWorkbook(file: File): Promise<Parsed> {
         const findSheet = (name: string) =>
           wb.SheetNames.find((n) => n.trim().toLowerCase() === name.toLowerCase());
 
+        // ---------- Opening Balance template detection ----------
+        // Sheets: "Student Master" + "Opening Balance as of <date>" + "Transactions from <month> onwards"
+        const studentMasterSheet = wb.SheetNames.find((n) => /^student\s*master$/i.test(n.trim()));
+        const openingSheet = wb.SheetNames.find((n) => /^opening\s+balance/i.test(n.trim()));
+        const txnSheet = wb.SheetNames.find((n) => /^transactions?/i.test(n.trim()));
+        if (studentMasterSheet && openingSheet && txnSheet) {
+          // Reuse clean parser for student master + transactions (payments).
+          // Subscriptions sheet is optional in this template.
+          const subsSheet = findSheet("Subscriptions") ?? studentMasterSheet;
+          const parsed = parseCleanWorkbook(file.name, wb, studentMasterSheet, txnSheet, subsSheet);
+          if (subsSheet === studentMasterSheet) {
+            parsed.subscriptions = [];
+            parsed.ledgerRaw = 0;
+            parsed.skippedSubs = 0;
+          }
+          const ob = parseOpeningBalanceSheet(wb, openingSheet);
+          parsed.openingBalances = ob.rows;
+          parsed.openingAsOf = ob.asOf;
+          parsed.openingRaw = ob.raw;
+          parsed.skippedOpening = ob.skipped;
+          resolve(parsed);
+          return;
+        }
+
         // ---------- Clean format detection ----------
-        // New "Vrindavan_Meals_Clean.xlsx": sheets Students / Payments / Subscriptions
+        // "Vrindavan_Meals_Clean.xlsx": sheets Students / Payments / Subscriptions
         const cleanStudents = findSheet("Students");
         const cleanPayments = findSheet("Payments");
         const cleanSubs = findSheet("Subscriptions");
@@ -431,6 +455,7 @@ function parseWorkbook(file: File): Promise<Parsed> {
           resolve(parseCleanWorkbook(file.name, wb, cleanStudents, cleanPayments, cleanSubs));
           return;
         }
+
 
         // ---------- Legacy format (Master / Receipts / STUDENT LEDGER) ----------
         const mName = findSheet("Master");
