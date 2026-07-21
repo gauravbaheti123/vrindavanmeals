@@ -294,6 +294,191 @@ export type Database = {
           },
         ]
       }
+      pos_categories: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pos_items: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          price?: number
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "pos_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_payment_modes: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      pos_sale_items: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string | null
+          item_name: string
+          line_total: number
+          quantity: number
+          sale_id: string
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id?: string | null
+          item_name: string
+          line_total?: number
+          quantity?: number
+          sale_id: string
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string | null
+          item_name?: string
+          line_total?: number
+          quantity?: number
+          sale_id?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_sale_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "pos_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "pos_sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_sales: {
+        Row: {
+          cashier_id: string | null
+          created_at: string
+          discount_amount: number
+          discount_type: string
+          discount_value: number
+          id: string
+          payment_mode: string
+          sale_number: number
+          sold_at: string
+          subtotal: number
+          tax_amount: number
+          tax_rate: number
+          total: number
+        }
+        Insert: {
+          cashier_id?: string | null
+          created_at?: string
+          discount_amount?: number
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          payment_mode: string
+          sale_number?: number
+          sold_at?: string
+          subtotal?: number
+          tax_amount?: number
+          tax_rate?: number
+          total?: number
+        }
+        Update: {
+          cashier_id?: string | null
+          created_at?: string
+          discount_amount?: number
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          payment_mode?: string
+          sale_number?: number
+          sold_at?: string
+          subtotal?: number
+          tax_amount?: number
+          tax_rate?: number
+          total?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
