@@ -138,3 +138,24 @@
     font-family: "Playfair Display", Georgia, serif;
   }
 }
+
+@media print {
+  @page { size: A4 portrait; margin: 10mm; }
+  html, body { background: white !important; }
+  /* Prevent cards from splitting */
+  [data-slot="card"],
+  .print-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* Prevent table rows from splitting */
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* Repeat table headers on page break */
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  /* Tighten spacing */
+  .print\:space-y-3 > * + * { margin-top: 0.5rem !important; }
+}
