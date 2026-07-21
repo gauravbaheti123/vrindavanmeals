@@ -165,20 +165,20 @@ function POSPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search items…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-        <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 pr-1">
+        <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 pr-1 content-start items-start">
           {filteredItems.map((it) => {
             const qty = cartQtyById[it.id];
             return (
               <button
                 key={it.id}
                 onClick={() => addToCart(it)}
-                className="relative border rounded-lg p-3 text-left hover:border-primary hover:shadow-md transition bg-card"
+                className="relative h-28 border rounded-lg p-3 text-left hover:border-primary hover:shadow-md transition bg-card flex flex-col justify-between"
               >
                 {qty ? (
                   <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs h-6 min-w-6 px-1 rounded-full grid place-items-center font-bold shadow">{qty}</span>
                 ) : null}
                 <div className="font-medium text-sm line-clamp-2">{it.name}</div>
-                <div className="text-primary font-semibold mt-2">{inr(Number(it.price))}</div>
+                <div className="text-primary font-semibold">{inr(Number(it.price))}</div>
               </button>
             );
           })}
