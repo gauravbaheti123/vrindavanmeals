@@ -646,6 +646,8 @@ function ProfileEditModal({
         <DialogHeader><DialogTitle>Edit Profile</DialogTitle></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Mess No *"><Input value={form.roll_number} onChange={(e) => set("roll_number", e.target.value)} placeholder="VM-0001" /></Field>
+          <Field label="Roll Number"><Input value={form.college_roll_number} onChange={(e) => set("college_roll_number", e.target.value)} placeholder="College roll no (optional)" /></Field>
+
           <Field label="Full Name *"><Input value={form.full_name} onChange={(e) => set("full_name", e.target.value)} /></Field>
           <Field label="Mobile"><Input value={form.mobile} onChange={(e) => set("mobile", e.target.value)} placeholder="Optional" /></Field>
           <Field label="Unit">
