@@ -269,10 +269,84 @@ type Parsed = {
 function pick(r: any, keys: string[]): any {
   for (const k of keys) {
     if (r[k] !== undefined && r[k] !== null && r[k] !== "") return r[k];
-    const upper = Object.keys(r).find((x) => x.trim().toLowerCase() === k.toLowerCase());
-    if (upper && r[upper] !== null && r[upper] !== "") return r[upper];
   }
   return null;
+}
+
+/** normalize a header cell: trim, drop trailing *, collapse spaces, lowercase, strip punctuation */
+function normHeader(v: any): string {
+  return String(v ?? "")
+    .replace(/\*/g, " ")
+    .replace(/[._-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** canonical field -> accepted header aliases (normalized) */
+const STUDENT_HEADERS: Record<string, string[]> = {
+  "Mess No": ["mess no", "messno", "mess number", "mess id", "mess"],
+  Name: ["name", "student name", "full name"],
+  Mobile: ["mobile", "mobile no", "mobile number", "phone", "contact"],
+  Unit: ["unit", "unit name"],
+  Room: ["room", "room no", "hostel room"],
+  "Opening Balance": ["opening balance", "opening bal", "carry forward"],
+  "Roll Number": ["roll number", "roll no", "college roll number", "college roll no"],
+  Course: ["course", "class"],
+  "Joining Date": ["joining date", "join date", "doj"],
+  "Exit Date": ["exit date", "leaving date"],
+  Status: ["status"],
+  Adjustment: ["adjustment", "adjustments"],
+};
+
+const TXN_HEADERS: Record<string, string[]> = {
+  "Mess No": ["mess no", "messno", "mess number", "mess id", "mess"],
+  Name: ["name", "student name", "full name"],
+  Mobile: ["mobile", "mobile no", "mobile number", "phone"],
+  Date: ["date", "payment date", "receipt date"],
+  Amount: ["amount", "amt", "paid amount"],
+  Mode: ["mode", "payment mode", "pay mode"],
+  Remarks: ["remarks", "remark", "note", "notes", "particulars"],
+  "Subscription Start Date": ["subscription start date", "sub start", "start date"],
+  "Subscription End Date": ["subscription end date", "sub end", "end date"],
+};
+
+/**
+ * Read a sheet into objects keyed by CANONICAL field names by matching the
+ * header row's actual text (case/format-insensitive). Unknown columns are
+ * ignored; missing optional columns are simply blank for every row.
+ */
+function readSheetByHeader(sheet: XLSX.WorkSheet, map: Record<string, string[]>): Record<string, any>[] {
+  const aoa = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, raw: true, defval: null, blankrows: false });
+  const alias = new Map<string, string>();
+  for (const [canon, list] of Object.entries(map)) for (const a of list) alias.set(a, canon);
+
+  // find the header row: the row within the first 15 that matches the most known headers
+  let headerIdx = -1;
+  let bestScore = 0;
+  for (let i = 0; i < Math.min(aoa.length, 15); i++) {
+    const score = (aoa[i] ?? []).reduce((acc: number, c: any) => acc + (alias.has(normHeader(c)) ? 1 : 0), 0);
+    if (score > bestScore) { bestScore = score; headerIdx = i; }
+  }
+  if (headerIdx < 0 || bestScore < 1) return [];
+
+  const cols: Array<{ idx: number; canon: string }> = [];
+  (aoa[headerIdx] ?? []).forEach((c: any, idx: number) => {
+    const canon = alias.get(normHeader(c));
+    if (canon && !cols.some((x) => x.canon === canon)) cols.push({ idx, canon });
+  });
+
+  const out: Record<string, any>[] = [];
+  for (let i = headerIdx + 1; i < aoa.length; i++) {
+    const row = aoa[i] ?? [];
+    const obj: Record<string, any> = {};
+    for (const c of cols) {
+      const v = row[c.idx];
+      obj[c.canon] = v === undefined || v === "" ? null : v;
+    }
+    out.push(obj);
+  }
+  return out;
 }
 
 function parseWorkbook(file: File): Promise<Parsed> {
@@ -286,7 +360,11 @@ function parseWorkbook(file: File): Promise<Parsed> {
         const txnSheet = pickSheet(wb, [/^transactions?$/i, /^payments?$/i, /^receipts?$/i]);
         if (!studentsSheet) throw new Error("No 'Students' sheet found. Download the template to see the expected format.");
 
-        const sRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[studentsSheet], { raw: true, defval: null });
+        const sRows = readSheetByHeader(wb.Sheets[studentsSheet], STUDENT_HEADERS);
+        if (sRows.length === 0) {
+          throw new Error("Could not find a header row on the 'Students' sheet. Expected columns like Mess No, Name, Status.");
+        }
+
         const students: StudentRow[] = [];
         const rowErrors: Array<{ section: string; row: number; reason: string }> = [];
         const todayISO = new Date().toISOString().slice(0, 10);
@@ -297,15 +375,15 @@ function parseWorkbook(file: File): Promise<Parsed> {
           const rowNum = i + 2;
           const isEmpty = Object.values(r).every((v) => v == null || v === "");
           if (isEmpty) { skippedStudents++; continue; }
-          const name = String(pick(r, ["Name", "STUDENT NAME", "Student Name", "full_name"]) ?? "").trim();
-          const mobileRaw = pick(r, ["Mobile", "MOBILE", "Mobile No", "mobile"]);
+          const name = String(pick(r, ["Name"]) ?? "").trim();
+          const mobileRaw = pick(r, ["Mobile"]);
           const mobile = mobileRaw ? String(mobileRaw).replace(/\D/g, "").slice(-10) : "";
           if (!name) {
             skippedStudents++;
             rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Name is mandatory` });
             continue;
           }
-          const messRawEarly = pick(r, ["Mess No", "MESS NO", "mess_no", "Mess Number"]);
+          const messRawEarly = pick(r, ["Mess No"]);
           const messNo = messRawEarly ? String(messRawEarly).trim().toUpperCase() : "";
           if (messNo && !/^VM-\d{4}$/.test(messNo)) {
             skippedStudents++;
@@ -319,15 +397,15 @@ function parseWorkbook(file: File): Promise<Parsed> {
           }
           if (messNo) seenMess.add(messNo);
 
-          const statusRaw = String(pick(r, ["Status", "STATUS", "status"]) ?? "").trim().toLowerCase();
+          const statusRaw = String(pick(r, ["Status"]) ?? "").trim().toLowerCase();
           if (statusRaw !== "active" && statusRaw !== "inactive") {
             skippedStudents++;
             rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Status must be 'Active' or 'Inactive'` });
             continue;
           }
 
-          const joinRaw = pick(r, ["Joining Date", "JOINING DATE", "joining_date", "Join Date"]);
-          const exitRaw = pick(r, ["Exit Date", "EXIT DATE", "exit_date"]);
+          const joinRaw = pick(r, ["Joining Date"]);
+          const exitRaw = pick(r, ["Exit Date"]);
           const joining_date = excelDateToISO(joinRaw);
           const exit_date = excelDateToISO(exitRaw);
           if ((joinRaw != null && joinRaw !== "" && !joining_date) || (exitRaw != null && exitRaw !== "" && !exit_date)) {
@@ -356,20 +434,23 @@ function parseWorkbook(file: File): Promise<Parsed> {
             continue;
           }
 
-          const ob = pick(r, ["Opening Balance", "OPENING BALANCE", "opening_balance"]);
+          const ob = pick(r, ["Opening Balance"]);
+          const adj = pick(r, ["Adjustment"]);
+          const obNum = ob != null && ob !== "" && !isNaN(Number(ob)) ? Number(ob) : 0;
+          const adjNum = adj != null && adj !== "" && !isNaN(Number(adj)) ? Number(adj) : 0;
           students.push({
             full_name: name,
             mobile: mobile || null,
             mess_no: messNo || null,
-            unit_name: (pick(r, ["Unit", "UNIT", "unit_name"]) ?? null) as any,
-            room: (pick(r, ["Room", "ROOM", "Room No", "hostel_room"]) ?? null) as any,
-            opening_balance: ob != null && ob !== "" && !isNaN(Number(ob)) ? Number(ob) : null,
-            course: (pick(r, ["Course", "COURSE", "course"]) ?? null) as any,
-            parent_mobile: (pick(r, ["Parent Mobile", "PARENT MOBILE", "parent_mobile"]) ?? null) as any,
-            email: (pick(r, ["Email", "EMAIL", "email"]) ?? null) as any,
-            blood_group: (pick(r, ["Blood Group", "BLOOD GROUP", "blood_group"]) ?? null) as any,
-            address: (pick(r, ["Address", "ADDRESS", "address"]) ?? null) as any,
-            college_roll_number: (pick(r, ["Roll Number", "ROLL NUMBER", "College Roll Number", "roll_number"]) ?? null) as any,
+            unit_name: (pick(r, ["Unit"]) ?? null) as any,
+            room: (pick(r, ["Room"]) ?? null) as any,
+            opening_balance: obNum || adjNum ? obNum + adjNum : null,
+            course: (pick(r, ["Course"]) ?? null) as any,
+            parent_mobile: null,
+            email: null,
+            blood_group: null,
+            address: null,
+            college_roll_number: (pick(r, ["Roll Number"]) ?? null) as any,
             joining_date,
             exit_date,
             status: statusRaw as "active" | "inactive",
@@ -381,31 +462,32 @@ function parseWorkbook(file: File): Promise<Parsed> {
         let skippedTxns = 0;
         let txnsRaw = 0;
         if (txnSheet) {
-          const tRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[txnSheet], { raw: true, defval: null });
+          const tRows = readSheetByHeader(wb.Sheets[txnSheet], TXN_HEADERS);
           txnsRaw = tRows.length;
           for (const r of tRows) {
             const isEmpty = Object.values(r).every((v) => v == null || v === "");
             if (isEmpty) { skippedTxns++; continue; }
-            const mobileRaw = pick(r, ["Mobile", "MOBILE", "Mobile No", "mobile", "student_mobile"]);
+            const mobileRaw = pick(r, ["Mobile"]);
             const mobile = mobileRaw ? String(mobileRaw).replace(/\D/g, "").slice(-10) : "";
-            const name = pick(r, ["Name", "STUDENT NAME", "Student Name"]);
-            const messRawT = pick(r, ["Mess No", "MESS NO", "mess_no", "Mess Number"]);
+            const name = pick(r, ["Name"]);
+            const messRawT = pick(r, ["Mess No"]);
             const messNoT = messRawT ? String(messRawT).trim().toUpperCase() : "";
             if (!mobile && !messNoT) { skippedTxns++; continue; } // no identifier — cannot match
-            const amtRaw = pick(r, ["Amount", "AMOUNT", "amount"]);
+            const amtRaw = pick(r, ["Amount"]);
             const amount = amtRaw != null && amtRaw !== "" && !isNaN(Number(amtRaw)) ? Number(amtRaw) : null;
             transactions.push({
               mobile: mobile || null,
               mess_no: messNoT || null,
               name: name ? String(name).trim() : null,
-              date: excelDateToISO(pick(r, ["Date", "DATE", "Payment Date", "PAYMENT DATE", "payment_date"])),
+              date: excelDateToISO(pick(r, ["Date"])),
               amount,
-              mode: normalizeMode(pick(r, ["Mode", "MODE", "Payment Mode", "PAYMENT MODE"])),
-              sub_start: excelDateToISO(pick(r, ["Subscription Start Date", "Sub Start", "SUB START", "START DATE", "Start Date"])),
-              sub_end: excelDateToISO(pick(r, ["Subscription End Date", "Sub End", "SUB END", "END DATE", "End Date"])),
+              mode: normalizeMode(pick(r, ["Mode"])),
+              sub_start: excelDateToISO(pick(r, ["Subscription Start Date"])),
+              sub_end: excelDateToISO(pick(r, ["Subscription End Date"])),
             });
           }
         }
+
 
         resolve({
           fileName: file.name,
@@ -425,42 +507,38 @@ function parseWorkbook(file: File): Promise<Parsed> {
 function downloadMasterTemplate() {
   const wb = XLSX.utils.book_new();
   const students = [
-    ["Mess No*", "Name*", "Mobile", "Roll Number", "Unit", "Room", "Opening Balance", "Course", "Parent Mobile", "Email", "Blood Group", "Joining Date", "Exit Date", "Status*"],
-    ["VM-0001", "Priya Sharma", "9876543210", "CS2024-11", "Unit 1", "A-101", 0, "B.Sc", "9123456789", "priya@example.com", "O+", "01-07-2026", "", "Active"],
-    ["", "Anita Patel", "", "", "", "A-102", 1200, "", "", "", "", "15-04-2026", "31-05-2026", "Inactive"],
+    ["Mess No*", "Name*", "Mobile", "Unit", "Room", "Opening Balance", "Roll Number", "Course", "Joining Date", "Exit Date", "Status*", "Adjustment"],
+    ["VM-0001", "Priya Sharma", "9876543210", "Unit 1", "A-101", 0, "CS2024-11", "B.Sc", "01-07-2026", "", "Active", 0],
+    ["", "Anita Patel", "", "", "A-102", 1200, "", "", "15-04-2026", "31-05-2026", "Inactive", -200],
   ];
   const txns = [
-    ["Mess No*", "Name", "Mobile", "Date", "Amount", "Mode", "Subscription Start Date", "Subscription End Date"],
-    ["VM-0001", "Priya Sharma", "9876543210", "05-07-2026", 3500, "UPI", "01-07-2026", "31-07-2026"],
-    ["VM-0002", "Anita Patel", "", "10-07-2026", 3500, "Cash", "", ""],
+    ["Mess No*", "Name", "Mobile", "Date", "Amount", "Mode", "Remarks", "Subscription Start Date", "Subscription End Date"],
+    ["VM-0001", "Priya Sharma", "9876543210", "05-07-2026", 3500, "UPI", "July fees", "01-07-2026", "31-07-2026"],
+    ["VM-0002", "Anita Patel", "", "10-07-2026", 3500, "Cash", "", "", ""],
   ];
   const instructions = [
     ["Vrindavan Meals — Master Import Template"],
+    [""],
+    ["Columns are matched by HEADER NAME (case-insensitive). Column order does not matter and extra columns are ignored."],
     [""],
     ["Sheet: Students"],
     ["Column", "Required", "Format / Accepted values", "Notes"],
     ["Mess No*", "Yes", "VM-0001 format", "Unique match key — auto-assigned (VM-####) if left blank"],
     ["Name*", "Yes", "Text", "Student full name"],
     ["Mobile", "No", "10-digit number", "Optional — may be left blank"],
-    ["Roll Number", "No", "Text", "College roll number (not the Mess No)"],
     ["Unit", "No", "Existing unit name", "Defaults to Unit 1"],
     ["Room", "No", "Text", ""],
     ["Opening Balance", "No", "Number", "Carry-forward due, posted directly to ledger"],
+    ["Roll Number", "No", "Text", "College roll number (not the Mess No)"],
     ["Course", "No", "Text", ""],
-    ["Parent Mobile", "No", "10-digit number", ""],
-    ["Email", "No", "Text", ""],
-    ["Blood Group", "No", "Text", ""],
     ["Joining Date", "No", "DD-MM-YYYY", "Reference only — no billing calculation"],
     ["Exit Date", "Conditional", "DD-MM-YYYY", "Required when Status = Inactive; must be blank when Active; cannot be in the future"],
     ["Status*", "Yes", "Active / Inactive", "Inactive marks the student deactivated (no refund calculation)"],
+    ["Adjustment", "No", "Number", "Added to the opening balance (negative = credit)"],
     [""],
-    ["Sample Students row"],
-    ["Mess No*", "Name*", "Mobile", "Joining Date", "Exit Date", "Status*"],
-    ["VM-0001", "Priya Sharma", "9876543210", "01-07-2026", "", "Active"],
-    ["", "Anita Patel", "", "15-04-2026", "31-05-2026", "Inactive"],
-    [""],
-    ["Sheet: Transactions — Required: Mess No (or Mobile). Optional: Name, Date, Amount, Mode, Subscription Start/End Date."],
+    ["Sheet: Transactions — Required: Mess No (or Mobile). Optional: Name, Date, Amount, Mode, Remarks, Subscription Start/End Date."],
   ];
+
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(instructions), "Instructions");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(students), "Students");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(txns), "Transactions");
@@ -522,10 +600,10 @@ function ExcelWorkbookTab() {
       <div className="text-xs text-muted-foreground space-y-1">
         <div><strong>Unified format — 2 sheets:</strong></div>
         <ul className="list-disc pl-5 space-y-0.5">
-          <li><strong>Students</strong> — required: <code>Mess No</code> (VM-0001 format, auto-assigned if blank), <code>Name</code>, <code>Status</code> (Active / Inactive). Optional: Mobile, Roll Number, Unit, Room, Opening Balance, Course, Parent Mobile, Email, Blood Group, Joining Date, Exit Date (required when Status = Inactive). Dates in <code>DD-MM-YYYY</code>.</li>
-          <li><strong>Transactions</strong> — required: <code>Mess No</code> (or Mobile). Optional: Date, Amount, Mode (Cash/UPI/Card/Razorpay), Subscription Start/End Date (defaults to the transaction month's 1st–last day).</li>
+          <li><strong>Students</strong> — required: <code>Mess No</code> (VM-0001 format, auto-assigned if blank), <code>Name</code>, <code>Status</code> (Active / Inactive). Optional: Mobile, Unit, Room, Opening Balance, Roll Number, Course, Joining Date, Exit Date (required when Status = Inactive), Adjustment. Dates in <code>DD-MM-YYYY</code>.</li>
+          <li><strong>Transactions</strong> — required: <code>Mess No</code> (or Mobile). Optional: Name, Date, Amount, Mode (Cash/UPI/Card/Razorpay), Remarks, Subscription Start/End Date (defaults to the transaction month's 1st–last day).</li>
         </ul>
-        <div className="pt-1">Match key is <strong>Mess No</strong> (mobile is used as a fallback when present). Existing students are updated in place — no duplicates. Rows without Amount are skipped (no payment recorded). Joining/Exit dates are reference-only — no billing, pivot or refund calculation runs on import.</div>
+        <div className="pt-1">Columns are matched by <strong>header name</strong> (case-insensitive, <code>*</code> ignored) — column order doesn't matter, extra columns are ignored and missing optional columns are treated as blank. Match key is <strong>Mess No</strong> (mobile is used as a fallback when present). Existing students are updated in place — no duplicates. Rows without Amount are skipped (no payment recorded). Joining/Exit dates are reference-only — no billing, pivot or refund calculation runs on import.</div>
       </div>
 
       {parsed && !result && (
