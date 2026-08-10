@@ -434,20 +434,23 @@ function parseWorkbook(file: File): Promise<Parsed> {
             continue;
           }
 
-          const ob = pick(r, ["Opening Balance", "OPENING BALANCE", "opening_balance"]);
+          const ob = pick(r, ["Opening Balance"]);
+          const adj = pick(r, ["Adjustment"]);
+          const obNum = ob != null && ob !== "" && !isNaN(Number(ob)) ? Number(ob) : 0;
+          const adjNum = adj != null && adj !== "" && !isNaN(Number(adj)) ? Number(adj) : 0;
           students.push({
             full_name: name,
             mobile: mobile || null,
             mess_no: messNo || null,
-            unit_name: (pick(r, ["Unit", "UNIT", "unit_name"]) ?? null) as any,
-            room: (pick(r, ["Room", "ROOM", "Room No", "hostel_room"]) ?? null) as any,
-            opening_balance: ob != null && ob !== "" && !isNaN(Number(ob)) ? Number(ob) : null,
-            course: (pick(r, ["Course", "COURSE", "course"]) ?? null) as any,
-            parent_mobile: (pick(r, ["Parent Mobile", "PARENT MOBILE", "parent_mobile"]) ?? null) as any,
-            email: (pick(r, ["Email", "EMAIL", "email"]) ?? null) as any,
-            blood_group: (pick(r, ["Blood Group", "BLOOD GROUP", "blood_group"]) ?? null) as any,
-            address: (pick(r, ["Address", "ADDRESS", "address"]) ?? null) as any,
-            college_roll_number: (pick(r, ["Roll Number", "ROLL NUMBER", "College Roll Number", "roll_number"]) ?? null) as any,
+            unit_name: (pick(r, ["Unit"]) ?? null) as any,
+            room: (pick(r, ["Room"]) ?? null) as any,
+            opening_balance: obNum || adjNum ? obNum + adjNum : null,
+            course: (pick(r, ["Course"]) ?? null) as any,
+            parent_mobile: null,
+            email: null,
+            blood_group: null,
+            address: null,
+            college_roll_number: (pick(r, ["Roll Number"]) ?? null) as any,
             joining_date,
             exit_date,
             status: statusRaw as "active" | "inactive",
@@ -459,31 +462,32 @@ function parseWorkbook(file: File): Promise<Parsed> {
         let skippedTxns = 0;
         let txnsRaw = 0;
         if (txnSheet) {
-          const tRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[txnSheet], { raw: true, defval: null });
+          const tRows = readSheetByHeader(wb.Sheets[txnSheet], TXN_HEADERS);
           txnsRaw = tRows.length;
           for (const r of tRows) {
             const isEmpty = Object.values(r).every((v) => v == null || v === "");
             if (isEmpty) { skippedTxns++; continue; }
-            const mobileRaw = pick(r, ["Mobile", "MOBILE", "Mobile No", "mobile", "student_mobile"]);
+            const mobileRaw = pick(r, ["Mobile"]);
             const mobile = mobileRaw ? String(mobileRaw).replace(/\D/g, "").slice(-10) : "";
-            const name = pick(r, ["Name", "STUDENT NAME", "Student Name"]);
-            const messRawT = pick(r, ["Mess No", "MESS NO", "mess_no", "Mess Number"]);
+            const name = pick(r, ["Name"]);
+            const messRawT = pick(r, ["Mess No"]);
             const messNoT = messRawT ? String(messRawT).trim().toUpperCase() : "";
             if (!mobile && !messNoT) { skippedTxns++; continue; } // no identifier — cannot match
-            const amtRaw = pick(r, ["Amount", "AMOUNT", "amount"]);
+            const amtRaw = pick(r, ["Amount"]);
             const amount = amtRaw != null && amtRaw !== "" && !isNaN(Number(amtRaw)) ? Number(amtRaw) : null;
             transactions.push({
               mobile: mobile || null,
               mess_no: messNoT || null,
               name: name ? String(name).trim() : null,
-              date: excelDateToISO(pick(r, ["Date", "DATE", "Payment Date", "PAYMENT DATE", "payment_date"])),
+              date: excelDateToISO(pick(r, ["Date"])),
               amount,
-              mode: normalizeMode(pick(r, ["Mode", "MODE", "Payment Mode", "PAYMENT MODE"])),
-              sub_start: excelDateToISO(pick(r, ["Subscription Start Date", "Sub Start", "SUB START", "START DATE", "Start Date"])),
-              sub_end: excelDateToISO(pick(r, ["Subscription End Date", "Sub End", "SUB END", "END DATE", "End Date"])),
+              mode: normalizeMode(pick(r, ["Mode"])),
+              sub_start: excelDateToISO(pick(r, ["Subscription Start Date"])),
+              sub_end: excelDateToISO(pick(r, ["Subscription End Date"])),
             });
           }
         }
+
 
         resolve({
           fileName: file.name,
