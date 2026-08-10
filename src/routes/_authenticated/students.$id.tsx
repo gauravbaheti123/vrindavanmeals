@@ -509,12 +509,25 @@ function ProfileEditModal({
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   async function save() {
-    if (!form.full_name.trim() || !form.mobile.trim()) return toast.error("Name and mobile required");
+    if (!form.full_name.trim()) return toast.error("Name is required");
+    const messNo = form.roll_number.trim();
+    if (!messNo) return toast.error("Mess No is required");
+    const legacy = (student.roll_number ?? "").trim();
+    const changed = messNo !== legacy;
+    if (changed && !isValidMessNo(messNo)) return toast.error("Mess No must follow format VM-0001");
+    const mobile = form.mobile.trim();
+    if (mobile && !/^\d{10}$/.test(mobile.replace(/\D/g, "").slice(-10))) {
+      return toast.error("Mobile must be a 10-digit number");
+    }
     setSaving(true);
+    if (changed && !(await isMessNoAvailable(messNo, student.id))) {
+      setSaving(false);
+      return toast.error("Mess No already in use — duplicate");
+    }
     const { error } = await supabase.from("students").update({
       full_name: form.full_name.trim(),
-      mobile: form.mobile.trim(),
-      roll_number: form.roll_number || null,
+      mobile: mobile || null,
+      roll_number: messNo,
       course: form.course || null,
       batch_year: form.batch_year ? Number(form.batch_year) : null,
       hostel_room: form.hostel_room || null,
@@ -535,9 +548,9 @@ function ProfileEditModal({
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Edit Profile</DialogTitle></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
+          <Field label="Mess No *"><Input value={form.roll_number} onChange={(e) => set("roll_number", e.target.value)} placeholder="VM-0001" /></Field>
           <Field label="Full Name *"><Input value={form.full_name} onChange={(e) => set("full_name", e.target.value)} /></Field>
-          <Field label="Mobile *"><Input value={form.mobile} onChange={(e) => set("mobile", e.target.value)} /></Field>
-          <Field label="Roll / Mess No"><Input value={form.roll_number} onChange={(e) => set("roll_number", e.target.value)} /></Field>
+          <Field label="Mobile"><Input value={form.mobile} onChange={(e) => set("mobile", e.target.value)} placeholder="Optional" /></Field>
           <Field label="Unit">
             <Select value={form.unit_id || "none"} onValueChange={(v) => set("unit_id", v === "none" ? "" : v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
