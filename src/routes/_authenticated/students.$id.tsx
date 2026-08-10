@@ -916,11 +916,12 @@ function ActivateStudentModal({
 /* ---------------- Deactivate Student Modal ---------------- */
 
 function DeactivateStudentModal({
-  student, advance, plan, onClose, onSaved,
+  student, advance, plan, slabs, onClose, onSaved,
 }: {
   student: Student;
   advance: number;
   plan: Database["public"]["Tables"]["subscription_plans"]["Row"] | undefined;
+  slabs: FeeSlab[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -928,11 +929,12 @@ function DeactivateStudentModal({
   const [action, setAction] = useState<"none" | "credit" | "refund">("none");
   const [refundMode, setRefundMode] = useState<PaymentMode>("cash");
   const [saving, setSaving] = useState(false);
-  const monthlyPrice = Number(plan?.price ?? 3000);
+  const monthlyPrice = feeForMonth(slabs, deactivateDate) ?? Number(plan?.price ?? 3000);
   const refundable = useMemo(
     () => computeDeactivationRefund(deactivateDate, monthlyPrice, advance),
     [deactivateDate, monthlyPrice, advance],
   );
+
 
   async function save() {
     setSaving(true);
