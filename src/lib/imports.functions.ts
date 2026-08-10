@@ -741,20 +741,15 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       }
     }
 
-    await logImport(supabaseAdmin, context.userId, "excel_workbook", data.file_name, {
-      total: summary.students.total + summary.payments.total,
-      imported: summary.students.imported + summary.students.updated + summary.payments.imported,
-      skipped: summary.students.skipped + summary.payments.skipped,
-      errors: errors.length,
-      errorRows: [
-        ...errors.map((e) => ({ row: e.row, reason: `[${e.section}] ${e.reason}`, data: null })),
-        // Audit trail for imported inactive students (mirrors the manual Deactivate flag, without refund calc)
-        ...deactivated.map((d) => ({ row: d.row, reason: `[audit] ${d.note} — ${d.mess_no} (exit ${d.exit_date})`, data: null })),
-      ],
-    });
-
-    return { ok: true, summary, errors, deactivated: deactivated.length };
-
+    // No import_logs write here — chunked runs are logged once by the caller
+    // via logImportRun, so a partial/failed run still produces exactly one entry.
+    return {
+      ok: true,
+      summary,
+      errors,
+      deactivated: deactivated.map((d) => ({ row: d.row, mess_no: d.mess_no, exit_date: d.exit_date, note: d.note })),
+    };
   });
+
 
 
