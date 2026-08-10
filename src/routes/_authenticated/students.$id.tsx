@@ -659,12 +659,11 @@ function ProfileEditModal({
             </Select>
           </Field>
           <Field label="Course"><Input value={form.course} onChange={(e) => set("course", e.target.value)} /></Field>
-          <Field label="Batch Year"><Input type="number" value={form.batch_year} onChange={(e) => set("batch_year", e.target.value)} /></Field>
           <Field label="Hostel Room"><Input value={form.hostel_room} onChange={(e) => set("hostel_room", e.target.value)} /></Field>
           <Field label="Blood Group"><Input value={form.blood_group} onChange={(e) => set("blood_group", e.target.value)} /></Field>
           <Field label="Email"><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} /></Field>
           <Field label="Parent Mobile"><Input value={form.parent_mobile} onChange={(e) => set("parent_mobile", e.target.value)} /></Field>
-          <div className="col-span-2"><Field label="Address"><Textarea value={form.address} onChange={(e) => set("address", e.target.value)} /></Field></div>
+          <Field label="Joining Date"><Input type="date" value={form.joining_date} onChange={(e) => set("joining_date", e.target.value)} /></Field>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
