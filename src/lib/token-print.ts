@@ -32,7 +32,7 @@ export function printToken(token: TokenData) {
   <div class="center">${token.unit}</div>
   <hr />
   <div>Name: <b>${token.student_name}</b></div>
-  ${token.roll_number ? `<div>Roll: ${token.roll_number}</div>` : ""}
+  ${token.roll_number ? `<div>Mess No: ${token.roll_number}</div>` : ""}
   <hr />
   <div class="center big">${token.meal_type.toUpperCase()}</div>
   <div class="center big">${token.token_label}</div>
