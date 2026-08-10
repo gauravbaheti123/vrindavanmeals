@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Fingerprint, Pencil, Printer, Plus, Trash2, IndianRupee, X, FileText, UserCheck, Scale } from "lucide-react";
 import { toast } from "sonner";
+import { logAudit, diffValues } from "@/lib/audit";
 import { isValidMessNo, isMessNoAvailable } from "@/lib/mess-no";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
 import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from "@/lib/billing";
@@ -337,6 +338,14 @@ function StudentDetail() {
                                   await supabase.from("payments").update({ subscription_id: null }).eq("subscription_id", sub.id);
                                   const { error } = await supabase.from("subscriptions").delete().eq("id", sub.id);
                                   if (error) return toast.error(error.message);
+                                  await logAudit({
+                                    action: "delete", entity: "subscription", entityId: sub.id, studentId: student.id,
+                                    label: `Billing charge for ${monthLabel(sub.start_date)}`,
+                                    oldValues: {
+                                      start_date: sub.start_date, end_date: sub.end_date,
+                                      billed_amount: sub.billed_amount, status: sub.status,
+                                    },
+                                  });
                                   toast.success(`Subscription for ${monthLabel(sub.start_date)} deleted`);
                                   refresh();
                                 }}
@@ -436,6 +445,11 @@ function StudentDetail() {
                                   onClick={async () => {
                                     const { error } = await supabase.from("payments").delete().eq("id", p.id);
                                     if (error) return toast.error(error.message);
+                                    await logAudit({
+                                      action: "delete", entity: "payment", entityId: p.id, studentId: student.id,
+                                      label: `${inr(Number(p.amount))} · ${p.mode} · ${new Date(p.created_at).toLocaleDateString("en-IN")}`,
+                                      oldValues: { amount: p.amount, mode: p.mode, date: p.created_at.slice(0, 10), status: p.status },
+                                    });
                                     toast.success("Payment deleted");
                                     refresh();
                                   }}
@@ -488,6 +502,11 @@ function StudentDetail() {
                             onClick={async () => {
                               const { error } = await supabase.from("ledger_adjustments").delete().eq("id", a.id);
                               if (error) return toast.error(error.message);
+                              await logAudit({
+                                action: "delete", entity: "adjustment", entityId: a.id, studentId: student.id,
+                                label: a.remarks ?? "Ledger adjustment",
+                                oldValues: { amount: a.amount, entry_date: a.entry_date, remarks: a.remarks },
+                              });
                               toast.success("Adjustment deleted");
                               refresh();
                             }}
