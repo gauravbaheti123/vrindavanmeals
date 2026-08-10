@@ -416,7 +416,7 @@ function UnitsCard() {
   const qc = useQueryClient();
   const { data: units } = useQuery({
     queryKey: ["units"],
-    queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("units").select("id,name,is_active").order("name")).data ?? [],
   });
   const [newName, setNewName] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
@@ -440,10 +440,29 @@ function UnitsCard() {
     qc.invalidateQueries({ queryKey: ["units"] });
   }
 
+  async function toggleUnit(id: string, name: string, isActive: boolean) {
+    if (isActive) {
+      const { count } = await supabase
+        .from("students").select("id", { count: "exact", head: true })
+        .eq("unit_id", id).eq("is_approved", true);
+      if (!confirm(
+        `Archive "${name}"?\n\n${count ?? 0} active student(s) stay linked and all history is kept — the unit just stops appearing in new forms.`,
+      )) return;
+    }
+    const { error } = await supabase.from("units").update({ is_active: !isActive }).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(isActive ? "Unit archived" : "Unit restored");
+    qc.invalidateQueries({ queryKey: ["units"] });
+    qc.invalidateQueries({ queryKey: ["units-active"] });
+  }
+
   return (
     <Card>
       <CardHeader><CardTitle>Units</CardTitle></CardHeader>
       <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Units are archived, never deleted — existing students, payments and attendance keep their unit history.
+        </p>
         <div className="space-y-2">
           {units?.map((u) => (
             <div key={u.id} className="flex items-center gap-2 border rounded-md px-3 py-2">
@@ -455,9 +474,18 @@ function UnitsCard() {
                 </>
               ) : (
                 <>
-                  <span className="flex-1 font-medium">{u.name}</span>
+                  <span className={`flex-1 font-medium ${u.is_active ? "" : "text-muted-foreground line-through"}`}>{u.name}</span>
+                  {!u.is_active && <span className="text-xs text-muted-foreground">Archived</span>}
                   <Button size="sm" variant="ghost" onClick={() => { setEditId(u.id); setEditName(u.name); }}>
                     <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className={u.is_active ? "text-destructive" : ""}
+                    onClick={() => toggleUnit(u.id, u.name, u.is_active)}
+                  >
+                    {u.is_active ? "Archive" : "Restore"}
                   </Button>
                 </>
               )}
@@ -472,4 +500,5 @@ function UnitsCard() {
     </Card>
   );
 }
+
 

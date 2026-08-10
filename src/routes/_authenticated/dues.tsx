@@ -226,7 +226,6 @@ function DuesPage() {
 
       <RecordPaymentModal
         row={payFor}
-        defaultAmount={planPrice}
         onClose={() => setPayFor(null)}
         onSaved={() => {
           setPayFor(null);
@@ -238,19 +237,19 @@ function DuesPage() {
   );
 }
 
-function RecordPaymentModal({ row, defaultAmount, onClose, onSaved }: {
-  row: Row | null; defaultAmount: number; onClose: () => void; onSaved: () => void;
+function RecordPaymentModal({ row, onClose, onSaved }: {
+  row: Row | null; onClose: () => void; onSaved: () => void;
 }) {
-  const [amount, setAmount] = useState<string>(String(defaultAmount));
+  const [amount, setAmount] = useState<string>("");
   const [mode, setMode] = useState("cash");
   const [date, setDate] = useState(todayISO());
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // reset on open
+  // reset on open — prefill with the student's exact outstanding due
   useMemo(() => {
-    if (row) { setAmount(String(defaultAmount)); setMode("cash"); setDate(todayISO()); setNote(""); }
-  }, [row, defaultAmount]);
+    if (row) { setAmount(String(Math.round(row.due_amount))); setMode("cash"); setDate(todayISO()); setNote(""); }
+  }, [row]);
 
   async function save() {
     if (!row) return;
@@ -262,7 +261,7 @@ function RecordPaymentModal({ row, defaultAmount, onClose, onSaved }: {
       student_id: row.student_id,
       subscription_id: row.sub_id,
       amount: Number(amount),
-      mode: mode as "cash" | "upi" | "card" | "razorpay",
+      mode: mode as "cash" | "upi" | "card" | "razorpay" | "rtgs" | "bank_transfer",
       status: "success",
       recorded_by: userRes.user?.id,
       created_at: new Date(date + "T" + new Date().toTimeString().slice(0, 8)).toISOString(),
@@ -282,9 +281,15 @@ function RecordPaymentModal({ row, defaultAmount, onClose, onSaved }: {
         </DialogHeader>
         {row && (
           <div className="space-y-3">
-            <div className="text-sm bg-muted/40 rounded-md px-3 py-2">
-              <div className="font-semibold">{row.full_name}</div>
-              <div className="text-xs text-muted-foreground">{row.roll_number} · {row.unit_name ?? "—"}</div>
+            <div className="text-sm bg-muted/40 rounded-md px-3 py-2 flex items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold">{row.full_name}</div>
+                <div className="text-xs text-muted-foreground">{row.roll_number} · {row.unit_name ?? "—"}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[11px] uppercase text-muted-foreground">Outstanding</div>
+                <div className="font-bold text-destructive">{inr(row.due_amount)}</div>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -298,10 +303,10 @@ function RecordPaymentModal({ row, defaultAmount, onClose, onSaved }: {
             </div>
             <div className="space-y-1">
               <Label>Mode</Label>
-              <RadioGroup value={mode} onValueChange={setMode} className="grid grid-cols-4 gap-2">
-                {["cash", "upi", "card", "razorpay"].map((m) => (
+              <RadioGroup value={mode} onValueChange={setMode} className="grid grid-cols-3 gap-2">
+                {["cash", "upi", "card", "razorpay", "rtgs", "bank_transfer"].map((m) => (
                   <label key={m} className={`flex items-center gap-1 border rounded-md px-2 py-1.5 cursor-pointer text-sm capitalize ${mode === m ? "border-primary bg-primary/5" : ""}`}>
-                    <RadioGroupItem value={m} />{m}
+                    <RadioGroupItem value={m} />{m.replace("_", " ")}
                   </label>
                 ))}
               </RadioGroup>

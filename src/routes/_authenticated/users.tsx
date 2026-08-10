@@ -69,7 +69,7 @@ function UsersTab() {
 
   const { data: units } = useQuery({
     queryKey: ["units"],
-    queryFn: async () => (await supabase.from("units").select("id,name")).data ?? [],
+    queryFn: async () => (await supabase.from("units").select("id,name").eq("is_active", true)).data ?? [],
   });
 
   const { data: users, refetch, isFetching } = useQuery({

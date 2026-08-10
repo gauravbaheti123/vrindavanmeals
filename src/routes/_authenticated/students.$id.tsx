@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -24,6 +24,7 @@ import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from 
 import { fetchFeeSlabs, feeForMonth, missingSlabMessage, type FeeSlab } from "@/lib/fees";
 import { generateNocPdf } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
+import { StudentPhoto, StudentPhotoEditor } from "@/components/student-photo";
 
 export const Route = createFileRoute("/_authenticated/students/$id")({
   head: () => ({ meta: [{ title: "Student — Vrindavan Meals" }] }),
@@ -62,7 +63,7 @@ function StudentDetail() {
         supabase.from("payments").select("*").eq("student_id", id).order("created_at", { ascending: true }),
         supabase.from("biometric_mappings").select("*").eq("student_id", id).eq("is_active", true).maybeSingle(),
         supabase.from("subscription_plans").select("*").eq("is_active", true).order("created_at"),
-        supabase.from("units").select("id, name").order("name"),
+        supabase.from("units").select("id, name").eq("is_active", true).order("name"),
         supabase.from("ledger_adjustments").select("*").eq("student_id", id).order("entry_date", { ascending: true }),
       ]);
       return {
@@ -200,16 +201,19 @@ function StudentDetail() {
 
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3 border-b pb-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-3xl font-bold">{s.full_name}</h1>
-            <Button size="icon" variant="ghost" className="h-7 w-7 print:hidden" onClick={() => setEditProfile(true)}>
-              <Pencil className="h-4 w-4" />
-            </Button>
+        <div className="flex items-start gap-4 min-w-0">
+          <StudentPhoto path={s.photo_url} size={80} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-3xl font-bold">{s.full_name}</h1>
+              <Button size="icon" variant="ghost" className="h-7 w-7 print:hidden" onClick={() => setEditProfile(true)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-sm">
+              {s.roll_number ?? "—"}{s.mobile ? ` · ${s.mobile}` : ""} · {unitName}
+            </p>
           </div>
-          <p className="text-muted-foreground text-sm">
-            {s.roll_number ?? "—"}{s.mobile ? ` · ${s.mobile}` : ""} · {unitName}
-          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           {effStatus && (
@@ -244,20 +248,19 @@ function StudentDetail() {
             </Button>
           </CardHeader>
           <CardContent className="text-sm space-y-1.5">
+            <div className="pb-3 mb-2 border-b">
+              <StudentPhotoEditor studentId={s.id} path={s.photo_url} onChanged={refresh} />
+            </div>
             <Row k="Mess No" v={s.roll_number} />
             <Row k="Roll Number" v={(s as unknown as { college_roll_number?: string | null }).college_roll_number} />
             <Row k="Course" v={s.course} />
-
-            <Row k="Batch Year" v={s.batch_year?.toString()} />
             <Row k="Hostel Room" v={s.hostel_room} />
             <Row k="Email" v={s.email} />
             <Row k="Parent Mobile" v={s.parent_mobile} />
             <Row k="Blood Group" v={s.blood_group} />
-            <Row k="Address" v={s.address} />
-            <Row k="Joining Date" v={(s as any).joining_date} />
-            <Row k="Exit Date" v={(s as any).exit_date} />
+            <Row k="Joining Date" v={(s as unknown as { joining_date?: string | null }).joining_date} />
+            <Row k="Exit Date" v={(s as unknown as { exit_date?: string | null }).exit_date} />
 
-            <Row k="Document" v={s.doc_type ? `${s.doc_type} — ${s.doc_number ?? ""}` : null} />
 
             {s.is_approved && (
               <div className="pt-3 mt-3 border-t print:hidden">
@@ -590,14 +593,12 @@ function ProfileEditModal({
     mobile: student.mobile ?? "",
     roll_number: student.roll_number ?? "",
     college_roll_number: (student as unknown as { college_roll_number?: string | null }).college_roll_number ?? "",
-
     course: student.course ?? "",
-    batch_year: student.batch_year?.toString() ?? "",
     hostel_room: student.hostel_room ?? "",
     email: student.email ?? "",
     parent_mobile: student.parent_mobile ?? "",
     blood_group: student.blood_group ?? "",
-    address: student.address ?? "",
+    joining_date: (student as unknown as { joining_date?: string | null }).joining_date ?? "",
     unit_id: student.unit_id ?? "",
   });
   const [saving, setSaving] = useState(false);
@@ -624,14 +625,12 @@ function ProfileEditModal({
       mobile: mobile || null,
       roll_number: messNo,
       college_roll_number: form.college_roll_number.trim() || null,
-
       course: form.course || null,
-      batch_year: form.batch_year ? Number(form.batch_year) : null,
       hostel_room: form.hostel_room || null,
       email: form.email || null,
       parent_mobile: form.parent_mobile || null,
       blood_group: form.blood_group || null,
-      address: form.address || null,
+      joining_date: form.joining_date || null,
       unit_id: form.unit_id || null,
     }).eq("id", student.id);
     setSaving(false);
@@ -660,12 +659,11 @@ function ProfileEditModal({
             </Select>
           </Field>
           <Field label="Course"><Input value={form.course} onChange={(e) => set("course", e.target.value)} /></Field>
-          <Field label="Batch Year"><Input type="number" value={form.batch_year} onChange={(e) => set("batch_year", e.target.value)} /></Field>
           <Field label="Hostel Room"><Input value={form.hostel_room} onChange={(e) => set("hostel_room", e.target.value)} /></Field>
           <Field label="Blood Group"><Input value={form.blood_group} onChange={(e) => set("blood_group", e.target.value)} /></Field>
           <Field label="Email"><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} /></Field>
           <Field label="Parent Mobile"><Input value={form.parent_mobile} onChange={(e) => set("parent_mobile", e.target.value)} /></Field>
-          <div className="col-span-2"><Field label="Address"><Textarea value={form.address} onChange={(e) => set("address", e.target.value)} /></Field></div>
+          <Field label="Joining Date"><Input type="date" value={form.joining_date} onChange={(e) => set("joining_date", e.target.value)} /></Field>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>

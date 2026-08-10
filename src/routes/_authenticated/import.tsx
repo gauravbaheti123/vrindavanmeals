@@ -245,7 +245,7 @@ type StudentRow = {
   full_name: string; mobile: string | null; mess_no: string | null;
   unit_name: string | null; room: string | null; opening_balance: number | null;
   course: string | null; parent_mobile: string | null; email: string | null;
-  blood_group: string | null; address: string | null;
+  blood_group: string | null; address: string | null; college_roll_number: string | null;
   joining_date: string | null; exit_date: string | null; status: "active" | "inactive";
 };
 type TxnRow = {
@@ -369,6 +369,7 @@ function parseWorkbook(file: File): Promise<Parsed> {
             email: (pick(r, ["Email", "EMAIL", "email"]) ?? null) as any,
             blood_group: (pick(r, ["Blood Group", "BLOOD GROUP", "blood_group"]) ?? null) as any,
             address: (pick(r, ["Address", "ADDRESS", "address"]) ?? null) as any,
+            college_roll_number: (pick(r, ["Roll Number", "ROLL NUMBER", "College Roll Number", "roll_number"]) ?? null) as any,
             joining_date,
             exit_date,
             status: statusRaw as "active" | "inactive",
@@ -424,9 +425,9 @@ function parseWorkbook(file: File): Promise<Parsed> {
 function downloadMasterTemplate() {
   const wb = XLSX.utils.book_new();
   const students = [
-    ["Mess No*", "Name*", "Mobile", "Unit", "Room", "Opening Balance", "Course", "Parent Mobile", "Email", "Blood Group", "Address", "Joining Date", "Exit Date", "Status*"],
-    ["VM-0001", "Priya Sharma", "9876543210", "Unit 1", "A-101", 0, "B.Sc", "9123456789", "priya@example.com", "O+", "Latur", "01-07-2026", "", "Active"],
-    ["", "Anita Patel", "", "", "A-102", 1200, "", "", "", "", "", "15-04-2026", "31-05-2026", "Inactive"],
+    ["Mess No*", "Name*", "Mobile", "Roll Number", "Unit", "Room", "Opening Balance", "Course", "Parent Mobile", "Email", "Blood Group", "Joining Date", "Exit Date", "Status*"],
+    ["VM-0001", "Priya Sharma", "9876543210", "CS2024-11", "Unit 1", "A-101", 0, "B.Sc", "9123456789", "priya@example.com", "O+", "01-07-2026", "", "Active"],
+    ["", "Anita Patel", "", "", "", "A-102", 1200, "", "", "", "", "15-04-2026", "31-05-2026", "Inactive"],
   ];
   const txns = [
     ["Mess No*", "Name", "Mobile", "Date", "Amount", "Mode", "Subscription Start Date", "Subscription End Date"],
@@ -441,6 +442,7 @@ function downloadMasterTemplate() {
     ["Mess No*", "Yes", "VM-0001 format", "Unique match key — auto-assigned (VM-####) if left blank"],
     ["Name*", "Yes", "Text", "Student full name"],
     ["Mobile", "No", "10-digit number", "Optional — may be left blank"],
+    ["Roll Number", "No", "Text", "College roll number (not the Mess No)"],
     ["Unit", "No", "Existing unit name", "Defaults to Unit 1"],
     ["Room", "No", "Text", ""],
     ["Opening Balance", "No", "Number", "Carry-forward due, posted directly to ledger"],
@@ -448,7 +450,6 @@ function downloadMasterTemplate() {
     ["Parent Mobile", "No", "10-digit number", ""],
     ["Email", "No", "Text", ""],
     ["Blood Group", "No", "Text", ""],
-    ["Address", "No", "Text", ""],
     ["Joining Date", "No", "DD-MM-YYYY", "Reference only — no billing calculation"],
     ["Exit Date", "Conditional", "DD-MM-YYYY", "Required when Status = Inactive; must be blank when Active; cannot be in the future"],
     ["Status*", "Yes", "Active / Inactive", "Inactive marks the student deactivated (no refund calculation)"],
@@ -521,7 +522,7 @@ function ExcelWorkbookTab() {
       <div className="text-xs text-muted-foreground space-y-1">
         <div><strong>Unified format — 2 sheets:</strong></div>
         <ul className="list-disc pl-5 space-y-0.5">
-          <li><strong>Students</strong> — required: <code>Mess No</code> (VM-0001 format, auto-assigned if blank), <code>Name</code>, <code>Status</code> (Active / Inactive). Optional: Mobile, Unit, Room, Opening Balance, Course, Parent Mobile, Email, Blood Group, Address, Joining Date, Exit Date (required when Status = Inactive). Dates in <code>DD-MM-YYYY</code>.</li>
+          <li><strong>Students</strong> — required: <code>Mess No</code> (VM-0001 format, auto-assigned if blank), <code>Name</code>, <code>Status</code> (Active / Inactive). Optional: Mobile, Roll Number, Unit, Room, Opening Balance, Course, Parent Mobile, Email, Blood Group, Joining Date, Exit Date (required when Status = Inactive). Dates in <code>DD-MM-YYYY</code>.</li>
           <li><strong>Transactions</strong> — required: <code>Mess No</code> (or Mobile). Optional: Date, Amount, Mode (Cash/UPI/Card/Razorpay), Subscription Start/End Date (defaults to the transaction month's 1st–last day).</li>
         </ul>
         <div className="pt-1">Match key is <strong>Mess No</strong> (mobile is used as a fallback when present). Existing students are updated in place — no duplicates. Rows without Amount are skipped (no payment recorded). Joining/Exit dates are reference-only — no billing, pivot or refund calculation runs on import.</div>
