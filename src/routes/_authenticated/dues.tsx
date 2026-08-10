@@ -171,10 +171,16 @@ function DuesPage() {
               </SelectContent>
             </Select>
           </div>
+          <LedgerFilterControls value={filter} onChange={setFilter} />
           <div className="flex items-center gap-2">
             <Switch id="overdue" checked={overdueOnly} onCheckedChange={setOverdueOnly} />
             <Label htmlFor="overdue" className="text-sm">Overdue only</Label>
           </div>
+          <div className="flex items-center gap-2">
+            <Switch id="settled" checked={includeSettled} onCheckedChange={setIncludeSettled} />
+            <Label htmlFor="settled" className="text-sm">Include paid-up students</Label>
+          </div>
+
         </CardContent>
       </Card>
 
