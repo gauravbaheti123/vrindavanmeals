@@ -109,20 +109,20 @@ function Dashboard() {
         end_date: string; grace_end_date: string; unit_id: string | null;
       };
       const subs = (subsAll.data ?? []) as Sub[];
-      const eff = subs.map((s) => ({ ...s, eff: computeSubscriptionStatus(s) }));
-      const active = eff.filter((s) => s.eff === "active").length;
-      const grace = eff.filter((s) => s.eff === "grace").length;
-      const expired = eff.filter((s) => s.eff === "expired").length;
 
       // Single source of truth — same formula as /dues page
-      const duesRows = await fetchDuesRows(planPrice);
-      const scopedDues = unitId === "all" ? duesRows : duesRows.filter((r) => r.unit_id === unitId);
+      const ledgerRows = await fetchLedgerRows(planPrice);
+      const scopedLedger = unitId === "all" ? ledgerRows : ledgerRows.filter((r) => r.unit_id === unitId);
+      const scopedDues = scopedLedger.filter((r) => r.due_amount > 0);
       const outstandingAmount = scopedDues.reduce((s, r) => s + r.due_amount, 0);
       const uniqUnpaidStudents = new Set(scopedDues.map((r) => r.student_id));
 
-      const expiring = eff.filter(
-        (s) => s.eff === "active" && s.end_date >= today && s.end_date <= in5,
-      ).length;
+      const activeStudents = scopedLedger.filter((r) => r.status === "active");
+      const activeDue = activeStudents.reduce((s, r) => s + Math.max(0, r.due_amount), 0);
+      const highDue = scopedDues.filter(
+        (r) => r.due_amount >= dueAmountThreshold || r.days_overdue >= daysOverdueThreshold,
+      );
+
 
       type Att = { meal_type: string };
       const atts = (attendanceToday.data ?? []) as Att[];
