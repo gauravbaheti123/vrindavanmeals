@@ -794,29 +794,66 @@ function ExcelWorkbookTab() {
             <ResultBox icon={CheckCircle2} label="Subscriptions created" value={result.summary.subscriptions.imported} color="text-emerald-600" />
           </div>
 
-          {result.errors?.length > 0 && (
-            <>
-              <div className="text-sm font-medium">Errors ({result.errors.length}):</div>
-              <div className="border rounded-md overflow-auto max-h-60">
-                <Table>
-                  <TableHeader><TableRow><TableHead>Section</TableHead><TableHead>Row</TableHead><TableHead>Reason</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {result.errors.slice(0, 100).map((e: any, i: number) => (
-                      <TableRow key={i}>
-                        <TableCell className="capitalize">{e.section}</TableCell>
-                        <TableCell>{e.row}</TableCell>
-                        <TableCell className="text-xs">{e.reason}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <Button variant="outline" onClick={() => {
-                const rows = [["section", "row", "reason"], ...result.errors.map((e: any) => [e.section, String(e.row), e.reason])];
-                downloadCsv("excel-import-errors.csv", rows);
-              }}><Download className="h-4 w-4 mr-2" />Download Error CSV</Button>
-            </>
-          )}
+          {(() => {
+            const all: any[] = result.errors ?? [];
+            const audit = all.filter((e) => e.section === "audit");
+            const errs = all.filter((e) => e.section !== "audit");
+            return (
+              <>
+                {errs.length > 0 && (
+                  <>
+                    <div className="text-sm font-medium text-destructive flex items-center gap-2">
+                      <XCircle className="h-4 w-4" />Errors ({errs.length}) — rows that need your attention
+                    </div>
+                    <div className="border border-destructive/30 rounded-md overflow-auto max-h-60">
+                      <Table>
+                        <TableHeader><TableRow><TableHead>Section</TableHead><TableHead>Row</TableHead><TableHead>Reason</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                          {errs.slice(0, 200).map((e: any, i: number) => (
+                            <TableRow key={i}>
+                              <TableCell className="capitalize">{e.section}</TableCell>
+                              <TableCell>{e.row}</TableCell>
+                              <TableCell className="text-xs">{e.reason}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <Button variant="outline" onClick={() => {
+                      const rows = [["section", "row", "reason"], ...errs.map((e: any) => [e.section, String(e.row), e.reason])];
+                      downloadCsv("excel-import-errors.csv", rows);
+                    }}><Download className="h-4 w-4 mr-2" />Download Error CSV</Button>
+                  </>
+                )}
+
+                {audit.length > 0 && (
+                  <>
+                    <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <Info className="h-4 w-4" />Audit Log ({audit.length}) — actions performed by this import
+                    </div>
+                    <div className="border rounded-md overflow-auto max-h-60 bg-muted/30">
+                      <Table>
+                        <TableHeader><TableRow><TableHead>Row</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                          {audit.slice(0, 200).map((e: any, i: number) => (
+                            <TableRow key={i}>
+                              <TableCell>{e.row}</TableCell>
+                              <TableCell className="text-xs">{e.reason}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const rows = [["row", "action"], ...audit.map((e: any) => [String(e.row), e.reason])];
+                      downloadCsv("excel-import-audit-log.csv", rows);
+                    }}><Download className="h-4 w-4 mr-2" />Download Audit Log CSV</Button>
+                  </>
+                )}
+              </>
+            );
+          })()}
+
           <Button variant="ghost" onClick={() => { setParsed(null); setResult(null); }}>Import Another File</Button>
         </div>
       )}
