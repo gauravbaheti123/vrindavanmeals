@@ -409,19 +409,48 @@ function parseWorkbook(file: File): Promise<Parsed> {
 function downloadMasterTemplate() {
   const wb = XLSX.utils.book_new();
   const students = [
-    ["Name*", "Mobile*", "Mess No", "Unit", "Room", "Opening Balance", "Course", "Parent Mobile", "Email", "Blood Group", "Address"],
-    ["Priya Sharma", "9876543210", "MESS-001", "Unit 1", "A-101", 0, "B.Sc", "9123456789", "priya@example.com", "O+", "Latur"],
-    ["Anita Patel", "9876543211", "", "", "A-102", 1200, "", "", "", "", ""],
+    ["Name*", "Mobile*", "Mess No", "Unit", "Room", "Opening Balance", "Course", "Parent Mobile", "Email", "Blood Group", "Address", "Joining Date", "Exit Date", "Status*"],
+    ["Priya Sharma", "9876543210", "MESS-001", "Unit 1", "A-101", 0, "B.Sc", "9123456789", "priya@example.com", "O+", "Latur", "01-07-2026", "", "Active"],
+    ["Anita Patel", "9876543211", "", "", "A-102", 1200, "", "", "", "", "", "15-04-2026", "31-05-2026", "Inactive"],
   ];
   const txns = [
     ["Mobile*", "Name", "Date", "Amount", "Mode", "Subscription Start Date", "Subscription End Date"],
-    ["9876543210", "Priya Sharma", "2026-07-05", 3500, "UPI", "2026-07-01", "2026-07-31"],
-    ["9876543211", "Anita Patel", "2026-07-10", 3500, "Cash", "", ""],
+    ["9876543210", "Priya Sharma", "05-07-2026", 3500, "UPI", "01-07-2026", "31-07-2026"],
+    ["9876543211", "Anita Patel", "10-07-2026", 3500, "Cash", "", ""],
   ];
+  const instructions = [
+    ["Vrindavan Meals — Master Import Template"],
+    [""],
+    ["Sheet: Students"],
+    ["Column", "Required", "Format / Accepted values", "Notes"],
+    ["Name*", "Yes", "Text", "Student full name"],
+    ["Mobile*", "Yes", "10-digit number", "Unique match key — existing students are updated"],
+    ["Mess No", "No", "Text", "Auto-generated if blank"],
+    ["Unit", "No", "Existing unit name", "Defaults to Unit 1"],
+    ["Room", "No", "Text", ""],
+    ["Opening Balance", "No", "Number", "Carry-forward due, posted directly to ledger"],
+    ["Course", "No", "Text", ""],
+    ["Parent Mobile", "No", "10-digit number", ""],
+    ["Email", "No", "Text", ""],
+    ["Blood Group", "No", "Text", ""],
+    ["Address", "No", "Text", ""],
+    ["Joining Date", "No", "DD-MM-YYYY", "Reference only — no billing calculation"],
+    ["Exit Date", "Conditional", "DD-MM-YYYY", "Required when Status = Inactive; must be blank when Active; cannot be in the future"],
+    ["Status*", "Yes", "Active / Inactive", "Inactive marks the student deactivated (no refund calculation)"],
+    [""],
+    ["Sample Students row"],
+    ["Name*", "Mobile*", "Joining Date", "Exit Date", "Status*"],
+    ["Priya Sharma", "9876543210", "01-07-2026", "", "Active"],
+    ["Anita Patel", "9876543211", "15-04-2026", "31-05-2026", "Inactive"],
+    [""],
+    ["Sheet: Transactions — unchanged. Required: Mobile. Optional: Date, Amount, Mode, Subscription Start/End Date."],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(instructions), "Instructions");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(students), "Students");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(txns), "Transactions");
   XLSX.writeFile(wb, `Vrindavan_Meals_Template.xlsx`);
 }
+
 
 function ExcelWorkbookTab() {
   const [parsed, setParsed] = useState<Parsed | null>(null);
