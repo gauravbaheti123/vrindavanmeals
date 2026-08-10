@@ -212,22 +212,23 @@ function Dashboard() {
           sub={`Cash ${inr(agg?.collection.byMode.cash ?? 0)} · UPI ${inr(agg?.collection.byMode.upi ?? 0)} · Card ${inr(agg?.collection.byMode.card ?? 0)}`}
         />
         <StatCard
-          to="/reports"
-          tone={agg && agg.expiring > 0 ? "warning" : "muted"}
-          icon={<CalendarClock className="h-5 w-5" />}
-          label="Expiring Soon (5 days)"
-          value={String(agg?.expiring ?? 0)}
-          sub="Send reminders"
-          alert={agg ? agg.expiring > 0 : false}
+          to="/dues"
+          tone={agg && agg.highDue.count > 0 ? "warning" : "muted"}
+          icon={<AlertTriangle className="h-5 w-5" />}
+          label="High Due Alert"
+          value={String(agg?.highDue.count ?? 0)}
+          sub={`Over ${inr(dueAmountThreshold)} or ${daysOverdueThreshold}+ days · ${inr(agg?.highDue.amount ?? 0)}`}
+          alert={agg ? agg.highDue.count > 0 : false}
         />
         <StatCard
           to="/subscriptions"
           tone="primary"
           icon={<IndianRupee className="h-5 w-5" />}
-          label="Active Subscriptions"
+          label="Active Students"
           value={String(agg?.subs.active ?? 0)}
-          sub={`Grace ${agg?.subs.grace ?? 0} · Expired ${agg?.subs.expired ?? 0}`}
+          sub={`Inactive ${agg?.subs.inactive ?? 0} · Active due ${inr(agg?.subs.activeDue ?? 0)}`}
         />
+
       </div>
 
       {/* TERTIARY ROW — operational (smaller, muted) */}
