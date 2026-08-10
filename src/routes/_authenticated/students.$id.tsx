@@ -63,7 +63,7 @@ function StudentDetail() {
         supabase.from("payments").select("*").eq("student_id", id).order("created_at", { ascending: true }),
         supabase.from("biometric_mappings").select("*").eq("student_id", id).eq("is_active", true).maybeSingle(),
         supabase.from("subscription_plans").select("*").eq("is_active", true).order("created_at"),
-        supabase.from("units").select("id, name").order("name"),
+        supabase.from("units").select("id, name").eq("is_active", true).order("name"),
         supabase.from("ledger_adjustments").select("*").eq("student_id", id).order("entry_date", { ascending: true }),
       ]);
       return {
