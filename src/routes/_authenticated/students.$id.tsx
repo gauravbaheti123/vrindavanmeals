@@ -464,7 +464,12 @@ function StudentDetail() {
                   </TableCell>
                   <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
                   <TableCell className="text-right print:hidden">
+                    <div className="flex justify-end gap-1">
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setAdjModal({ existing: a })}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
                     <AlertDialog>
+
                       <AlertDialogTrigger asChild>
                         <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive">
                           <Trash2 className="h-3 w-3" />
