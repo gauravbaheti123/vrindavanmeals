@@ -49,6 +49,10 @@ type Adjustment = {
 
 const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 const todayISO = () => new Date().toISOString().slice(0, 10);
+/** "2026-05-17" → "May 2026" */
+const monthLabel = (iso: string) =>
+  new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+
 
 function StudentDetail() {
   const { id } = useParams({ from: "/_authenticated/students/$id" });
@@ -84,7 +88,7 @@ function StudentDetail() {
   const [editSub, setEditSub] = useState<Subscription | null>(null);
   const [newSub, setNewSub] = useState(false);
   const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment } | null>(null);
-  const [adjModal, setAdjModal] = useState(false);
+  const [adjModal, setAdjModal] = useState<{ existing: Adjustment | null } | null>(null);
 
   const [activateOpen, setActivateOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
@@ -310,7 +314,40 @@ function StudentDetail() {
                         <Button size="icon" variant="ghost" className="h-7 w-7 print:hidden" onClick={() => setEditSub(sub)}>
                           <Pencil className="h-3 w-3" />
                         </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 print:hidden text-destructive hover:text-destructive">
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                Delete this subscription entry ({monthLabel(sub.start_date)})?
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This removes the billing charge for that month. This cannot be undone directly,
+                                though “Rebuild All Billing” will regenerate it if the student is still Active for that period.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={async () => {
+                                  await supabase.from("payments").update({ subscription_id: null }).eq("subscription_id", sub.id);
+                                  const { error } = await supabase.from("subscriptions").delete().eq("id", sub.id);
+                                  if (error) return toast.error(error.message);
+                                  toast.success(`Subscription for ${monthLabel(sub.start_date)} deleted`);
+                                  refresh();
+                                }}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
+
                     </li>
                   );
                 })}
@@ -325,7 +362,7 @@ function StudentDetail() {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base">Payment Ledger</CardTitle>
           <div className="flex gap-2 print:hidden">
-            <Button size="sm" variant="outline" onClick={() => setAdjModal(true)}>
+            <Button size="sm" variant="outline" onClick={() => setAdjModal({ existing: null })}>
               <Scale className="h-3 w-3 mr-1" />Add Adjustment
             </Button>
             <Button size="sm" onClick={() => setPayModal({ mode: "new" })}>
@@ -427,7 +464,12 @@ function StudentDetail() {
                   </TableCell>
                   <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
                   <TableCell className="text-right print:hidden">
+                    <div className="flex justify-end gap-1">
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setAdjModal({ existing: a })}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
                     <AlertDialog>
+
                       <AlertDialogTrigger asChild>
                         <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive">
                           <Trash2 className="h-3 w-3" />
@@ -455,7 +497,9 @@ function StudentDetail() {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
+                    </div>
                   </TableCell>
+
                 </TableRow>
               ))}
             </TableBody>
@@ -560,10 +604,12 @@ function StudentDetail() {
       {adjModal && (
         <AdjustmentModal
           studentId={s.id}
-          onClose={() => setAdjModal(false)}
-          onSaved={() => { setAdjModal(false); refresh(); }}
+          existing={adjModal.existing}
+          onClose={() => setAdjModal(null)}
+          onSaved={() => { setAdjModal(null); refresh(); }}
         />
       )}
+
 
     </div>
   );
@@ -1041,16 +1087,17 @@ function DeactivateStudentModal({
 /* ---------------- Ledger Adjustment Modal ---------------- */
 
 function AdjustmentModal({
-  studentId, onClose, onSaved,
+  studentId, existing, onClose, onSaved,
 }: {
   studentId: string;
+  existing?: Adjustment | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [kind, setKind] = useState<"credit" | "charge">("credit");
-  const [amount, setAmount] = useState("");
-  const [entryDate, setEntryDate] = useState(todayISO());
-  const [remarks, setRemarks] = useState("");
+  const [kind, setKind] = useState<"credit" | "charge">(existing && Number(existing.amount) > 0 ? "charge" : "credit");
+  const [amount, setAmount] = useState(existing ? String(Math.abs(Number(existing.amount))) : "");
+  const [entryDate, setEntryDate] = useState(existing?.entry_date ?? todayISO());
+  const [remarks, setRemarks] = useState(existing?.remarks ?? "");
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -1060,15 +1107,24 @@ function AdjustmentModal({
     setSaving(true);
     try {
       const { data: userRes } = await supabase.auth.getUser();
-      const { error } = await supabase.from("ledger_adjustments").insert({
-        student_id: studentId,
-        amount: kind === "credit" ? -abs : abs,
-        entry_date: entryDate,
-        remarks: remarks.trim(),
-        created_by: userRes.user?.id ?? null,
-      });
-      if (error) throw new Error(error.message);
-      toast.success(`${kind === "credit" ? "Credit" : "Charge"} of ${inr(abs)} added to ledger`);
+      const signed = kind === "credit" ? -abs : abs;
+      if (existing) {
+        const { error } = await supabase.from("ledger_adjustments")
+          .update({ amount: signed, entry_date: entryDate, remarks: remarks.trim() })
+          .eq("id", existing.id);
+        if (error) throw new Error(error.message);
+        toast.success("Adjustment updated");
+      } else {
+        const { error } = await supabase.from("ledger_adjustments").insert({
+          student_id: studentId,
+          amount: signed,
+          entry_date: entryDate,
+          remarks: remarks.trim(),
+          created_by: userRes.user?.id ?? null,
+        });
+        if (error) throw new Error(error.message);
+        toast.success(`${kind === "credit" ? "Credit" : "Charge"} of ${inr(abs)} added to ledger`);
+      }
       onSaved();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save adjustment");
@@ -1080,7 +1136,8 @@ function AdjustmentModal({
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Add Ledger Adjustment</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{existing ? "Edit Ledger Adjustment" : "Add Ledger Adjustment"}</DialogTitle></DialogHeader>
+
         <div className="space-y-3">
           <Field label="Type">
             <RadioGroup value={kind} onValueChange={(v) => setKind(v as typeof kind)} className="grid grid-cols-2 gap-2">
