@@ -212,6 +212,21 @@ function ManualEntrySheet({ unitId, onDone }: { unitId: string; onDone: (r: { su
       }).select("id").single();
       if (error) throw error;
 
+      // Overdue warning — token still prints normally
+      let warning_message: string | undefined;
+      try {
+        const [{ data: settingsRows }, dueInfo] = await Promise.all([
+          supabase.from("system_settings").select("key,value"),
+          fetchStudentDue(student.id),
+        ]);
+        const map = Object.fromEntries((settingsRows ?? []).map((s) => [s.key, s.value]));
+        const amtLimit = Number(map["due_amount_threshold"] ?? 3000);
+        const dayLimit = Number(map["days_overdue_threshold"] ?? 15);
+        if (dueInfo.due_amount >= amtLimit || (dueInfo.due_amount > 0 && dueInfo.days_overdue >= dayLimit)) {
+          warning_message = `Payment overdue — ₹${Math.round(dueInfo.due_amount).toLocaleString("en-IN")} pending for ${dueInfo.days_overdue} days`;
+        }
+      } catch { /* warning is best-effort */ }
+
       onDone({
         success: true,
         token_data: {
@@ -220,8 +235,10 @@ function ManualEntrySheet({ unitId, onDone }: { unitId: string; onDone: (r: { su
           unit: unit?.name ?? "", meal_type, token_number, token_label,
           scan_time: now.toISOString(),
           student_mobile: student.mobile, student_id: student.id,
+          warning_message,
         },
       });
+
     } catch (e) {
       onDone({ success: false, message: (e as Error).message });
     } finally { setSaving(false); }
