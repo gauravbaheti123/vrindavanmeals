@@ -369,6 +369,7 @@ function parseWorkbook(file: File): Promise<Parsed> {
             email: (pick(r, ["Email", "EMAIL", "email"]) ?? null) as any,
             blood_group: (pick(r, ["Blood Group", "BLOOD GROUP", "blood_group"]) ?? null) as any,
             address: (pick(r, ["Address", "ADDRESS", "address"]) ?? null) as any,
+            college_roll_number: (pick(r, ["Roll Number", "ROLL NUMBER", "College Roll Number", "roll_number"]) ?? null) as any,
             joining_date,
             exit_date,
             status: statusRaw as "active" | "inactive",
