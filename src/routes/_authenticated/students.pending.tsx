@@ -48,6 +48,7 @@ function Pending() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[70px]">Photo</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Mobile</TableHead>
               <TableHead>Roll No.</TableHead>
@@ -58,14 +59,15 @@ function Pending() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
             ) : data?.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No pending registrations.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No pending registrations.</TableCell></TableRow>
             ) : data?.map((s) => (
               <TableRow key={s.id}>
+                <TableCell><StudentPhoto path={s.photo_url} size={44} /></TableCell>
                 <TableCell className="font-medium">{s.full_name}</TableCell>
                 <TableCell>{s.mobile}</TableCell>
-                <TableCell>{s.roll_number || "—"}</TableCell>
+                <TableCell>{(s as unknown as { college_roll_number?: string | null }).college_roll_number || "—"}</TableCell>
                 <TableCell>{s.course || "—"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{new Date(s.created_at).toLocaleDateString()}</TableCell>
                 <TableCell className="text-right space-x-2">
