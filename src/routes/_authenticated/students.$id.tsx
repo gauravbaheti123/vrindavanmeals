@@ -497,7 +497,9 @@ function StudentDetail() {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
+                    </div>
                   </TableCell>
+
                 </TableRow>
               ))}
             </TableBody>
