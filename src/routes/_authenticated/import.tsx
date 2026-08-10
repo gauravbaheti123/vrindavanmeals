@@ -375,15 +375,15 @@ function parseWorkbook(file: File): Promise<Parsed> {
           const rowNum = i + 2;
           const isEmpty = Object.values(r).every((v) => v == null || v === "");
           if (isEmpty) { skippedStudents++; continue; }
-          const name = String(pick(r, ["Name", "STUDENT NAME", "Student Name", "full_name"]) ?? "").trim();
-          const mobileRaw = pick(r, ["Mobile", "MOBILE", "Mobile No", "mobile"]);
+          const name = String(pick(r, ["Name"]) ?? "").trim();
+          const mobileRaw = pick(r, ["Mobile"]);
           const mobile = mobileRaw ? String(mobileRaw).replace(/\D/g, "").slice(-10) : "";
           if (!name) {
             skippedStudents++;
             rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Name is mandatory` });
             continue;
           }
-          const messRawEarly = pick(r, ["Mess No", "MESS NO", "mess_no", "Mess Number"]);
+          const messRawEarly = pick(r, ["Mess No"]);
           const messNo = messRawEarly ? String(messRawEarly).trim().toUpperCase() : "";
           if (messNo && !/^VM-\d{4}$/.test(messNo)) {
             skippedStudents++;
