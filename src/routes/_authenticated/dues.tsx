@@ -226,7 +226,6 @@ function DuesPage() {
 
       <RecordPaymentModal
         row={payFor}
-        defaultAmount={planPrice}
         onClose={() => setPayFor(null)}
         onSaved={() => {
           setPayFor(null);
