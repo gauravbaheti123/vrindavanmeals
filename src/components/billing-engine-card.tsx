@@ -8,16 +8,22 @@ import { Label } from "@/components/ui/label";
 import { Save, RefreshCcw, CalendarPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { rebuildBilling, accrueMonthlyBilling, type RebuildSummary } from "@/lib/billing.functions";
+import { startRebuild, rebuildBillingBatch, rebuildSamples, accrueMonthlyBilling, type RebuildSummary } from "@/lib/billing.functions";
+
+const BATCH_SIZE = 25;
 
 const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 
 export function BillingEngineCard() {
   const qc = useQueryClient();
-  const runRebuild = useServerFn(rebuildBilling);
+  const runStart = useServerFn(startRebuild);
+  const runBatch = useServerFn(rebuildBillingBatch);
+  const runSamples = useServerFn(rebuildSamples);
   const runAccrue = useServerFn(accrueMonthlyBilling);
   const [busy, setBusy] = useState<"" | "rebuild" | "accrue">("");
   const [summary, setSummary] = useState<RebuildSummary | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
 
   const [amount, setAmount] = useState<string | null>(null);
   const [days, setDays] = useState<string | null>(null);
@@ -53,13 +59,30 @@ export function BillingEngineCard() {
   async function doRebuild() {
     if (!confirm("Recalculate month-by-month billing for every student from their joining date? Payments and adjustments are not touched.")) return;
     setBusy("rebuild");
+    setFailure(null);
+    setSummary(null);
+    let done = 0, before = 0, after = 0, total = 0;
     try {
-      const res = await runRebuild({} as never);
-      setSummary(res);
+      const started = await runStart({} as never);
+      total = started.total;
+      setProgress({ done: 0, total });
+      while (done < total) {
+        const res = await runBatch({ data: { offset: done, limit: BATCH_SIZE } });
+        if (res.processed === 0) break;
+        done += res.processed;
+        before += res.before;
+        after += res.after;
+        setProgress({ done, total });
+      }
+      const samples = await runSamples({} as never);
+      setSummary({ students_processed: done, before_total: before, after_total: after, samples });
       qc.invalidateQueries();
-      toast.success(`Rebuilt billing for ${res.students_processed} students`);
+      toast.success(`Recalculated billing for ${done} students. Total billed ${inr(before)} → ${inr(after)}`);
     } catch (e) {
-      toast.error((e as Error).message);
+      const msg = (e as Error).message || "Rebuild failed";
+      setFailure(`Stopped after ${done} of ${total || "?"} students: ${msg}. Progress so far is saved — you can safely run it again.`);
+      qc.invalidateQueries();
+      toast.error(`Rebuild failed after ${done} students: ${msg}`);
     } finally { setBusy(""); }
   }
 
@@ -106,6 +129,27 @@ export function BillingEngineCard() {
             Active students are charged a full month on the 1st of every month. Joining and exit months use the 15th-pivot rule
             (1–15 = full month, 16–end = half month). Payments only reduce the due — they never create billing.
           </p>
+
+          {busy === "rebuild" && progress && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Rebuilding billing…</span>
+                <span className="font-mono">{progress.done} / {progress.total}</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {failure && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              {failure}
+            </div>
+          )}
 
           {summary && (
             <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-2">
