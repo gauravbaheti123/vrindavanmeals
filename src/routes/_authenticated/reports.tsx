@@ -946,6 +946,160 @@ function RenewalsReport({ unit }: { unit: string }) {
 
 // ================== 5. Student Ledger ==================
 function StudentLedger() {
+  const [mode, setMode] = useState<"bulk" | "single">("bulk");
+  return (
+    <div className="space-y-3">
+      <Card className="p-3 flex flex-wrap items-center gap-2">
+        <div className="text-sm font-semibold flex items-center gap-2 mr-2"><BookOpen className="h-4 w-4" />Student Ledger</div>
+        <Button size="sm" variant={mode === "bulk" ? "default" : "outline"} onClick={() => setMode("bulk")}>Bulk Summary (all students)</Button>
+        <Button size="sm" variant={mode === "single" ? "default" : "outline"} onClick={() => setMode("single")}>Single Student Detail</Button>
+      </Card>
+      {mode === "bulk" ? <BulkLedgerSummary /> : <SingleStudentLedger />}
+    </div>
+  );
+}
+
+function BulkLedgerSummary() {
+  const [unit, setUnit] = useState("all");
+  const [filter, setFilter] = useState<LedgerFilterState>(defaultLedgerFilter);
+  const [minDue, setMinDue] = useState("");
+  const [maxDue, setMaxDue] = useState("");
+
+  const { data: units } = useQuery({
+    queryKey: ["units"],
+    queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
+  });
+
+  const { data: planPrice } = useQuery({
+    queryKey: ["default-plan-price"],
+    queryFn: async () => {
+      const { data } = await supabase.from("subscription_plans").select("price").eq("is_active", true)
+        .order("created_at", { ascending: true }).limit(1).maybeSingle();
+      return Number(data?.price ?? 3000);
+    },
+  });
+
+  const { data: ledger, isLoading } = useQuery({
+    queryKey: ["bulk-ledger", planPrice],
+    enabled: planPrice !== undefined,
+    queryFn: () => fetchLedgerRows(planPrice ?? 3000),
+  });
+
+  const rows = useMemo(() => {
+    const min = minDue.trim() === "" ? null : Number(minDue);
+    const max = maxDue.trim() === "" ? null : Number(maxDue);
+    const custom = min !== null || max !== null;
+    const base = (ledger ?? []).filter((r) => {
+      if (unit !== "all" && r.unit_id !== unit) return false;
+      if (custom) {
+        if (min !== null && r.due_amount < min) return false;
+        if (max !== null && r.due_amount > max) return false;
+      }
+      return true;
+    });
+    return applyLedgerFilter(base, custom ? { ...filter, dueRange: "all" } : filter);
+  }, [ledger, unit, filter, minDue, maxDue]);
+
+  const COLS = ["Mess No", "Name", "Mobile", "Unit", "Status", "Total Billed", "Total Paid", "Adjustments", "Total Due", "Last Payment Date"];
+  const exportRows = () =>
+    rows.map((r) => [
+      r.roll_number ?? "—",
+      r.full_name,
+      r.mobile ?? "—",
+      r.unit_name ?? "—",
+      r.status === "active" ? "Active" : "Inactive",
+      Math.round(r.total_billed),
+      Math.round(r.paid),
+      Math.round(r.opening_balance + r.adjustments),
+      Math.round(r.due_amount),
+      r.last_payment_date ? new Date(r.last_payment_date).toLocaleDateString("en-IN") : "—",
+    ]);
+  const meta = () => ({
+    title: "Student Ledger Summary",
+    subtitle: `${rows.length} students · Unit: ${unit === "all" ? "All" : units?.find((u) => u.id === unit)?.name ?? "—"} · Status: ${filter.status}`,
+    columns: COLS,
+    rows: exportRows(),
+    filename: `student-ledger-summary-${dISO(new Date())}`,
+  });
+
+  const totals = useMemo(() => rows.reduce((a, r) => ({
+    billed: a.billed + r.total_billed, paid: a.paid + r.paid,
+    adj: a.adj + r.opening_balance + r.adjustments, due: a.due + r.due_amount,
+  }), { billed: 0, paid: 0, adj: 0, due: 0 }), [rows]);
+
+  return (
+    <div className="space-y-3">
+      <Card className="p-4 flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs">Unit</Label>
+          <Select value={unit} onValueChange={setUnit}>
+            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Units</SelectItem>
+              {units?.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <LedgerFilterControls value={filter} onChange={setFilter} />
+        <div className="space-y-1">
+          <Label className="text-xs">Custom due min</Label>
+          <Input className="w-[110px]" type="number" placeholder="min" value={minDue} onChange={(e) => setMinDue(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Custom due max</Label>
+          <Input className="w-[110px]" type="number" placeholder="max" value={maxDue} onChange={(e) => setMaxDue(e.target.value)} />
+        </div>
+        <div className="ml-auto flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => exportExcel(meta())} disabled={!rows.length}>
+            <Download className="h-4 w-4 mr-1" />Excel
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => exportPdf(meta())} disabled={!rows.length}>
+            <FileText className="h-4 w-4 mr-1" />PDF
+          </Button>
+        </div>
+      </Card>
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <KPI label="Students" value={rows.length} icon={Users} />
+        <KPI label="Total Billed" value={fmtINR(totals.billed)} icon={Receipt} />
+        <KPI label="Total Paid" value={fmtINR(totals.paid)} icon={Wallet} tone="text-success" />
+        <KPI label="Adjustments" value={fmtINR(totals.adj)} icon={PiggyBank} />
+        <KPI label="Total Due" value={fmtINR(totals.due)} icon={AlertCircle} tone="text-destructive" />
+      </div>
+
+      <Card className="overflow-x-auto">
+        <Table>
+          <TableHeader><TableRow>{COLS.map((c) => (
+            <TableHead key={c} className={c.startsWith("Total") || c === "Adjustments" ? "text-right" : ""}>{c}</TableHead>
+          ))}</TableRow></TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow><TableCell colSpan={COLS.length} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
+            ) : rows.length === 0 ? (
+              <TableRow><TableCell colSpan={COLS.length} className="text-center py-8 text-muted-foreground">No students match the filters.</TableCell></TableRow>
+            ) : rows.map((r) => (
+              <TableRow key={r.student_id}>
+                <TableCell className="font-mono text-xs">{r.roll_number ?? "—"}</TableCell>
+                <TableCell className="font-medium">{r.full_name}</TableCell>
+                <TableCell>{r.mobile ?? "—"}</TableCell>
+                <TableCell>{r.unit_name ?? "—"}</TableCell>
+                <TableCell><StatusBadge status={r.status} /></TableCell>
+                <TableCell className="text-right">{fmtINR(r.total_billed)}</TableCell>
+                <TableCell className="text-right text-success">{fmtINR(r.paid)}</TableCell>
+                <TableCell className="text-right">{fmtINR(r.opening_balance + r.adjustments)}</TableCell>
+                <TableCell className={cn("text-right font-semibold", r.due_amount > 0 ? "text-destructive" : "text-success")}>{fmtINR(r.due_amount)}</TableCell>
+                <TableCell>{r.last_payment_date ? new Date(r.last_payment_date).toLocaleDateString("en-IN") : "—"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
+    </div>
+  );
+}
+
+function SingleStudentLedger() {
+
   const [student, setStudent] = useState<StudentOption | null>(null);
   const { data: ledger } = useQuery({
     queryKey: ["ledger", student?.id],
