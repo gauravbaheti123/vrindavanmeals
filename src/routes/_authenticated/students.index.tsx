@@ -71,7 +71,7 @@ function StudentList() {
       <Card className="p-4 flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[240px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by name, mobile or roll no." className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Input placeholder="Search by Mess No, name or mobile" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <Select value={unit} onValueChange={setUnit}>
           <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
@@ -86,9 +86,9 @@ function StudentList() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Mess No</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Mobile</TableHead>
-              <TableHead>Roll No.</TableHead>
               <TableHead>Unit</TableHead>
               <TableHead className="w-[100px]"></TableHead>
             </TableRow>
@@ -105,9 +105,9 @@ function StudentList() {
               </TableRow>
             ) : students?.map((s) => (
               <TableRow key={s.id}>
+                <TableCell className="font-mono text-xs">{s.roll_number || "—"}</TableCell>
                 <TableCell className="font-medium">{s.full_name}</TableCell>
-                <TableCell>{s.mobile}</TableCell>
-                <TableCell>{s.roll_number || "—"}</TableCell>
+                <TableCell>{s.mobile || "—"}</TableCell>
                 <TableCell>{(s as unknown as { units?: { name: string } }).units?.name || "—"}</TableCell>
                 <TableCell>
                   <Button asChild size="sm" variant="ghost"><Link to="/students/$id" params={{ id: s.id }}>View</Link></Button>
