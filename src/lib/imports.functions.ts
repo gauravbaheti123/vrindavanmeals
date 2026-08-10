@@ -531,9 +531,9 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
 
     // ---------- STUDENTS (Sheet 1) ----------
     const todayISO = new Date().toISOString().slice(0, 10);
-    for (let idx = 0; idx < data.students.length; idx++) {
+    for (let idx = 0; idx < (data.phase === "students" ? data.students.length : 0); idx++) {
       const s = data.students[idx];
-      const rowNum = idx + 2;
+      const rowNum = idx + data.row_offset + 2;
       const mobile = s.mobile ? normalizeMobile(s.mobile) : "";
       if (!s.full_name?.trim()) {
         summary.students.skipped++;
@@ -639,9 +639,9 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
 
 
     // ---------- TRANSACTIONS (Sheet 2) ----------
-    for (let idx = 0; idx < data.transactions.length; idx++) {
+    for (let idx = 0; idx < (data.phase === "transactions" ? data.transactions.length : 0); idx++) {
       const t = data.transactions[idx];
-      const rowNum = idx + 2;
+      const rowNum = idx + data.row_offset + 2;
       const mobile = t.mobile ? normalizeMobile(t.mobile) : "";
       const txnMess = (t.mess_no ?? "").trim().toUpperCase();
       if (!txnMess && !mobile) {
