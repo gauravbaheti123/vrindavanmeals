@@ -37,41 +37,20 @@ type ReportKey =
   | "pos.items";
 
 interface NavGroup { label: string; icon: React.ComponentType<{ className?: string }>; items: { key: ReportKey; label: string }[]; }
+// 7 key reports the canteen owner actually uses day to day.
 const NAV: NavGroup[] = [
-  { label: "Student Reports", icon: Users, items: [
-    { key: "s.master", label: "Master List" },
-    { key: "s.active", label: "Active Students" },
-    { key: "s.inactive", label: "Inactive / Exit" },
+  { label: "Students", icon: Users, items: [
+    { key: "s.master", label: "Student Master List" },
     { key: "s.expiring", label: "Expiring Soon" },
-    { key: "s.noshow", label: "No-Show" },
   ]},
-  { label: "Payment Reports", icon: Wallet, items: [
+  { label: "Money", icon: Wallet, items: [
     { key: "p.collection", label: "Collection Report" },
-    { key: "p.monthly", label: "Monthly Summary" },
-    { key: "p.outstanding", label: "Outstanding Fees" },
-    { key: "p.advance", label: "Advance Payments" },
-    { key: "p.mode", label: "Mode-wise" },
-  ]},
-  { label: "Attendance Reports", icon: ClipboardCheck, items: [
-    { key: "a.daily", label: "Daily Report" },
-    { key: "a.monthly", label: "Monthly Summary" },
-    { key: "a.trend", label: "Meal Trend" },
-    { key: "a.manual", label: "Manual Entry Log" },
-    { key: "a.unmapped", label: "Unmapped Scans" },
-  ]},
-  { label: "Subscriptions", icon: CalendarRange, items: [
-    { key: "sub.status", label: "Status Summary" },
-    { key: "sub.enrol", label: "Enrollments" },
-    { key: "sub.renew", label: "Renewals" },
-  ]},
-  { label: "Ledger & Financials", icon: BookOpen, items: [
+    { key: "p.outstanding", label: "Outstanding Dues" },
     { key: "ledger", label: "📒 Student Ledger" },
-    { key: "fin.gst", label: "🧾 GST Report" },
-    { key: "fin.rev", label: "Revenue Dashboard" },
-    { key: "reprint", label: "🖨️ Reprint Log" },
+    { key: "fin.gst", label: "🧾 GST Report (5%)" },
   ]},
-  { label: "POS", icon: Receipt, items: [
-    { key: "pos.items", label: "Item Sales" },
+  { label: "Operations", icon: ClipboardCheck, items: [
+    { key: "a.daily", label: "Daily Attendance" },
   ]},
 ];
 
