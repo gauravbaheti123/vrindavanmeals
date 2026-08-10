@@ -237,19 +237,19 @@ function DuesPage() {
   );
 }
 
-function RecordPaymentModal({ row, defaultAmount, onClose, onSaved }: {
-  row: Row | null; defaultAmount: number; onClose: () => void; onSaved: () => void;
+function RecordPaymentModal({ row, onClose, onSaved }: {
+  row: Row | null; onClose: () => void; onSaved: () => void;
 }) {
-  const [amount, setAmount] = useState<string>(String(defaultAmount));
+  const [amount, setAmount] = useState<string>("");
   const [mode, setMode] = useState("cash");
   const [date, setDate] = useState(todayISO());
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // reset on open
+  // reset on open — prefill with the student's exact outstanding due
   useMemo(() => {
-    if (row) { setAmount(String(defaultAmount)); setMode("cash"); setDate(todayISO()); setNote(""); }
-  }, [row, defaultAmount]);
+    if (row) { setAmount(String(Math.round(row.due_amount))); setMode("cash"); setDate(todayISO()); setNote(""); }
+  }, [row]);
 
   async function save() {
     if (!row) return;
@@ -261,7 +261,7 @@ function RecordPaymentModal({ row, defaultAmount, onClose, onSaved }: {
       student_id: row.student_id,
       subscription_id: row.sub_id,
       amount: Number(amount),
-      mode: mode as "cash" | "upi" | "card" | "razorpay",
+      mode: mode as "cash" | "upi" | "card" | "razorpay" | "rtgs" | "bank_transfer",
       status: "success",
       recorded_by: userRes.user?.id,
       created_at: new Date(date + "T" + new Date().toTimeString().slice(0, 8)).toISOString(),
