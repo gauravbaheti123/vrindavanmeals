@@ -69,12 +69,11 @@ function Dashboard() {
 
 
   const { data: agg } = useQuery({
-    queryKey: ["dashboard-agg-v2", unitId, planPrice],
+    queryKey: ["dashboard-agg-v3", unitId, planPrice, dueAmountThreshold, daysOverdueThreshold],
     refetchInterval: REFRESH_MS,
     queryFn: async () => {
       const today = todayISO();
       const monthStart = monthStartISO();
-      const in5 = daysAhead(5);
 
       const unitFilter = <T,>(q: T, col = "unit_id"): T => {
         if (unitId === "all") return q;
@@ -82,7 +81,7 @@ function Dashboard() {
         return q.eq(col, unitId);
       };
 
-      const [monthPayments, subsAll, attendanceToday, studentsCount] = await Promise.all([
+      const [monthPayments, attendanceToday, studentsCount] = await Promise.all([
         unitFilter(
           supabase
             .from("payments")
@@ -90,11 +89,6 @@ function Dashboard() {
             .eq("status", "success")
             .gte("created_at", monthStart),
           "students.unit_id",
-        ),
-        unitFilter(
-          supabase
-            .from("subscriptions")
-            .select("id, student_id, status, end_date, grace_end_date, unit_id"),
         ),
         unitFilter(
           supabase
@@ -109,6 +103,7 @@ function Dashboard() {
             .eq("is_approved", true),
         ),
       ]);
+
 
       type Pay = { amount: number; mode: string; student_id: string };
       const pays = (monthPayments.data ?? []) as unknown as Pay[];
