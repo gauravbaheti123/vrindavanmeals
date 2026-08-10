@@ -15,6 +15,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { logAudit } from "@/lib/audit";
 import { fetchFeeSlabs, formatMonth, prevMonthKey, MONTH_NAMES, type FeeSlab } from "@/lib/fees";
 
 const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
@@ -30,6 +31,11 @@ export function FeeSettingsCard() {
   async function removeSlab(s: FeeSlab) {
     const { error } = await supabase.from("fee_settings").delete().eq("id", s.id);
     if (error) return toast.error(error.message);
+    await logAudit({
+      action: "delete", entity: "fee_slab", entityId: s.id,
+      label: `${inr(Number(s.monthly_fee))} from ${formatMonth(s.effective_month)}`,
+      oldValues: { monthly_fee: s.monthly_fee, effective_month: s.effective_month, effective_to_month: s.effective_to_month },
+    });
     // If the deleted slab was the ongoing one, re-open the most recent earlier slab.
     const rest = (slabs ?? []).filter((x) => x.id !== s.id);
     if (s.effective_to_month === null && rest.length > 0) {
@@ -134,6 +140,11 @@ function EditSlabModal({ slab, onClose, onSaved }: { slab: FeeSlab; onClose: () 
     const { error } = await supabase.from("fee_settings").update({ monthly_fee: amount }).eq("id", slab.id);
     setSaving(false);
     if (error) return toast.error(error.message);
+    await logAudit({
+      action: "update", entity: "fee_slab", entityId: slab.id,
+      label: `Fee slab from ${formatMonth(slab.effective_month)}`,
+      oldValues: { monthly_fee: Number(slab.monthly_fee) }, newValues: { monthly_fee: amount },
+    });
     toast.success("Fee slab updated — re-run Rebuild All Billing to apply");
     onSaved();
   }
@@ -197,6 +208,11 @@ function AddSlabModal({ slabs, onClose, onSaved }: { slabs: FeeSlab[]; onClose: 
         created_by: userRes.user?.id ?? null,
       });
       if (insErr) throw new Error(insErr.message);
+      await logAudit({
+        action: "create", entity: "fee_slab",
+        label: `${inr(amount)} from ${formatMonth(from)}`,
+        newValues: { monthly_fee: amount, effective_month: from },
+      });
       toast.success(`Fee slab added — ${inr(amount)} from ${formatMonth(from)}`);
       onSaved();
     } catch (e) {
