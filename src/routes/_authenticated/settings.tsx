@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pencil, Plus, Save, Upload, Fingerprint, Users, ChevronRight, ShoppingBag } from "lucide-react";
+import { Pencil, Plus, Save, Upload, Fingerprint, Users, ChevronRight, ShoppingBag, History } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
 import { FeeSettingsCard } from "@/components/fee-settings-card";
