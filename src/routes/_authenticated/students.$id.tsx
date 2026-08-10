@@ -310,7 +310,40 @@ function StudentDetail() {
                         <Button size="icon" variant="ghost" className="h-7 w-7 print:hidden" onClick={() => setEditSub(sub)}>
                           <Pencil className="h-3 w-3" />
                         </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 print:hidden text-destructive hover:text-destructive">
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                Delete this subscription entry ({monthLabel(sub.start_date)})?
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This removes the billing charge for that month. This cannot be undone directly,
+                                though “Rebuild All Billing” will regenerate it if the student is still Active for that period.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={async () => {
+                                  await supabase.from("payments").update({ subscription_id: null }).eq("subscription_id", sub.id);
+                                  const { error } = await supabase.from("subscriptions").delete().eq("id", sub.id);
+                                  if (error) return toast.error(error.message);
+                                  toast.success(`Subscription for ${monthLabel(sub.start_date)} deleted`);
+                                  refresh();
+                                }}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
+
                     </li>
                   );
                 })}
