@@ -86,7 +86,7 @@ export const importStudents = createServerFn({ method: "POST" })
     const inputMobiles = data.rows.map((r) => normalizeMobile(r.mobile)).filter(Boolean);
     const { data: existing } = await supabaseAdmin
       .from("students").select("mobile").in("mobile", inputMobiles);
-    (existing ?? []).forEach((s) => seenMobiles.add(s.mobile));
+    (existing ?? []).forEach((s) => { if (s.mobile) seenMobiles.add(s.mobile); });
 
     data.rows.forEach((r, idx) => {
       const rowNum = idx + 2;
@@ -390,11 +390,11 @@ export const importAttendance = createServerFn({ method: "POST" })
 
 // ============ Excel workbook (unified 2-sheet importer) ============
 // Sheet 1 = Students, Sheet 2 = Transactions.
-// Match key: MOBILE (unique). Existing students are updated in place.
+// Match key: MESS NO (VM-####, unique). Mobile is optional. Existing students are updated in place.
 
 const UStudentRow = z.object({
   full_name: z.string().min(1),
-  mobile: z.string().min(1),
+  mobile: z.string().nullable().optional(),
   mess_no: z.string().nullable().optional(),
   unit_name: z.string().nullable().optional(),
   room: z.string().nullable().optional(),
@@ -411,7 +411,8 @@ const UStudentRow = z.object({
 
 
 const UTxnRow = z.object({
-  mobile: z.string().min(1),
+  mobile: z.string().nullable().optional(),
+  mess_no: z.string().nullable().optional(),
   name: z.string().nullable().optional(),
   date: z.string().nullable().optional(),
   amount: z.number().nullable().optional(),
@@ -462,7 +463,7 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
     const graceDays = Number(gp?.value ?? 5);
 
     const errors: Array<{ section: string; row: number; reason: string }> = [...data.row_errors];
-    const deactivated: Array<{ row: number; mobile: string; exit_date: string | null; note: string }> = [];
+    const deactivated: Array<{ row: number; mess_no: string; exit_date: string | null; note: string }> = [];
 
     const summary = {
       students: { total: data.students.length, imported: 0, updated: 0, skipped: 0 },
@@ -470,36 +471,48 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       payments: { total: 0, imported: 0, skipped: 0, total_amount: 0 },
     };
 
-    const allMobiles = Array.from(new Set([
-      ...data.students.map((s) => normalizeMobile(s.mobile)),
-      ...data.transactions.map((t) => normalizeMobile(t.mobile)),
-    ].filter(Boolean)));
-
+    // Full identifier index — mess no is the primary key for matching, mobile is a fallback.
     const { data: existing } = await supabaseAdmin
-      .from("students").select("id,mobile,roll_number").in("mobile", allMobiles);
+      .from("students").select("id,mobile,roll_number");
     const mobileToId = new Map<string, string>();
-    (existing ?? []).forEach((s) => { if (s.mobile) mobileToId.set(s.mobile, s.id); });
+    const messToId = new Map<string, string>();
+    const takenMess = new Set<string>();
+    (existing ?? []).forEach((s) => {
+      if (s.mobile) mobileToId.set(s.mobile, s.id);
+      if (s.roll_number) { messToId.set(s.roll_number.trim().toUpperCase(), s.id); takenMess.add(s.roll_number.trim().toUpperCase()); }
+    });
 
-    const { data: maxRow } = await supabaseAdmin
-      .from("students").select("roll_number")
-      .like("roll_number", "MESS-%").order("roll_number", { ascending: false }).limit(1);
-    let messCounter = 0;
-    if (maxRow?.[0]?.roll_number) {
-      const m = String(maxRow[0].roll_number).match(/MESS-(\d+)/);
-      if (m) messCounter = Number(m[1]);
-    }
-    const nextMess = () => `MESS-${String(++messCounter).padStart(3, "0")}`;
+    // Fresh max of the VM-#### series; legacy formats are preserved but ignored for max.
+    const nextMess = () => {
+      let max = 0;
+      takenMess.forEach((r) => {
+        const m = r.match(/^VM-(\d{4})$/);
+        if (m) max = Math.max(max, Number(m[1]));
+      });
+      const next = `VM-${String(max + 1).padStart(4, "0")}`;
+      takenMess.add(next);
+      return next;
+    };
 
     // ---------- STUDENTS (Sheet 1) ----------
     const todayISO = new Date().toISOString().slice(0, 10);
     for (let idx = 0; idx < data.students.length; idx++) {
       const s = data.students[idx];
       const rowNum = idx + 2;
-      const mobile = normalizeMobile(s.mobile);
-      if (!s.full_name?.trim() || !mobile) {
+      const mobile = s.mobile ? normalizeMobile(s.mobile) : "";
+      if (!s.full_name?.trim()) {
         summary.students.skipped++;
-        errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Name and Mobile are mandatory` });
+        errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Name is mandatory` });
         continue;
+      }
+      let messNo = (s.mess_no ?? "").trim().toUpperCase();
+      const existingByMess = messNo ? messToId.get(messNo) : undefined;
+      if (messNo) {
+        if (!/^VM-\d{4}$/.test(messNo)) {
+          summary.students.skipped++;
+          errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Mess No must follow format VM-0001` });
+          continue;
+        }
       }
 
       // Status / date validation (reference fields — never trigger billing or refund logic)
@@ -553,28 +566,37 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       patch.joining_date = joiningDate;
       patch.exit_date = status === "inactive" ? exitDate : null;
 
-      const existingId = mobileToId.get(mobile);
+      const existingId = existingByMess ?? (mobile ? mobileToId.get(mobile) : undefined);
       if (existingId) {
         const { error } = await supabaseAdmin.from("students").update(patch).eq("id", existingId);
         if (error) errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Update failed — ${error.message}` });
         else {
+          if (mobile) mobileToId.set(mobile, existingId);
+          if (messNo) messToId.set(messNo, existingId);
           summary.students.updated++;
-          if (status === "inactive") deactivated.push({ row: rowNum, mobile, exit_date: exitDate, note: "Deactivated via Excel Import" });
+          if (status === "inactive") deactivated.push({ row: rowNum, mess_no: messNo || mobile, exit_date: exitDate, note: "Deactivated via Excel Import" });
         }
       } else {
-        const roll = s.mess_no?.trim() || nextMess();
+        if (messNo && takenMess.has(messNo)) {
+          summary.students.skipped++;
+          errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Mess No already in use — duplicate` });
+          continue;
+        }
+        if (!messNo) messNo = nextMess();
+        else takenMess.add(messNo);
         const { data: ins, error } = await supabaseAdmin.from("students").insert({
           ...patch,
-          mobile,
-          roll_number: roll,
+          mobile: mobile || null,
+          roll_number: messNo,
           unit_id: unitId,
         }).select("id").maybeSingle();
         if (error || !ins) {
           errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Insert failed — ${error?.message || "unknown"}` });
         } else {
-          mobileToId.set(mobile, ins.id);
+          if (mobile) mobileToId.set(mobile, ins.id);
+          messToId.set(messNo, ins.id);
           summary.students.imported++;
-          if (status === "inactive") deactivated.push({ row: rowNum, mobile, exit_date: exitDate, note: "Deactivated via Excel Import" });
+          if (status === "inactive") deactivated.push({ row: rowNum, mess_no: messNo || mobile, exit_date: exitDate, note: "Deactivated via Excel Import" });
         }
       }
     }
@@ -584,19 +606,23 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
     for (let idx = 0; idx < data.transactions.length; idx++) {
       const t = data.transactions[idx];
       const rowNum = idx + 2;
-      const mobile = normalizeMobile(t.mobile);
-      if (!mobile) {
-        errors.push({ section: "transactions", row: rowNum, reason: "Missing mobile" });
+      const mobile = t.mobile ? normalizeMobile(t.mobile) : "";
+      const txnMess = (t.mess_no ?? "").trim().toUpperCase();
+      if (!txnMess && !mobile) {
+        errors.push({ section: "transactions", row: rowNum, reason: `Row ${rowNum}: Mess No or Mobile is required` });
         continue;
       }
-      let studentId = mobileToId.get(mobile);
+      let studentId = (txnMess ? messToId.get(txnMess) : undefined) ?? (mobile ? mobileToId.get(mobile) : undefined);
 
       if (!studentId) {
-        const name = t.name?.trim() || `Student ${mobile}`;
+        const roll = txnMess && /^VM-\d{4}$/.test(txnMess) && !takenMess.has(txnMess)
+          ? (takenMess.add(txnMess), txnMess)
+          : nextMess();
+        const name = t.name?.trim() || `Student ${roll}`;
         const { data: ins, error } = await supabaseAdmin.from("students").insert({
           full_name: name,
-          mobile,
-          roll_number: nextMess(),
+          mobile: mobile || null,
+          roll_number: roll,
           unit_id: defaultUnitId,
           is_approved: true,
         }).select("id").maybeSingle();
@@ -605,7 +631,8 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
           continue;
         }
         studentId = ins.id;
-        mobileToId.set(mobile, studentId);
+        if (mobile) mobileToId.set(mobile, studentId);
+        messToId.set(roll, studentId);
         summary.students.imported++;
       }
 
@@ -686,7 +713,7 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       errorRows: [
         ...errors.map((e) => ({ row: e.row, reason: `[${e.section}] ${e.reason}`, data: null })),
         // Audit trail for imported inactive students (mirrors the manual Deactivate flag, without refund calc)
-        ...deactivated.map((d) => ({ row: d.row, reason: `[audit] ${d.note} — ${d.mobile} (exit ${d.exit_date})`, data: null })),
+        ...deactivated.map((d) => ({ row: d.row, reason: `[audit] ${d.note} — ${d.mess_no} (exit ${d.exit_date})`, data: null })),
       ],
     });
 

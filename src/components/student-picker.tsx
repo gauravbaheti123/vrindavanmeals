@@ -34,7 +34,7 @@ export function StudentPicker({
         .from("students")
         .select("id, full_name, mobile, roll_number, unit_id")
         .eq("is_approved", true)
-        .order("full_name")
+        .order("roll_number")
         .limit(50);
       if (q) query = query.or(`full_name.ilike.%${q}%,mobile.ilike.%${q}%,roll_number.ilike.%${q}%`);
       const { data } = await query;
@@ -47,7 +47,7 @@ export function StudentPicker({
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
           {value ? (
-            <span className="truncate">{value.full_name} <span className="text-muted-foreground">· {value.mobile}</span></span>
+            <span className="truncate">{value.full_name} <span className="text-muted-foreground">· {value.roll_number ?? "—"}</span></span>
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
           )}
@@ -56,7 +56,7 @@ export function StudentPicker({
       </PopoverTrigger>
       <PopoverContent className="p-0 w-[--radix-popover-trigger-width] pointer-events-auto" align="start">
         <Command shouldFilter={false}>
-          <CommandInput placeholder="Search name, mobile, roll no." value={q} onValueChange={setQ} />
+          <CommandInput placeholder="Search by Mess No or name" value={q} onValueChange={setQ} />
           <CommandList>
             <CommandEmpty>No students found.</CommandEmpty>
             <CommandGroup>
@@ -72,7 +72,7 @@ export function StudentPicker({
                   <Check className={cn("h-4 w-4 mr-2", value?.id === s.id ? "opacity-100" : "opacity-0")} />
                   <div className="flex flex-col">
                     <span>{s.full_name}</span>
-                    <span className="text-xs text-muted-foreground">{s.mobile} {s.roll_number ? `· ${s.roll_number}` : ""}</span>
+                    <span className="text-xs text-muted-foreground">{s.roll_number ?? "—"}{s.mobile ? ` · ${s.mobile}` : ""}</span>
                   </div>
                 </CommandItem>
               ))}

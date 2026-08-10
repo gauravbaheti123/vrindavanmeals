@@ -315,7 +315,7 @@ function StudentMaster({ unit }: { unit: string }) {
     <Badge key="ss" className={badge(s.subStatus)}>{s.subStatus}</Badge>,
     s.mobile,
   ]);
-  const exportRows = filtered.map((s) => [s.roll_number ?? "", s.full_name, s.hostel_room ?? "", s.units?.name ?? "", new Date(s.created_at).toLocaleDateString("en-IN"), s.is_approved ? "Active" : "Inactive", s.subStatus, s.mobile]);
+  const exportRows = filtered.map((s) => [s.roll_number ?? "", s.full_name, s.hostel_room ?? "", s.units?.name ?? "", new Date(s.created_at).toLocaleDateString("en-IN"), s.is_approved ? "Active" : "Inactive", s.subStatus, s.mobile ?? ""]);
 
   return (
     <div className="space-y-3">

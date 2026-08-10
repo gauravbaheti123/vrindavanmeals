@@ -94,11 +94,11 @@ export function generateNocPdf(brand: NocBranding, data: NocData): jsPDF {
 
   // Student detail block
   const rows: [string, string][] = [
-    ["Student Name", data.studentName],
     ["Mess Number", data.messNo || "—"],
+    ["Student Name", data.studentName],
     ["Room / Unit", [data.room, data.unitName].filter(Boolean).join(" · ") || "—"],
-    ["Mobile", data.mobile || "—"],
   ];
+  if (data.mobile) rows.push(["Mobile", data.mobile]);
   doc.setFont("helvetica", "bold");
   rows.forEach(([k]) => {
     doc.text(k, margin, y);

@@ -576,7 +576,7 @@ export type Database = {
           id: string
           is_approved: boolean
           joining_date: string | null
-          mobile: string
+          mobile: string | null
           opening_balance: number
           opening_balance_as_of: string | null
           parent_mobile: string | null
@@ -601,7 +601,7 @@ export type Database = {
           id?: string
           is_approved?: boolean
           joining_date?: string | null
-          mobile: string
+          mobile?: string | null
           opening_balance?: number
           opening_balance_as_of?: string | null
           parent_mobile?: string | null
@@ -626,7 +626,7 @@ export type Database = {
           id?: string
           is_approved?: boolean
           joining_date?: string | null
-          mobile?: string
+          mobile?: string | null
           opening_balance?: number
           opening_balance_as_of?: string | null
           parent_mobile?: string | null
