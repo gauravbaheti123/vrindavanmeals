@@ -425,9 +425,9 @@ function parseWorkbook(file: File): Promise<Parsed> {
 function downloadMasterTemplate() {
   const wb = XLSX.utils.book_new();
   const students = [
-    ["Mess No*", "Name*", "Mobile", "Unit", "Room", "Opening Balance", "Course", "Parent Mobile", "Email", "Blood Group", "Address", "Joining Date", "Exit Date", "Status*"],
-    ["VM-0001", "Priya Sharma", "9876543210", "Unit 1", "A-101", 0, "B.Sc", "9123456789", "priya@example.com", "O+", "Latur", "01-07-2026", "", "Active"],
-    ["", "Anita Patel", "", "", "A-102", 1200, "", "", "", "", "", "15-04-2026", "31-05-2026", "Inactive"],
+    ["Mess No*", "Name*", "Mobile", "Roll Number", "Unit", "Room", "Opening Balance", "Course", "Parent Mobile", "Email", "Blood Group", "Joining Date", "Exit Date", "Status*"],
+    ["VM-0001", "Priya Sharma", "9876543210", "CS2024-11", "Unit 1", "A-101", 0, "B.Sc", "9123456789", "priya@example.com", "O+", "01-07-2026", "", "Active"],
+    ["", "Anita Patel", "", "", "", "A-102", 1200, "", "", "", "", "15-04-2026", "31-05-2026", "Inactive"],
   ];
   const txns = [
     ["Mess No*", "Name", "Mobile", "Date", "Amount", "Mode", "Subscription Start Date", "Subscription End Date"],
