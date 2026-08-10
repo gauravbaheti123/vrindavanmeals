@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Fingerprint, Pencil, Printer, Plus, Trash2, IndianRupee, X, FileText, UserCheck, Scale } from "lucide-react";
 import { toast } from "sonner";
+import { logAudit, diffValues } from "@/lib/audit";
 import { isValidMessNo, isMessNoAvailable } from "@/lib/mess-no";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
 import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from "@/lib/billing";
@@ -337,6 +338,14 @@ function StudentDetail() {
                                   await supabase.from("payments").update({ subscription_id: null }).eq("subscription_id", sub.id);
                                   const { error } = await supabase.from("subscriptions").delete().eq("id", sub.id);
                                   if (error) return toast.error(error.message);
+                                  await logAudit({
+                                    action: "delete", entity: "subscription", entityId: sub.id, studentId: s.id,
+                                    label: `Billing charge for ${monthLabel(sub.start_date)}`,
+                                    oldValues: {
+                                      start_date: sub.start_date, end_date: sub.end_date,
+                                      billed_amount: sub.billed_amount, status: sub.status,
+                                    },
+                                  });
                                   toast.success(`Subscription for ${monthLabel(sub.start_date)} deleted`);
                                   refresh();
                                 }}
@@ -436,6 +445,11 @@ function StudentDetail() {
                                   onClick={async () => {
                                     const { error } = await supabase.from("payments").delete().eq("id", p.id);
                                     if (error) return toast.error(error.message);
+                                    await logAudit({
+                                      action: "delete", entity: "payment", entityId: p.id, studentId: s.id,
+                                      label: `${inr(Number(p.amount))} · ${p.mode} · ${new Date(p.created_at).toLocaleDateString("en-IN")}`,
+                                      oldValues: { amount: p.amount, mode: p.mode, date: p.created_at.slice(0, 10), status: p.status },
+                                    });
                                     toast.success("Payment deleted");
                                     refresh();
                                   }}
@@ -488,6 +502,11 @@ function StudentDetail() {
                             onClick={async () => {
                               const { error } = await supabase.from("ledger_adjustments").delete().eq("id", a.id);
                               if (error) return toast.error(error.message);
+                              await logAudit({
+                                action: "delete", entity: "adjustment", entityId: a.id, studentId: s.id,
+                                label: a.remarks ?? "Ledger adjustment",
+                                oldValues: { amount: a.amount, entry_date: a.entry_date, remarks: a.remarks },
+                              });
                               toast.success("Adjustment deleted");
                               refresh();
                             }}
@@ -768,11 +787,17 @@ function SubscriptionModal({
     if (Number.isNaN(amt) || amt < 0) return toast.error("Invalid billed amount");
     setSaving(true);
     if (existing) {
-      const { error } = await supabase.from("subscriptions").update({
+      const next = {
         plan_id: planId, start_date: startDate, end_date: endDate, grace_end_date: graceEnd, status, billed_amount: amt,
-      }).eq("id", existing.id);
+      };
+      const { error } = await supabase.from("subscriptions").update(next).eq("id", existing.id);
       setSaving(false);
       if (error) return toast.error(error.message);
+      const d = diffValues(existing as unknown as Record<string, unknown>, next as unknown as Record<string, unknown>);
+      await logAudit({
+        action: "update", entity: "subscription", entityId: existing.id, studentId,
+        label: `Subscription ${startDate} → ${endDate}`, oldValues: d.old, newValues: d.new,
+      });
       toast.success("Subscription updated");
     } else {
       const { error } = await supabase.from("subscriptions").insert({
@@ -781,6 +806,11 @@ function SubscriptionModal({
       });
       setSaving(false);
       if (error) return toast.error(error.message);
+      await logAudit({
+        action: "create", entity: "subscription", studentId,
+        label: `Subscription ${startDate} → ${endDate}`,
+        newValues: { start_date: startDate, end_date: endDate, billed_amount: amt, status },
+      });
       toast.success("Subscription added");
     }
     onSaved();
@@ -868,6 +898,22 @@ function PaymentModal({
     const { error } = await q;
     setSaving(false);
     if (error) return toast.error(error.message);
+    if (existing) {
+      const d = diffValues(
+        { amount: existing.amount, mode: existing.mode, created_at: existing.created_at.slice(0, 10), razorpay_payment_id: existing.razorpay_payment_id },
+        { amount: payload.amount, mode: payload.mode, created_at: date, razorpay_payment_id: payload.razorpay_payment_id },
+      );
+      await logAudit({
+        action: "update", entity: "payment", entityId: existing.id, studentId,
+        label: `Payment of ${inr(Number(amount))}`, oldValues: d.old, newValues: d.new,
+      });
+    } else {
+      await logAudit({
+        action: "create", entity: "payment", studentId,
+        label: `Payment of ${inr(Number(amount))}`,
+        newValues: { amount: payload.amount, mode: payload.mode, date },
+      });
+    }
     toast.success(existing ? "Payment updated" : "Payment recorded");
     onSaved();
   }
@@ -1113,6 +1159,14 @@ function AdjustmentModal({
           .update({ amount: signed, entry_date: entryDate, remarks: remarks.trim() })
           .eq("id", existing.id);
         if (error) throw new Error(error.message);
+        const d = diffValues(
+          { amount: existing.amount, entry_date: existing.entry_date, remarks: existing.remarks },
+          { amount: signed, entry_date: entryDate, remarks: remarks.trim() },
+        );
+        await logAudit({
+          action: "update", entity: "adjustment", entityId: existing.id, studentId,
+          label: remarks.trim(), oldValues: d.old, newValues: d.new,
+        });
         toast.success("Adjustment updated");
       } else {
         const { error } = await supabase.from("ledger_adjustments").insert({
@@ -1123,6 +1177,10 @@ function AdjustmentModal({
           created_by: userRes.user?.id ?? null,
         });
         if (error) throw new Error(error.message);
+        await logAudit({
+          action: "create", entity: "adjustment", studentId, label: remarks.trim(),
+          newValues: { amount: signed, entry_date: entryDate, remarks: remarks.trim() },
+        });
         toast.success(`${kind === "credit" ? "Credit" : "Charge"} of ${inr(abs)} added to ledger`);
       }
       onSaved();

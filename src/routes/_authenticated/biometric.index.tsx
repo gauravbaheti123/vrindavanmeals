@@ -20,6 +20,7 @@ import { Search, Upload, Fingerprint, AlertTriangle, CheckCircle2, Trash2 } from
 import { StudentPicker, type StudentOption } from "@/components/student-picker";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { toast } from "sonner";
+import { logAudit } from "@/lib/audit";
 
 export const Route = createFileRoute("/_authenticated/biometric/")({
   head: () => ({ meta: [{ title: "Biometric Mapping — Vrindavan Meals" }] }),
@@ -180,6 +181,12 @@ function BiometricMappingPage() {
                                   onClick={async () => {
                                     const { error } = await supabase.from("biometric_mappings").delete().eq("id", r.id);
                                     if (error) return toast.error(error.message);
+                                    await logAudit({
+                                      action: "delete", entity: "biometric_mapping", entityId: r.id,
+                                      studentId: r.student_id ?? null,
+                                      label: `Device ${r.device_user_id}`,
+                                      oldValues: { device_user_id: r.device_user_id, student: r.students?.full_name ?? null, is_active: r.is_active },
+                                    });
                                     toast.success("Mapping deleted");
                                     qc.invalidateQueries({ queryKey: ["biometric-mappings"] });
                                   }}
@@ -335,6 +342,12 @@ function MapDialog({ row, onClose }: { row: MappingRow | null; onClose: () => vo
     }).eq("id", row.id);
     setSaving(false);
     if (error) return toast.error(error.message);
+    await logAudit({
+      action: "update", entity: "biometric_mapping", entityId: row.id, studentId: student.id,
+      label: `Device ${row.device_user_id} mapped`,
+      oldValues: { student: row.students?.full_name ?? null },
+      newValues: { student: student.full_name },
+    });
     toast.success("Mapping saved");
     qc.invalidateQueries({ queryKey: ["biometric-mappings"] });
     setStudent(null); onClose();
@@ -344,6 +357,11 @@ function MapDialog({ row, onClose }: { row: MappingRow | null; onClose: () => vo
     if (!row) return;
     const { error } = await supabase.from("biometric_mappings").update({ is_active: false }).eq("id", row.id);
     if (error) return toast.error(error.message);
+    await logAudit({
+      action: "update", entity: "biometric_mapping", entityId: row.id, studentId: row.student_id ?? null,
+      label: `Device ${row.device_user_id} deactivated`,
+      oldValues: { is_active: true }, newValues: { is_active: false },
+    });
     toast.success("Mapping deactivated");
     qc.invalidateQueries({ queryKey: ["biometric-mappings"] });
     onClose();

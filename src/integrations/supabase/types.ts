@@ -77,6 +77,53 @@ export type Database = {
           },
         ]
       }
+      audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          entity: string
+          entity_id: string | null
+          id: string
+          label: string | null
+          new_values: Json | null
+          old_values: Json | null
+          student_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          entity: string
+          entity_id?: string | null
+          id?: string
+          label?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          student_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          entity?: string
+          entity_id?: string | null
+          id?: string
+          label?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          student_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_backfill_log: {
         Row: {
           after_billed: number

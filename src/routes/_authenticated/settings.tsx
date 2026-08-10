@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pencil, Plus, Save, Upload, Fingerprint, Users, ChevronRight, ShoppingBag } from "lucide-react";
+import { Pencil, Plus, Save, Upload, Fingerprint, Users, ChevronRight, ShoppingBag, History } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
 import { FeeSettingsCard } from "@/components/fee-settings-card";
@@ -240,7 +240,9 @@ function PortalModulesCard() {
     { title: "Biometric Mapping", desc: "Map biometric IDs to students", icon: Fingerprint, to: "/biometric" },
     { title: "Users & Roles", desc: "Manage staff and role permissions", icon: Users, to: "/users" },
     { title: "POS Masters", desc: "Manage categories, items, payment modes & tax", icon: ShoppingBag, to: "/pos-masters" },
+    { title: "Activity Log", desc: "Audit trail of every edit and deletion", icon: History, to: "/activity-log" },
   ];
+
   return (
     <Card>
       <CardHeader><CardTitle>Portal Modules</CardTitle></CardHeader>
