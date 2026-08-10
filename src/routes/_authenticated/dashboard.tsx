@@ -8,8 +8,8 @@ import {
   Users, CalendarClock, IndianRupee, AlertTriangle, Wallet,
   Utensils, RefreshCw, ArrowRight,
 } from "lucide-react";
-import { computeSubscriptionStatus } from "@/lib/subscription-status";
-import { fetchDuesRows } from "@/lib/dues";
+import { fetchLedgerRows } from "@/lib/dues";
+
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Vrindavan Meals" }] }),
