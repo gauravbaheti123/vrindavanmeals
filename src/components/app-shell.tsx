@@ -99,7 +99,9 @@ export function AppShell() {
           </Button>
         </header>
         <div className="flex-1 p-4 md:p-6 overflow-y-auto">
-          {loading ? (
+          {/* Only gate on the very first load. Background auth refreshes must never
+              unmount <Outlet />, or in-progress form input would be lost. */}
+          {loading && roles.length === 0 && !profile ? (
             <div className="text-muted-foreground">Loading…</div>
           ) : !flags.hasAny ? (
             <NoRoleNotice />
@@ -107,6 +109,7 @@ export function AppShell() {
             <Outlet />
           )}
         </div>
+
       </main>
     </div>
   );
