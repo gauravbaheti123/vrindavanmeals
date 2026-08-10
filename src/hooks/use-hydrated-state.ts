@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 /**
  * Form state that can be seeded from server data, but is never overwritten by a
@@ -16,9 +16,9 @@ export function useHydratedState<T>(initial: T) {
   const [value, setValue] = useState<T>(initial);
   const dirty = useRef(false);
 
-  const set = useCallback((next: T | ((prev: T) => T)) => {
+  const set = useCallback<Dispatch<SetStateAction<T>>>((next) => {
     dirty.current = true;
-    setValue(next as T);
+    setValue(next);
   }, []);
 
   const hydrate = useCallback((next: T) => {
