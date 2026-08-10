@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useHydratedState } from "@/hooks/use-hydrated-state";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,8 +55,9 @@ function PosMastersPage() {
     },
   });
 
-  const [tax, setTax] = useState("");
-  useEffect(() => { if (settings) setTax(settings.pos_tax_rate ?? "0"); }, [settings]);
+  const { value: tax, set: setTax, hydrate: hydrateTax, resetDirty: resetTax } = useHydratedState("");
+  // Seeds only while untouched, so a tab-switch refetch can't wipe an edited rate.
+  useEffect(() => { if (settings) hydrateTax(settings.pos_tax_rate ?? "0"); }, [settings, hydrateTax]);
 
   const [newCat, setNewCat] = useState("");
   const [newItem, setNewItem] = useState({ name: "", category_id: "", price: "" });
@@ -80,7 +82,9 @@ function PosMastersPage() {
     const { error } = await supabase.from("system_settings").upsert({ key: "pos_tax_rate", value: tax }, { onConflict: "key" });
     if (error) return toast.error(error.message);
     toast.success("Tax rate saved");
+    resetTax();
     qc.invalidateQueries({ queryKey: ["system-settings"] });
+
   }
 
   function invalidateAll() {
