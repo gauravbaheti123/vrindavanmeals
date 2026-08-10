@@ -466,6 +466,8 @@ function ExcelWorkbookTab() {
           file_name: parsed.fileName,
           students: parsed.students,
           transactions: parsed.transactions,
+          row_errors: parsed.rowErrors,
+
         },
       });
     },
