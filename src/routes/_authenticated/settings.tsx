@@ -55,7 +55,7 @@ function BrandingCard() {
       return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
     },
   });
-  const [form, setForm] = useState({
+  const { value: form, set: setFormState, hydrate, resetDirty } = useHydratedState({
     brand_org_name: "",
     brand_address: "",
     brand_contact: "",
@@ -67,7 +67,8 @@ function BrandingCard() {
 
   useEffect(() => {
     if (!data) return;
-    setForm({
+    // Only seeds while the form is untouched — a focus refetch can't wipe typing.
+    hydrate({
       brand_org_name: data.brand_org_name ?? "Vrindavan Meals",
       brand_address: data.brand_address ?? "",
       brand_contact: data.brand_contact ?? "",
@@ -75,9 +76,10 @@ function BrandingCard() {
       brand_logo_url: data.brand_logo_url ?? "",
       brand_stamp_url: data.brand_stamp_url ?? "",
     });
-  }, [data]);
+  }, [data, hydrate]);
 
-  const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof typeof form, v: string) => setFormState((f) => ({ ...f, [k]: v }));
+
 
   async function fileToDataUrl(file: File): Promise<string> {
     if (file.size > 500 * 1024) throw new Error("Image must be under 500 KB");
