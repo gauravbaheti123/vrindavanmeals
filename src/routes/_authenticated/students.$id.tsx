@@ -200,16 +200,19 @@ function StudentDetail() {
 
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3 border-b pb-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-3xl font-bold">{s.full_name}</h1>
-            <Button size="icon" variant="ghost" className="h-7 w-7 print:hidden" onClick={() => setEditProfile(true)}>
-              <Pencil className="h-4 w-4" />
-            </Button>
+        <div className="flex items-start gap-4 min-w-0">
+          <StudentPhoto path={s.photo_url} size={80} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-3xl font-bold">{s.full_name}</h1>
+              <Button size="icon" variant="ghost" className="h-7 w-7 print:hidden" onClick={() => setEditProfile(true)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-sm">
+              {s.roll_number ?? "—"}{s.mobile ? ` · ${s.mobile}` : ""} · {unitName}
+            </p>
           </div>
-          <p className="text-muted-foreground text-sm">
-            {s.roll_number ?? "—"}{s.mobile ? ` · ${s.mobile}` : ""} · {unitName}
-          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           {effStatus && (
