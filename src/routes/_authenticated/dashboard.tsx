@@ -119,11 +119,8 @@ function Dashboard() {
       }, {});
       
 
-      type Sub = {
-        id: string; student_id: string; status: "active" | "grace" | "expired" | "pending";
-        end_date: string; grace_end_date: string; unit_id: string | null;
-      };
-      const subs = (subsAll.data ?? []) as Sub[];
+
+
 
       // Single source of truth — same formula as /dues page
       const ledgerRows = await fetchLedgerRows(planPrice);
