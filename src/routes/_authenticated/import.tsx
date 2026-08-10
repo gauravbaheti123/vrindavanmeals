@@ -600,10 +600,10 @@ function ExcelWorkbookTab() {
       <div className="text-xs text-muted-foreground space-y-1">
         <div><strong>Unified format — 2 sheets:</strong></div>
         <ul className="list-disc pl-5 space-y-0.5">
-          <li><strong>Students</strong> — required: <code>Mess No</code> (VM-0001 format, auto-assigned if blank), <code>Name</code>, <code>Status</code> (Active / Inactive). Optional: Mobile, Roll Number, Unit, Room, Opening Balance, Course, Parent Mobile, Email, Blood Group, Joining Date, Exit Date (required when Status = Inactive). Dates in <code>DD-MM-YYYY</code>.</li>
-          <li><strong>Transactions</strong> — required: <code>Mess No</code> (or Mobile). Optional: Date, Amount, Mode (Cash/UPI/Card/Razorpay), Subscription Start/End Date (defaults to the transaction month's 1st–last day).</li>
+          <li><strong>Students</strong> — required: <code>Mess No</code> (VM-0001 format, auto-assigned if blank), <code>Name</code>, <code>Status</code> (Active / Inactive). Optional: Mobile, Unit, Room, Opening Balance, Roll Number, Course, Joining Date, Exit Date (required when Status = Inactive), Adjustment. Dates in <code>DD-MM-YYYY</code>.</li>
+          <li><strong>Transactions</strong> — required: <code>Mess No</code> (or Mobile). Optional: Name, Date, Amount, Mode (Cash/UPI/Card/Razorpay), Remarks, Subscription Start/End Date (defaults to the transaction month's 1st–last day).</li>
         </ul>
-        <div className="pt-1">Match key is <strong>Mess No</strong> (mobile is used as a fallback when present). Existing students are updated in place — no duplicates. Rows without Amount are skipped (no payment recorded). Joining/Exit dates are reference-only — no billing, pivot or refund calculation runs on import.</div>
+        <div className="pt-1">Columns are matched by <strong>header name</strong> (case-insensitive, <code>*</code> ignored) — column order doesn't matter, extra columns are ignored and missing optional columns are treated as blank. Match key is <strong>Mess No</strong> (mobile is used as a fallback when present). Existing students are updated in place — no duplicates. Rows without Amount are skipped (no payment recorded). Joining/Exit dates are reference-only — no billing, pivot or refund calculation runs on import.</div>
       </div>
 
       {parsed && !result && (
