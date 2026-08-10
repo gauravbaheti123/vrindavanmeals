@@ -246,6 +246,7 @@ type StudentRow = {
   unit_name: string | null; room: string | null; opening_balance: number | null;
   course: string | null; parent_mobile: string | null; email: string | null;
   blood_group: string | null; address: string | null;
+  joining_date: string | null; exit_date: string | null; status: "active" | "inactive";
 };
 type TxnRow = {
   mobile: string; name: string | null; date: string | null;
@@ -261,7 +262,9 @@ type Parsed = {
   txnsRaw: number;
   skippedStudents: number;
   skippedTxns: number;
+  rowErrors: Array<{ section: string; row: number; reason: string }>;
 };
+
 
 function pick(r: any, keys: string[]): any {
   for (const k of keys) {
