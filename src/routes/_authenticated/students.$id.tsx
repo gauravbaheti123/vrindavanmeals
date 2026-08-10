@@ -625,14 +625,12 @@ function ProfileEditModal({
       mobile: mobile || null,
       roll_number: messNo,
       college_roll_number: form.college_roll_number.trim() || null,
-
       course: form.course || null,
-      batch_year: form.batch_year ? Number(form.batch_year) : null,
       hostel_room: form.hostel_room || null,
       email: form.email || null,
       parent_mobile: form.parent_mobile || null,
       blood_group: form.blood_group || null,
-      address: form.address || null,
+      joining_date: form.joining_date || null,
       unit_id: form.unit_id || null,
     }).eq("id", student.id);
     setSaving(false);
