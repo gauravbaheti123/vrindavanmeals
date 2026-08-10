@@ -109,7 +109,9 @@ function BrandingCard() {
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Branding updated");
+    resetDirty(); // saved — server data may hydrate this form again
     qc.invalidateQueries({ queryKey: ["system-settings"] });
+
   }
 
   return (
