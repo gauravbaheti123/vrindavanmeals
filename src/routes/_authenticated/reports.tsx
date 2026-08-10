@@ -162,7 +162,7 @@ function ReportRouter({ active, from, to, unit }: { active: ReportKey; from: str
     case "sub.enrol": return <EnrollmentsReport />;
     case "sub.renew": return <RenewalsReport unit={unit} />;
     case "ledger": return <StudentLedger />;
-    case "fin.gst": return <GSTReport />;
+    case "fin.gst": return <GSTReport from={from} to={to} />;
     case "fin.rev": return <RevenueReport />;
     case "reprint": return <ReprintLog from={from} to={to} />;
     case "pos.items": return <PosItemSales from={from} to={to} />;
