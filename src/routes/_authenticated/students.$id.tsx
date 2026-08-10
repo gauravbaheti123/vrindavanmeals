@@ -593,14 +593,12 @@ function ProfileEditModal({
     mobile: student.mobile ?? "",
     roll_number: student.roll_number ?? "",
     college_roll_number: (student as unknown as { college_roll_number?: string | null }).college_roll_number ?? "",
-
     course: student.course ?? "",
-    batch_year: student.batch_year?.toString() ?? "",
     hostel_room: student.hostel_room ?? "",
     email: student.email ?? "",
     parent_mobile: student.parent_mobile ?? "",
     blood_group: student.blood_group ?? "",
-    address: student.address ?? "",
+    joining_date: (student as unknown as { joining_date?: string | null }).joining_date ?? "",
     unit_id: student.unit_id ?? "",
   });
   const [saving, setSaving] = useState(false);
