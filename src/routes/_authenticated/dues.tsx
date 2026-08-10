@@ -35,8 +35,10 @@ type Row = DuesRow;
 function DuesPage() {
   const qc = useQueryClient();
   const [unitId, setUnitId] = useState<string>("all");
-  const [overdueOnly, setOverdueOnly] = useState(true);
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [includeSettled, setIncludeSettled] = useState(false);
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<LedgerFilterState>(defaultLedgerFilter);
   const [payFor, setPayFor] = useState<Row | null>(null);
 
   const { data: units } = useQuery({
@@ -63,8 +65,8 @@ function DuesPage() {
   const planPrice = plan ?? 3000;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["dues-list", planPrice],
-    queryFn: () => fetchDuesRows(planPrice),
+    queryKey: ["dues-list", planPrice, includeSettled],
+    queryFn: () => (includeSettled ? fetchLedgerRows(planPrice) : fetchDuesRows(planPrice)),
     enabled: plan !== undefined,
   });
 
@@ -83,28 +85,31 @@ function DuesPage() {
   const filtered = useMemo(() => {
     if (!data) return [];
     const q = search.trim().toLowerCase();
-    return data.filter((r) => {
+    const base = data.filter((r) => {
       if (unitId !== "all" && r.unit_id !== unitId) return false;
       if (overdueOnly && r.days_overdue <= 0) return false;
       if (q && !(r.full_name.toLowerCase().includes(q) || (r.roll_number ?? "").toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [data, search, unitId, overdueOnly]);
+    return applyLedgerFilter(base, filter);
+  }, [data, search, unitId, overdueOnly, filter]);
 
-  const totalOutstanding = filtered.reduce((s, r) => s + r.due_amount, 0);
+  const totalOutstanding = filtered.reduce((s, r) => s + Math.max(0, r.due_amount), 0);
 
-  const exportColumns = ["Mess No", "Student", "Mobile", "Unit", "Due", "Last Payment", "Days Overdue", "Status"];
+  const exportColumns = ["Mess No", "Student", "Mobile", "Unit", "Total Billed", "Due", "Last Payment", "Days Overdue", "Status"];
   const exportRows = filtered.map((r) => [
     r.roll_number ?? "",
     r.full_name,
     r.mobile ?? "",
     r.unit_name ?? "",
+    r.total_billed,
     r.due_amount,
     r.last_payment_date ? r.last_payment_date.slice(0, 10) : "",
     r.days_overdue,
-    r.eff_status,
+    r.status === "active" ? "Active" : "Inactive",
   ]);
   const exportTitle = `Dues & Ledger — ${new Date().toLocaleDateString("en-IN")}`;
+
 
   return (
     <div className="space-y-4">
