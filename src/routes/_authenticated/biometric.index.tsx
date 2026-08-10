@@ -30,7 +30,9 @@ interface MappingRow {
 }
 
 function BiometricMappingPage() {
+  const qc = useQueryClient();
   const [q, setQ] = useState("");
+
   const [unit, setUnit] = useState("all");
   const [status, setStatus] = useState<"all" | "mapped" | "unmapped">("all");
   const [importOpen, setImportOpen] = useState(false);
