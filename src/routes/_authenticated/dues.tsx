@@ -208,14 +208,16 @@ function DuesPage() {
                 ) : !filtered.length ? (
                   <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground">No dues 🎉</TableCell></TableRow>
                 ) : filtered.map((r) => (
-                  <TableRow key={r.sub_id}>
+                  <TableRow key={r.student_id}>
                     <TableCell className="font-mono text-xs">{r.roll_number ?? "—"}</TableCell>
                     <TableCell>
                       <Link to="/students/$id" params={{ id: r.student_id }} className="hover:underline font-medium">{r.full_name}</Link>
                     </TableCell>
                     <TableCell className="text-sm">{r.mobile ?? "—"}</TableCell>
                     <TableCell className="text-sm">{r.unit_name ?? "—"}</TableCell>
-                    <TableCell className="text-right font-semibold text-destructive">{inr(r.due_amount)}</TableCell>
+                    <TableCell className="text-right">
+                      <DueAmount status={r.status} due={r.due_amount} daysOverdue={r.days_overdue} />
+                    </TableCell>
                     <TableCell className="text-sm">{r.last_payment_date ? r.last_payment_date.slice(0, 10) : <span className="text-muted-foreground">Never</span>}</TableCell>
                     <TableCell className="text-right">
                       <span className={r.days_overdue > 30 ? "font-bold text-destructive" : r.days_overdue > 7 ? "font-semibold text-warning-foreground" : ""}>
@@ -223,13 +225,14 @@ function DuesPage() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={r.eff_status === "expired" ? "destructive" : r.eff_status === "grace" ? "secondary" : "outline"} className="capitalize">{r.eff_status}</Badge>
+                      <StatusBadge status={r.status} />
                     </TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" onClick={() => setPayFor(r)}><IndianRupee className="h-3 w-3 mr-1" />Record</Button>
                     </TableCell>
                   </TableRow>
                 ))}
+
               </TableBody>
             </Table>
           </div>
