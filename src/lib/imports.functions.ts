@@ -86,7 +86,7 @@ export const importStudents = createServerFn({ method: "POST" })
     const inputMobiles = data.rows.map((r) => normalizeMobile(r.mobile)).filter(Boolean);
     const { data: existing } = await supabaseAdmin
       .from("students").select("mobile").in("mobile", inputMobiles);
-    (existing ?? []).forEach((s) => seenMobiles.add(s.mobile));
+    (existing ?? []).forEach((s) => { if (s.mobile) seenMobiles.add(s.mobile); });
 
     data.rows.forEach((r, idx) => {
       const rowNum = idx + 2;
