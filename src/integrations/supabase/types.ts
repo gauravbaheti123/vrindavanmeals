@@ -77,6 +77,41 @@ export type Database = {
           },
         ]
       }
+      billing_backfill_log: {
+        Row: {
+          after_billed: number
+          before_billed: number
+          created_at: string
+          id: string
+          run_at: string
+          student_id: string
+        }
+        Insert: {
+          after_billed?: number
+          before_billed?: number
+          created_at?: string
+          id?: string
+          run_at?: string
+          student_id: string
+        }
+        Update: {
+          after_billed?: number
+          before_billed?: number
+          created_at?: string
+          id?: string
+          run_at?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_backfill_log_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       biometric_mappings: {
         Row: {
           created_at: string
@@ -945,7 +980,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      accrue_monthly_billing: { Args: never; Returns: number }
+      fee_for_month: { Args: { p_month: string }; Returns: number }
+      rebuild_all_billing: {
+        Args: never
+        Returns: {
+          after_total: number
+          before_total: number
+          students_processed: number
+        }[]
+      }
+      rebuild_student_billing: { Args: { p_student: string }; Returns: number }
     }
     Enums: {
       app_role: "super_admin" | "manager" | "counter_staff" | "accountant"
