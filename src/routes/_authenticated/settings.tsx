@@ -267,17 +267,18 @@ function GeneralSettings() {
       return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
     },
   });
-  const [price, setPrice] = useState("");
-  const [grace, setGrace] = useState("");
-  const [warn, setWarn] = useState("");
+  const { value: price, set: setPrice, hydrate: hydratePrice, resetDirty: resetPrice } = useHydratedState("");
+  const { value: grace, set: setGrace, hydrate: hydrateGrace, resetDirty: resetGrace } = useHydratedState("");
+  const { value: warn, set: setWarn, hydrate: hydrateWarn, resetDirty: resetWarn } = useHydratedState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!data) return;
-    setPrice(data.subscription_price ?? "3000");
-    setGrace(data.grace_period_days ?? "5");
-    setWarn(data.expiry_warning_days ?? "5");
-  }, [data]);
+    // Pristine fields only — background refetches never clobber typed values.
+    hydratePrice(data.subscription_price ?? "3000");
+    hydrateGrace(data.grace_period_days ?? "5");
+    hydrateWarn(data.expiry_warning_days ?? "5");
+  }, [data, hydratePrice, hydrateGrace, hydrateWarn]);
 
   async function save() {
     setSaving(true);
@@ -290,6 +291,7 @@ function GeneralSettings() {
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Settings updated");
+    resetPrice(); resetGrace(); resetWarn();
     qc.invalidateQueries({ queryKey: ["system-settings"] });
   }
 
