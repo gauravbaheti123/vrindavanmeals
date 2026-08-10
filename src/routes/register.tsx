@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { submitStudentRegistration } from "@/lib/registration.functions";
@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UtensilsCrossed, Loader2, CheckCircle2 } from "lucide-react";
+import { UtensilsCrossed, Loader2, CheckCircle2, Camera, User, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { fileToBase64, MAX_PHOTO_BYTES } from "@/lib/photos";
 
 export const Route = createFileRoute("/register")({
   head: () => ({ meta: [{ title: "Student Registration — Vrindavan Meals" }] }),
@@ -20,16 +21,29 @@ export const Route = createFileRoute("/register")({
 function RegisterPage() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
-    full_name: "", mobile: "", roll_number: "", course: "", hostel_room: "",
-    parent_mobile: "", email: "", unit_id: "",
+    full_name: "", mobile: "", college_roll_number: "", course: "", hostel_room: "",
+    parent_mobile: "", email: "", blood_group: "", unit_id: "",
   });
   const set = <K extends keyof typeof form>(k: K, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const { data: units } = useQuery({
     queryKey: ["public-units"],
-    queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("units").select("id,name").eq("is_active", true).order("name")).data ?? [],
   });
+
+  async function onPhoto(file: File) {
+    if (!file.type.startsWith("image/")) return toast.error("Please choose an image file");
+    if (file.size > MAX_PHOTO_BYTES) return toast.error("Photo must be under 2 MB");
+    try {
+      setPhoto(await fileToBase64(file));
+    } catch {
+      toast.error("Could not read that image");
+    }
+  }
 
   const register = useServerFn(submitStudentRegistration);
   const submit = async (e: React.FormEvent) => {
@@ -41,12 +55,14 @@ function RegisterPage() {
         data: {
           full_name: form.full_name.trim(),
           mobile: form.mobile.trim(),
-          roll_number: form.roll_number || null,
+          college_roll_number: form.college_roll_number || null,
           course: form.course || null,
           hostel_room: form.hostel_room || null,
           parent_mobile: form.parent_mobile || null,
           email: form.email || null,
+          blood_group: form.blood_group || null,
           unit_id: form.unit_id || null,
+          photo_base64: photo,
         },
       });
       setDone(true);
@@ -90,13 +106,37 @@ function RegisterPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2 flex items-center gap-4">
+                <div className="h-24 w-24 rounded-lg border bg-muted grid place-items-center overflow-hidden">
+                  {photo ? (
+                    <img src={photo} alt="Selected student photo preview" className="h-full w-full object-cover" />
+                  ) : (
+                    <User className="h-8 w-8 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden"
+                    onChange={(e) => e.target.files?.[0] && onPhoto(e.target.files[0])} />
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                    <Camera className="h-4 w-4 mr-1" />{photo ? "Change Photo" : "Upload Photo"}
+                  </Button>
+                  {photo && (
+                    <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setPhoto(null)}>
+                      <Trash2 className="h-4 w-4 mr-1" />Remove
+                    </Button>
+                  )}
+                  <p className="text-xs text-muted-foreground">Optional · JPG / PNG, max 2 MB</p>
+                </div>
+              </div>
+
               <F label="Full Name *" v={form.full_name} onChange={(v) => set("full_name", v)} required />
               <F label="Mobile *" v={form.mobile} onChange={(v) => set("mobile", v)} required />
-              <F label="Roll Number" v={form.roll_number} onChange={(v) => set("roll_number", v)} />
+              <F label="Roll Number" v={form.college_roll_number} onChange={(v) => set("college_roll_number", v)} />
               <F label="Course" v={form.course} onChange={(v) => set("course", v)} />
               <F label="Hostel Room" v={form.hostel_room} onChange={(v) => set("hostel_room", v)} />
               <F label="Parent Mobile" v={form.parent_mobile} onChange={(v) => set("parent_mobile", v)} />
               <F label="Email" type="email" v={form.email} onChange={(v) => set("email", v)} />
+              <F label="Blood Group" v={form.blood_group} onChange={(v) => set("blood_group", v)} />
               <div className="space-y-2">
                 <Label>Unit</Label>
                 <Select value={form.unit_id} onValueChange={(v) => set("unit_id", v)}>
