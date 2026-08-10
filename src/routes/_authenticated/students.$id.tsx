@@ -49,6 +49,10 @@ type Adjustment = {
 
 const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 const todayISO = () => new Date().toISOString().slice(0, 10);
+/** "2026-05-17" → "May 2026" */
+const monthLabel = (iso: string) =>
+  new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+
 
 function StudentDetail() {
   const { id } = useParams({ from: "/_authenticated/students/$id" });
