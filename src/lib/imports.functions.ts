@@ -424,7 +424,12 @@ const UnifiedWorkbookSchema = z.object({
   file_name: z.string().default("workbook.xlsx"),
   students: z.array(UStudentRow).max(20000),
   transactions: z.array(UTxnRow).max(30000),
+  row_errors: z
+    .array(z.object({ section: z.string(), row: z.number(), reason: z.string() }))
+    .max(20000)
+    .default([]),
 });
+
 
 function monthBounds(iso: string): { start: string; end: string } {
   const d = new Date(iso + "T00:00:00");
