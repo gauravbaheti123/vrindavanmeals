@@ -25,7 +25,7 @@ interface MappingRow {
   id: string; device_user_id: string; device_name: string | null; unit_id: string;
   is_active: boolean; mapped_at: string | null; mapped_by: string | null;
   student_id: string | null;
-  students?: { id: string; full_name: string } | null;
+  students?: { id: string; full_name: string; roll_number: string | null } | null;
   units?: { name: string } | null;
 }
 
@@ -45,7 +45,7 @@ function BiometricMappingPage() {
     queryKey: ["biometric-mappings", unit],
     queryFn: async () => {
       let query = supabase.from("biometric_mappings")
-        .select("id, device_user_id, device_name, unit_id, is_active, mapped_at, mapped_by, student_id, students(id, full_name), units(name)")
+        .select("id, device_user_id, device_name, unit_id, is_active, mapped_at, mapped_by, student_id, students(id, full_name, roll_number), units(name)")
         .order("device_user_id");
       if (unit !== "all") query = query.eq("unit_id", unit);
       const { data } = await query;
@@ -61,7 +61,8 @@ function BiometricMappingPage() {
       const s = q.toLowerCase();
       if (!(r.device_name?.toLowerCase().includes(s)
         || r.device_user_id.toLowerCase().includes(s)
-        || r.students?.full_name?.toLowerCase().includes(s))) return false;
+        || r.students?.full_name?.toLowerCase().includes(s)
+        || r.students?.roll_number?.toLowerCase().includes(s))) return false;
     }
     return true;
   }), [mappings, status, q]);
@@ -97,7 +98,7 @@ function BiometricMappingPage() {
           <Card className="p-4 flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[240px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search device or student" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
+              <Input placeholder="Search device, Mess No or name" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <Select value={unit} onValueChange={setUnit}>
               <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
@@ -139,7 +140,7 @@ function BiometricMappingPage() {
                       <TableCell className="font-mono text-xs">{r.device_user_id}</TableCell>
                       <TableCell>{r.device_name ?? "—"}</TableCell>
                       <TableCell>{r.units?.name ?? "—"}</TableCell>
-                      <TableCell>{r.students?.full_name ?? <span className="text-muted-foreground">Unmapped</span>}</TableCell>
+                      <TableCell>{r.students ? <span><span className="font-mono text-xs mr-1">{r.students.roll_number ?? "—"}</span>{r.students.full_name}</span> : <span className="text-muted-foreground">Unmapped</span>}</TableCell>
                       <TableCell>{r.mapped_at ? new Date(r.mapped_at).toLocaleDateString("en-IN") : "—"}</TableCell>
                       <TableCell>
                         {mapped
@@ -318,7 +319,7 @@ function MapDialog({ row, onClose }: { row: MappingRow | null; onClose: () => vo
               <div><b>Device ID:</b> {row.device_user_id}</div>
               <div><b>Device Name:</b> {row.device_name ?? "—"}</div>
               <div><b>Unit:</b> {row.units?.name}</div>
-              {row.students?.full_name && <div><b>Currently:</b> {row.students.full_name}</div>}
+              {row.students?.full_name && <div><b>Currently:</b> {row.students.roll_number ?? "—"} · {row.students.full_name}</div>}
             </div>
             <div>
               <div className="text-sm font-medium mb-1">Select student</div>
