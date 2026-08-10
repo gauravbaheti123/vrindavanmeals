@@ -82,7 +82,9 @@ function PosMastersPage() {
     const { error } = await supabase.from("system_settings").upsert({ key: "pos_tax_rate", value: tax }, { onConflict: "key" });
     if (error) return toast.error(error.message);
     toast.success("Tax rate saved");
+    resetTax();
     qc.invalidateQueries({ queryKey: ["system-settings"] });
+
   }
 
   function invalidateAll() {
