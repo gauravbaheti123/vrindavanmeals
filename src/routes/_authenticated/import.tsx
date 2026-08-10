@@ -397,15 +397,15 @@ function parseWorkbook(file: File): Promise<Parsed> {
           }
           if (messNo) seenMess.add(messNo);
 
-          const statusRaw = String(pick(r, ["Status", "STATUS", "status"]) ?? "").trim().toLowerCase();
+          const statusRaw = String(pick(r, ["Status"]) ?? "").trim().toLowerCase();
           if (statusRaw !== "active" && statusRaw !== "inactive") {
             skippedStudents++;
             rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Status must be 'Active' or 'Inactive'` });
             continue;
           }
 
-          const joinRaw = pick(r, ["Joining Date", "JOINING DATE", "joining_date", "Join Date"]);
-          const exitRaw = pick(r, ["Exit Date", "EXIT DATE", "exit_date"]);
+          const joinRaw = pick(r, ["Joining Date"]);
+          const exitRaw = pick(r, ["Exit Date"]);
           const joining_date = excelDateToISO(joinRaw);
           const exit_date = excelDateToISO(exitRaw);
           if ((joinRaw != null && joinRaw !== "" && !joining_date) || (exitRaw != null && exitRaw !== "" && !exit_date)) {
