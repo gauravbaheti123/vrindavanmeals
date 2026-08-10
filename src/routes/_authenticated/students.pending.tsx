@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { StudentPhoto } from "@/components/student-photo";
 
 export const Route = createFileRoute("/_authenticated/students/pending")({
   head: () => ({ meta: [{ title: "Pending Approvals — Vrindavan Meals" }] }),
