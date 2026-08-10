@@ -4,69 +4,73 @@ import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, CalendarClock, Download, FileText } from "lucide-react";
-import { computeSubscriptionStatus, STATUS_STYLES, STATUS_LABEL, type EffectiveStatus } from "@/lib/subscription-status";
+import { StatusBadge, DueAmount, inr } from "@/components/due-status";
+import { applyLedgerFilter, defaultLedgerFilter, LedgerFilterControls, type LedgerFilterState } from "@/components/ledger-filters";
+import { fetchLedgerRows } from "@/lib/dues";
 import { exportPdf, exportExcel } from "@/lib/report-export";
 
 export const Route = createFileRoute("/_authenticated/subscriptions/")({
-  head: () => ({ meta: [{ title: "Subscriptions — Vrindavan Meals" }] }),
+  head: () => ({
+    meta: [
+      { title: "Subscriptions — Vrindavan Meals" },
+      { name: "description", content: "One row per student: current status and outstanding due under continuous monthly billing." },
+    ],
+  }),
   component: SubscriptionList,
 });
 
 function SubscriptionList() {
   const [q, setQ] = useState("");
   const [unit, setUnit] = useState("all");
-  const [status, setStatus] = useState<"all" | EffectiveStatus>("all");
+  const [filter, setFilter] = useState<LedgerFilterState>(defaultLedgerFilter);
 
   const { data: units } = useQuery({
     queryKey: ["units"],
     queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
   });
 
-  const { data: subs, isLoading } = useQuery({
-    queryKey: ["subscriptions", unit],
+  const { data: planPrice } = useQuery({
+    queryKey: ["default-plan-price"],
     queryFn: async () => {
-      let query = supabase
-        .from("subscriptions")
-        .select("id, start_date, end_date, grace_end_date, status, unit_id, students(id, full_name), units(name), subscription_plans(name)")
-        .order("start_date", { ascending: false })
-        .limit(500);
-      if (unit !== "all") query = query.eq("unit_id", unit);
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
+      const { data } = await supabase
+        .from("subscription_plans").select("price").eq("is_active", true)
+        .order("created_at", { ascending: true }).limit(1).maybeSingle();
+      return Number(data?.price ?? 3000);
     },
   });
 
+  const { data: ledger, isLoading } = useQuery({
+    queryKey: ["subscription-ledger", planPrice],
+    enabled: planPrice !== undefined,
+    queryFn: () => fetchLedgerRows(planPrice ?? 3000),
+  });
+
   const rows = useMemo(() => {
-    const list = (subs ?? []).map((s) => {
-      const r = s as unknown as {
-        id: string; start_date: string; end_date: string; grace_end_date: string;
-        status: "active" | "pending" | "grace" | "expired";
-        students?: { full_name: string }; units?: { name: string }; subscription_plans?: { name: string };
-      };
-      return { ...r, effective: computeSubscriptionStatus(r) };
-    });
-    return list.filter((r) => {
-      if (status !== "all" && r.effective !== status) return false;
-      if (q && !r.students?.full_name?.toLowerCase().includes(q.toLowerCase())) return false;
+    const base = (ledger ?? []).filter((r) => {
+      if (unit !== "all" && r.unit_id !== unit) return false;
+      const s = q.trim().toLowerCase();
+      if (s && !(r.full_name.toLowerCase().includes(s) || (r.roll_number ?? "").toLowerCase().includes(s))) return false;
       return true;
     });
-  }, [subs, status, q]);
+    return applyLedgerFilter(base, filter);
+  }, [ledger, unit, q, filter]);
 
-  const exportColumns = ["Student", "Unit", "Plan", "Start", "End", "Grace End", "Status"];
+  const exportColumns = ["Mess No", "Student", "Unit", "Joined", "Exit", "Status", "Total Billed", "Due", "Days Overdue"];
   const exportRows = rows.map((r) => [
-    r.students?.full_name ?? "",
-    r.units?.name ?? "",
-    r.subscription_plans?.name ?? "",
-    r.start_date,
-    r.end_date,
-    r.grace_end_date,
-    STATUS_LABEL[r.effective],
+    r.roll_number ?? "",
+    r.full_name,
+    r.unit_name ?? "",
+    r.joining_date ?? "",
+    r.exit_date ?? "",
+    r.status === "active" ? "Active" : "Inactive",
+    r.total_billed,
+    r.due_amount,
+    r.days_overdue,
   ]);
   const exportTitle = `Subscriptions — ${new Date().toLocaleDateString("en-IN")}`;
 
@@ -75,7 +79,9 @@ function SubscriptionList() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold">Subscriptions</h1>
-          <p className="text-muted-foreground">Track and manage student meal subscriptions.</p>
+          <p className="text-muted-foreground">
+            One row per student — billing accrues automatically every month until the student is deactivated.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => exportPdf({ title: exportTitle, columns: exportColumns, rows: exportRows, filename: "subscriptions" })}>
@@ -90,41 +96,40 @@ function SubscriptionList() {
         </div>
       </div>
 
-      <Card className="p-4 flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by student name" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-        <Select value={unit} onValueChange={setUnit}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Units</SelectItem>
-            {units?.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="grace">Grace</SelectItem>
-            <SelectItem value="expired">Expired</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-          </SelectContent>
-        </Select>
+      <Card>
+        <CardContent className="pt-4 flex flex-wrap items-end gap-3">
+          <div className="space-y-1 flex-1 min-w-[220px]">
+            <Label className="text-xs">Search</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Name or Mess No" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Unit</Label>
+            <Select value={unit} onValueChange={setUnit}>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Units</SelectItem>
+                {units?.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <LedgerFilterControls value={filter} onChange={setFilter} />
+        </CardContent>
       </Card>
 
       <Card>
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Mess No</TableHead>
               <TableHead>Student</TableHead>
               <TableHead>Unit</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead>Start</TableHead>
-              <TableHead>End</TableHead>
-              <TableHead>Grace End</TableHead>
+              <TableHead>Joined</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Total Billed</TableHead>
+              <TableHead className="text-right">Due</TableHead>
               <TableHead className="w-[80px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -135,23 +140,25 @@ function SubscriptionList() {
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-12">
                   <CalendarClock className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-muted-foreground">No subscriptions match the filters.</p>
+                  <p className="text-muted-foreground">No students match the filters.</p>
                 </TableCell>
               </TableRow>
             ) : rows.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.students?.full_name ?? "—"}</TableCell>
-                <TableCell>{r.units?.name ?? "—"}</TableCell>
-                <TableCell>{r.subscription_plans?.name ?? "—"}</TableCell>
-                <TableCell>{r.start_date}</TableCell>
-                <TableCell>{r.end_date}</TableCell>
-                <TableCell>{r.grace_end_date}</TableCell>
-                <TableCell>
-                  <Badge className={STATUS_STYLES[r.effective]}>{STATUS_LABEL[r.effective]}</Badge>
+              <TableRow key={r.student_id}>
+                <TableCell className="font-mono text-xs">{r.roll_number ?? "—"}</TableCell>
+                <TableCell className="font-medium">
+                  <Link to="/students/$id" params={{ id: r.student_id }} className="hover:underline">{r.full_name}</Link>
+                </TableCell>
+                <TableCell>{r.unit_name ?? "—"}</TableCell>
+                <TableCell className="text-sm">{r.joining_date ?? "—"}</TableCell>
+                <TableCell><StatusBadge status={r.status} /></TableCell>
+                <TableCell className="text-right text-sm">{inr(r.total_billed)}</TableCell>
+                <TableCell className="text-right">
+                  <DueAmount status={r.status} due={r.due_amount} daysOverdue={r.days_overdue} />
                 </TableCell>
                 <TableCell>
                   <Button asChild size="sm" variant="ghost">
-                    <Link to="/subscriptions/$id" params={{ id: r.id }}>View</Link>
+                    <Link to="/students/$id" params={{ id: r.student_id }}>View</Link>
                   </Button>
                 </TableCell>
               </TableRow>
