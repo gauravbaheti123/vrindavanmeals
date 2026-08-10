@@ -14,8 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AlertTriangle, Wallet, Users as UsersIcon, Search, IndianRupee, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { computeSubscriptionStatus } from "@/lib/subscription-status";
-import { fetchDuesRows, type DuesRow } from "@/lib/dues";
+import { StatusBadge, DueAmount } from "@/components/due-status";
+import { applyLedgerFilter, defaultLedgerFilter, LedgerFilterControls, type LedgerFilterState } from "@/components/ledger-filters";
+import { fetchDuesRows, fetchLedgerRows, type DuesRow } from "@/lib/dues";
 import { exportPdf, exportExcel } from "@/lib/report-export";
 
 export const Route = createFileRoute("/_authenticated/dues")({
@@ -35,8 +36,10 @@ type Row = DuesRow;
 function DuesPage() {
   const qc = useQueryClient();
   const [unitId, setUnitId] = useState<string>("all");
-  const [overdueOnly, setOverdueOnly] = useState(true);
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [includeSettled, setIncludeSettled] = useState(false);
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<LedgerFilterState>(defaultLedgerFilter);
   const [payFor, setPayFor] = useState<Row | null>(null);
 
   const { data: units } = useQuery({
@@ -63,8 +66,8 @@ function DuesPage() {
   const planPrice = plan ?? 3000;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["dues-list", planPrice],
-    queryFn: () => fetchDuesRows(planPrice),
+    queryKey: ["dues-list", planPrice, includeSettled],
+    queryFn: () => (includeSettled ? fetchLedgerRows(planPrice) : fetchDuesRows(planPrice)),
     enabled: plan !== undefined,
   });
 
@@ -83,28 +86,31 @@ function DuesPage() {
   const filtered = useMemo(() => {
     if (!data) return [];
     const q = search.trim().toLowerCase();
-    return data.filter((r) => {
+    const base = data.filter((r) => {
       if (unitId !== "all" && r.unit_id !== unitId) return false;
       if (overdueOnly && r.days_overdue <= 0) return false;
       if (q && !(r.full_name.toLowerCase().includes(q) || (r.roll_number ?? "").toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [data, search, unitId, overdueOnly]);
+    return applyLedgerFilter(base, filter);
+  }, [data, search, unitId, overdueOnly, filter]);
 
-  const totalOutstanding = filtered.reduce((s, r) => s + r.due_amount, 0);
+  const totalOutstanding = filtered.reduce((s, r) => s + Math.max(0, r.due_amount), 0);
 
-  const exportColumns = ["Mess No", "Student", "Mobile", "Unit", "Due", "Last Payment", "Days Overdue", "Status"];
+  const exportColumns = ["Mess No", "Student", "Mobile", "Unit", "Total Billed", "Due", "Last Payment", "Days Overdue", "Status"];
   const exportRows = filtered.map((r) => [
     r.roll_number ?? "",
     r.full_name,
     r.mobile ?? "",
     r.unit_name ?? "",
+    r.total_billed,
     r.due_amount,
     r.last_payment_date ? r.last_payment_date.slice(0, 10) : "",
     r.days_overdue,
-    r.eff_status,
+    r.status === "active" ? "Active" : "Inactive",
   ]);
   const exportTitle = `Dues & Ledger — ${new Date().toLocaleDateString("en-IN")}`;
+
 
   return (
     <div className="space-y-4">
@@ -165,10 +171,16 @@ function DuesPage() {
               </SelectContent>
             </Select>
           </div>
+          <LedgerFilterControls value={filter} onChange={setFilter} />
           <div className="flex items-center gap-2">
             <Switch id="overdue" checked={overdueOnly} onCheckedChange={setOverdueOnly} />
             <Label htmlFor="overdue" className="text-sm">Overdue only</Label>
           </div>
+          <div className="flex items-center gap-2">
+            <Switch id="settled" checked={includeSettled} onCheckedChange={setIncludeSettled} />
+            <Label htmlFor="settled" className="text-sm">Include paid-up students</Label>
+          </div>
+
         </CardContent>
       </Card>
 
@@ -196,14 +208,16 @@ function DuesPage() {
                 ) : !filtered.length ? (
                   <TableRow><TableCell colSpan={9} className="text-center py-10 text-muted-foreground">No dues 🎉</TableCell></TableRow>
                 ) : filtered.map((r) => (
-                  <TableRow key={r.sub_id}>
+                  <TableRow key={r.student_id}>
                     <TableCell className="font-mono text-xs">{r.roll_number ?? "—"}</TableCell>
                     <TableCell>
                       <Link to="/students/$id" params={{ id: r.student_id }} className="hover:underline font-medium">{r.full_name}</Link>
                     </TableCell>
                     <TableCell className="text-sm">{r.mobile ?? "—"}</TableCell>
                     <TableCell className="text-sm">{r.unit_name ?? "—"}</TableCell>
-                    <TableCell className="text-right font-semibold text-destructive">{inr(r.due_amount)}</TableCell>
+                    <TableCell className="text-right">
+                      <DueAmount status={r.status} due={r.due_amount} daysOverdue={r.days_overdue} />
+                    </TableCell>
                     <TableCell className="text-sm">{r.last_payment_date ? r.last_payment_date.slice(0, 10) : <span className="text-muted-foreground">Never</span>}</TableCell>
                     <TableCell className="text-right">
                       <span className={r.days_overdue > 30 ? "font-bold text-destructive" : r.days_overdue > 7 ? "font-semibold text-warning-foreground" : ""}>
@@ -211,13 +225,14 @@ function DuesPage() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={r.eff_status === "expired" ? "destructive" : r.eff_status === "grace" ? "secondary" : "outline"} className="capitalize">{r.eff_status}</Badge>
+                      <StatusBadge status={r.status} />
                     </TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" onClick={() => setPayFor(r)}><IndianRupee className="h-3 w-3 mr-1" />Record</Button>
                     </TableCell>
                   </TableRow>
                 ))}
+
               </TableBody>
             </Table>
           </div>

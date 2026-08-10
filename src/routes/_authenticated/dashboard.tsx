@@ -8,8 +8,8 @@ import {
   Users, CalendarClock, IndianRupee, AlertTriangle, Wallet,
   Utensils, RefreshCw, ArrowRight,
 } from "lucide-react";
-import { computeSubscriptionStatus } from "@/lib/subscription-status";
-import { fetchDuesRows } from "@/lib/dues";
+import { fetchLedgerRows } from "@/lib/dues";
+
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Vrindavan Meals" }] }),
@@ -53,13 +53,27 @@ function Dashboard() {
   });
   const planPrice = Number(plan?.price ?? 3000);
 
+  const { data: thresholds } = useQuery({
+    queryKey: ["due-thresholds"],
+    queryFn: async () => {
+      const { data } = await supabase.from("system_settings").select("key,value");
+      const map = Object.fromEntries((data ?? []).map((s) => [s.key, s.value]));
+      return {
+        amount: Number(map["due_amount_threshold"] ?? 3000),
+        days: Number(map["days_overdue_threshold"] ?? 15),
+      };
+    },
+  });
+  const dueAmountThreshold = thresholds?.amount ?? 3000;
+  const daysOverdueThreshold = thresholds?.days ?? 15;
+
+
   const { data: agg } = useQuery({
-    queryKey: ["dashboard-agg-v2", unitId, planPrice],
+    queryKey: ["dashboard-agg-v3", unitId, planPrice, dueAmountThreshold, daysOverdueThreshold],
     refetchInterval: REFRESH_MS,
     queryFn: async () => {
       const today = todayISO();
       const monthStart = monthStartISO();
-      const in5 = daysAhead(5);
 
       const unitFilter = <T,>(q: T, col = "unit_id"): T => {
         if (unitId === "all") return q;
@@ -67,7 +81,7 @@ function Dashboard() {
         return q.eq(col, unitId);
       };
 
-      const [monthPayments, subsAll, attendanceToday, studentsCount] = await Promise.all([
+      const [monthPayments, attendanceToday, studentsCount] = await Promise.all([
         unitFilter(
           supabase
             .from("payments")
@@ -75,11 +89,6 @@ function Dashboard() {
             .eq("status", "success")
             .gte("created_at", monthStart),
           "students.unit_id",
-        ),
-        unitFilter(
-          supabase
-            .from("subscriptions")
-            .select("id, student_id, status, end_date, grace_end_date, unit_id"),
         ),
         unitFilter(
           supabase
@@ -95,6 +104,7 @@ function Dashboard() {
         ),
       ]);
 
+
       type Pay = { amount: number; mode: string; student_id: string };
       const pays = (monthPayments.data ?? []) as unknown as Pay[];
       const totalCollection = pays.reduce((s, p) => s + Number(p.amount), 0);
@@ -104,25 +114,22 @@ function Dashboard() {
       }, {});
       
 
-      type Sub = {
-        id: string; student_id: string; status: "active" | "grace" | "expired" | "pending";
-        end_date: string; grace_end_date: string; unit_id: string | null;
-      };
-      const subs = (subsAll.data ?? []) as Sub[];
-      const eff = subs.map((s) => ({ ...s, eff: computeSubscriptionStatus(s) }));
-      const active = eff.filter((s) => s.eff === "active").length;
-      const grace = eff.filter((s) => s.eff === "grace").length;
-      const expired = eff.filter((s) => s.eff === "expired").length;
+
+
 
       // Single source of truth — same formula as /dues page
-      const duesRows = await fetchDuesRows(planPrice);
-      const scopedDues = unitId === "all" ? duesRows : duesRows.filter((r) => r.unit_id === unitId);
+      const ledgerRows = await fetchLedgerRows(planPrice);
+      const scopedLedger = unitId === "all" ? ledgerRows : ledgerRows.filter((r) => r.unit_id === unitId);
+      const scopedDues = scopedLedger.filter((r) => r.due_amount > 0);
       const outstandingAmount = scopedDues.reduce((s, r) => s + r.due_amount, 0);
       const uniqUnpaidStudents = new Set(scopedDues.map((r) => r.student_id));
 
-      const expiring = eff.filter(
-        (s) => s.eff === "active" && s.end_date >= today && s.end_date <= in5,
-      ).length;
+      const activeStudents = scopedLedger.filter((r) => r.status === "active");
+      const activeDue = activeStudents.reduce((s, r) => s + Math.max(0, r.due_amount), 0);
+      const highDue = scopedDues.filter(
+        (r) => r.due_amount >= dueAmountThreshold || r.days_overdue >= daysOverdueThreshold,
+      );
+
 
       type Att = { meal_type: string };
       const atts = (attendanceToday.data ?? []) as Att[];
@@ -132,8 +139,9 @@ function Dashboard() {
       return {
         collection: { total: totalCollection, byMode },
         outstanding: { amount: outstandingAmount, students: uniqUnpaidStudents.size },
-        expiring,
-        subs: { active, grace, expired, total: eff.length },
+        highDue: { count: highDue.length, amount: highDue.reduce((s, r) => s + r.due_amount, 0) },
+        subs: { active: activeStudents.length, inactive: scopedLedger.length - activeStudents.length, activeDue, total: scopedLedger.length },
+
         attendance: { total: atts.length, lunch: lunchCount, dinner: dinnerCount },
         studentsTotal: studentsCount.count ?? 0,
       };
@@ -196,22 +204,23 @@ function Dashboard() {
           sub={`Cash ${inr(agg?.collection.byMode.cash ?? 0)} · UPI ${inr(agg?.collection.byMode.upi ?? 0)} · Card ${inr(agg?.collection.byMode.card ?? 0)}`}
         />
         <StatCard
-          to="/reports"
-          tone={agg && agg.expiring > 0 ? "warning" : "muted"}
-          icon={<CalendarClock className="h-5 w-5" />}
-          label="Expiring Soon (5 days)"
-          value={String(agg?.expiring ?? 0)}
-          sub="Send reminders"
-          alert={agg ? agg.expiring > 0 : false}
+          to="/dues"
+          tone={agg && agg.highDue.count > 0 ? "warning" : "muted"}
+          icon={<AlertTriangle className="h-5 w-5" />}
+          label="High Due Alert"
+          value={String(agg?.highDue.count ?? 0)}
+          sub={`Over ${inr(dueAmountThreshold)} or ${daysOverdueThreshold}+ days · ${inr(agg?.highDue.amount ?? 0)}`}
+          alert={agg ? agg.highDue.count > 0 : false}
         />
         <StatCard
           to="/subscriptions"
           tone="primary"
           icon={<IndianRupee className="h-5 w-5" />}
-          label="Active Subscriptions"
+          label="Active Students"
           value={String(agg?.subs.active ?? 0)}
-          sub={`Grace ${agg?.subs.grace ?? 0} · Expired ${agg?.subs.expired ?? 0}`}
+          sub={`Inactive ${agg?.subs.inactive ?? 0} · Active due ${inr(agg?.subs.activeDue ?? 0)}`}
         />
+
       </div>
 
       {/* TERTIARY ROW — operational (smaller, muted) */}

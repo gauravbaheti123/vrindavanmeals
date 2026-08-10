@@ -12,6 +12,8 @@ import { Pencil, Plus, Save, Upload, Fingerprint, Users, ChevronRight, ShoppingB
 import { toast } from "sonner";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
 import { FeeSettingsCard } from "@/components/fee-settings-card";
+import { BillingEngineCard } from "@/components/billing-engine-card";
+
 
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -40,6 +42,8 @@ function SettingsPage() {
       <PortalModulesCard />
       <GeneralSettings />
       <FeeSettingsCard />
+      <BillingEngineCard />
+
       <BrandingCard />
 
       <MealWindowsCard />
