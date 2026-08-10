@@ -714,8 +714,14 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
 
       if (!hasPayment && !hasSubDates) {
         summary.payments.skipped++;
+        errors.push({
+          section: "transactions",
+          row: rowNum,
+          reason: `Row ${rowNum}: Skipped — no Amount and no Subscription Start/End Date (nothing to record)`,
+        });
         continue;
       }
+
 
       const payDate = t.date || t.sub_start || new Date().toISOString().slice(0, 10);
       const anchor = t.sub_start || t.date || payDate;
