@@ -623,6 +623,8 @@ function ProfileEditModal({
       full_name: form.full_name.trim(),
       mobile: mobile || null,
       roll_number: messNo,
+      college_roll_number: form.college_roll_number.trim() || null,
+
       course: form.course || null,
       batch_year: form.batch_year ? Number(form.batch_year) : null,
       hostel_room: form.hostel_room || null,
