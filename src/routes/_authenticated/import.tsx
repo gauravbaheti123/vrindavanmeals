@@ -288,12 +288,60 @@ function parseWorkbook(file: File): Promise<Parsed> {
 
         const sRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[studentsSheet], { raw: true, defval: null });
         const students: StudentRow[] = [];
+        const rowErrors: Array<{ section: string; row: number; reason: string }> = [];
+        const todayISO = new Date().toISOString().slice(0, 10);
         let skippedStudents = 0;
-        for (const r of sRows) {
+        for (let i = 0; i < sRows.length; i++) {
+          const r = sRows[i];
+          const rowNum = i + 2;
+          const isEmpty = Object.values(r).every((v) => v == null || v === "");
+          if (isEmpty) { skippedStudents++; continue; }
           const name = String(pick(r, ["Name", "STUDENT NAME", "Student Name", "full_name"]) ?? "").trim();
           const mobileRaw = pick(r, ["Mobile", "MOBILE", "Mobile No", "mobile"]);
           const mobile = mobileRaw ? String(mobileRaw).replace(/\D/g, "").slice(-10) : "";
-          if (!name || !mobile) { skippedStudents++; continue; }
+          if (!name || !mobile) {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Name and Mobile are mandatory` });
+            continue;
+          }
+
+          const statusRaw = String(pick(r, ["Status", "STATUS", "status"]) ?? "").trim().toLowerCase();
+          if (statusRaw !== "active" && statusRaw !== "inactive") {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Status must be 'Active' or 'Inactive'` });
+            continue;
+          }
+
+          const joinRaw = pick(r, ["Joining Date", "JOINING DATE", "joining_date", "Join Date"]);
+          const exitRaw = pick(r, ["Exit Date", "EXIT DATE", "exit_date"]);
+          const joining_date = excelDateToISO(joinRaw);
+          const exit_date = excelDateToISO(exitRaw);
+          if ((joinRaw != null && joinRaw !== "" && !joining_date) || (exitRaw != null && exitRaw !== "" && !exit_date)) {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Invalid date format — use DD-MM-YYYY` });
+            continue;
+          }
+          if (statusRaw === "inactive" && !exit_date) {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Exit Date is required when Status is Inactive` });
+            continue;
+          }
+          if (statusRaw === "active" && exit_date) {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Exit Date should be blank when Status is Active` });
+            continue;
+          }
+          if (joining_date && exit_date && exit_date < joining_date) {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Exit Date cannot be before Joining Date` });
+            continue;
+          }
+          if (exit_date && exit_date > todayISO) {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Exit Date cannot be in the future` });
+            continue;
+          }
+
           const messRaw = pick(r, ["Mess No", "MESS NO", "mess_no"]);
           const ob = pick(r, ["Opening Balance", "OPENING BALANCE", "opening_balance"]);
           students.push({
@@ -308,8 +356,12 @@ function parseWorkbook(file: File): Promise<Parsed> {
             email: (pick(r, ["Email", "EMAIL", "email"]) ?? null) as any,
             blood_group: (pick(r, ["Blood Group", "BLOOD GROUP", "blood_group"]) ?? null) as any,
             address: (pick(r, ["Address", "ADDRESS", "address"]) ?? null) as any,
+            joining_date,
+            exit_date,
+            status: statusRaw as "active" | "inactive",
           });
         }
+
 
         const transactions: TxnRow[] = [];
         let skippedTxns = 0;
