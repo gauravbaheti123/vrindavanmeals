@@ -281,9 +281,15 @@ function RecordPaymentModal({ row, onClose, onSaved }: {
         </DialogHeader>
         {row && (
           <div className="space-y-3">
-            <div className="text-sm bg-muted/40 rounded-md px-3 py-2">
-              <div className="font-semibold">{row.full_name}</div>
-              <div className="text-xs text-muted-foreground">{row.roll_number} · {row.unit_name ?? "—"}</div>
+            <div className="text-sm bg-muted/40 rounded-md px-3 py-2 flex items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold">{row.full_name}</div>
+                <div className="text-xs text-muted-foreground">{row.roll_number} · {row.unit_name ?? "—"}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[11px] uppercase text-muted-foreground">Outstanding</div>
+                <div className="font-bold text-destructive">{inr(row.due_amount)}</div>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -297,10 +303,10 @@ function RecordPaymentModal({ row, onClose, onSaved }: {
             </div>
             <div className="space-y-1">
               <Label>Mode</Label>
-              <RadioGroup value={mode} onValueChange={setMode} className="grid grid-cols-4 gap-2">
-                {["cash", "upi", "card", "razorpay"].map((m) => (
+              <RadioGroup value={mode} onValueChange={setMode} className="grid grid-cols-3 gap-2">
+                {["cash", "upi", "card", "razorpay", "rtgs", "bank_transfer"].map((m) => (
                   <label key={m} className={`flex items-center gap-1 border rounded-md px-2 py-1.5 cursor-pointer text-sm capitalize ${mode === m ? "border-primary bg-primary/5" : ""}`}>
-                    <RadioGroupItem value={m} />{m}
+                    <RadioGroupItem value={m} />{m.replace("_", " ")}
                   </label>
                 ))}
               </RadioGroup>
