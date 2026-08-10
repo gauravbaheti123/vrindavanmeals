@@ -148,10 +148,43 @@ function BiometricMappingPage() {
                           : <Badge variant="destructive">Unmapped ⚠️</Badge>}
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant={mapped ? "ghost" : "default"} onClick={() => setMapRow(r)}>
-                          {mapped ? "Change" : "Map Student"}
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button size="sm" variant={mapped ? "ghost" : "default"} onClick={() => setMapRow(r)}>
+                            {mapped ? "Change" : "Map Student"}
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete this device mapping?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Device {r.device_user_id}
+                                  {r.students ? ` (mapped to ${r.students.full_name})` : ""} will be removed permanently.
+                                  Past attendance records are not affected.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={async () => {
+                                    const { error } = await supabase.from("biometric_mappings").delete().eq("id", r.id);
+                                    if (error) return toast.error(error.message);
+                                    toast.success("Mapping deleted");
+                                    qc.invalidateQueries({ queryKey: ["biometric-mappings"] });
+                                  }}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
+
                     </TableRow>
                   );
                 })}
