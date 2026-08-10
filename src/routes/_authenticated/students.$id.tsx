@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Fingerprint, Pencil, Printer, Plus, Trash2, IndianRupee, X, FileText, UserCheck } from "lucide-react";
 import { toast } from "sonner";
+import { isValidMessNo, isMessNoAvailable } from "@/lib/mess-no";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
 import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from "@/lib/billing";
 import { generateNocPdf } from "@/lib/noc";
@@ -187,7 +188,7 @@ function StudentDetail() {
             </Button>
           </div>
           <p className="text-muted-foreground text-sm">
-            {s.roll_number ?? "—"} · {s.mobile} · {unitName}
+            {s.roll_number ?? "—"}{s.mobile ? ` · ${s.mobile}` : ""} · {unitName}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -223,7 +224,7 @@ function StudentDetail() {
             </Button>
           </CardHeader>
           <CardContent className="text-sm space-y-1.5">
-            <Row k="Roll Number" v={s.roll_number} />
+            <Row k="Mess No" v={s.roll_number} />
             <Row k="Course" v={s.course} />
             <Row k="Batch Year" v={s.batch_year?.toString()} />
             <Row k="Hostel Room" v={s.hostel_room} />
