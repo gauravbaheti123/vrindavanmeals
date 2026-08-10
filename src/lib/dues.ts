@@ -130,3 +130,41 @@ export async function fetchLedgerRows(planPrice: number): Promise<DuesRow[]> {
 export async function fetchDuesRows(planPrice: number): Promise<DuesRow[]> {
   return (await fetchLedgerRows(planPrice)).filter((r) => r.due_amount > 0);
 }
+
+export type StudentDueSummary = { due_amount: number; days_overdue: number };
+
+/** Lightweight single-student due lookup (used by the attendance counter). */
+export async function fetchStudentDue(studentId: string): Promise<StudentDueSummary> {
+  const [stRes, subsRes, paysRes, adjRes] = await Promise.all([
+    supabase
+      .from("students")
+      .select("opening_balance, opening_balance_as_of, joining_date")
+      .eq("id", studentId)
+      .maybeSingle(),
+    supabase.from("subscriptions").select("start_date, billed_amount").eq("student_id", studentId),
+    supabase
+      .from("payments")
+      .select("amount, created_at")
+      .eq("student_id", studentId)
+      .eq("status", "success")
+      .order("created_at", { ascending: false }),
+    supabase.from("ledger_adjustments").select("amount").eq("student_id", studentId),
+  ]);
+
+  const st = stRes.data as { opening_balance: number | null; opening_balance_as_of: string | null; joining_date: string | null } | null;
+  const billed = (subsRes.data ?? []).reduce((s, r) => s + Number((r as { billed_amount: number | null }).billed_amount ?? 0), 0);
+  const pays = (paysRes.data ?? []) as { amount: number; created_at: string }[];
+  const paid = pays.reduce((s, p) => s + Number(p.amount), 0);
+  const adjustments = (adjRes.data ?? []).reduce((s, a) => s + Number((a as { amount: number }).amount), 0);
+  const due = billed + Number(st?.opening_balance ?? 0) + adjustments - paid;
+
+  const today = todayISO();
+  const firstSub = (subsRes.data ?? [])
+    .map((s) => (s as { start_date: string }).start_date)
+    .sort()[0];
+  const refDate = pays[0]?.created_at.slice(0, 10) ?? st?.joining_date ?? firstSub ?? st?.opening_balance_as_of ?? today;
+  const days = due > 0 ? Math.max(0, Math.floor((Date.parse(today) - Date.parse(refDate)) / 86400000)) : 0;
+
+  return { due_amount: due, days_overdue: days };
+}
+
