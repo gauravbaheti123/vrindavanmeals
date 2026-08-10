@@ -1026,3 +1026,77 @@ function DeactivateStudentModal({
     </Dialog>
   );
 }
+
+/* ---------------- Ledger Adjustment Modal ---------------- */
+
+function AdjustmentModal({
+  studentId, onClose, onSaved,
+}: {
+  studentId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [kind, setKind] = useState<"credit" | "charge">("credit");
+  const [amount, setAmount] = useState("");
+  const [entryDate, setEntryDate] = useState(todayISO());
+  const [remarks, setRemarks] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const abs = Number(amount);
+    if (!abs || abs <= 0) return toast.error("Amount must be a positive number");
+    if (!remarks.trim()) return toast.error("Remarks are required for an adjustment");
+    setSaving(true);
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
+      const { error } = await supabase.from("ledger_adjustments").insert({
+        student_id: studentId,
+        amount: kind === "credit" ? -abs : abs,
+        entry_date: entryDate,
+        remarks: remarks.trim(),
+        created_by: userRes.user?.id ?? null,
+      });
+      if (error) throw new Error(error.message);
+      toast.success(`${kind === "credit" ? "Credit" : "Charge"} of ${inr(abs)} added to ledger`);
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save adjustment");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>Add Ledger Adjustment</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <Field label="Type">
+            <RadioGroup value={kind} onValueChange={(v) => setKind(v as typeof kind)} className="grid grid-cols-2 gap-2">
+              <label className={`flex items-center gap-2 border rounded-md px-3 py-2 cursor-pointer text-sm ${kind === "credit" ? "border-primary bg-primary/5" : ""}`}>
+                <RadioGroupItem value="credit" />Credit (reduces due)
+              </label>
+              <label className={`flex items-center gap-2 border rounded-md px-3 py-2 cursor-pointer text-sm ${kind === "charge" ? "border-primary bg-primary/5" : ""}`}>
+                <RadioGroupItem value="charge" />Charge (increases due)
+              </label>
+            </RadioGroup>
+          </Field>
+          <Field label="Amount (₹)">
+            <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500" />
+          </Field>
+          <Field label="Date">
+            <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
+          </Field>
+          <Field label="Remarks (required)">
+            <Input value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="e.g. Waiver for mess closure" />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Adjustment"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
