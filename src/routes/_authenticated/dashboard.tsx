@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { pageAll } from "@/lib/fetch-all";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -81,20 +82,24 @@ function Dashboard() {
         return q.eq(col, unitId);
       };
 
-      const [monthPayments, attendanceToday, studentsCount] = await Promise.all([
-        unitFilter(
-          supabase
-            .from("payments")
-            .select("amount, mode, student_id, status, created_at, students!inner(unit_id)")
-            .eq("status", "success")
-            .gte("created_at", monthStart),
-          "students.unit_id",
+      const [monthPaymentRows, attendanceRows, studentsCount] = await Promise.all([
+        pageAll((f, t) =>
+          unitFilter(
+            supabase
+              .from("payments")
+              .select("amount, mode, student_id, status, created_at, students!inner(unit_id)")
+              .eq("status", "success")
+              .gte("created_at", monthStart),
+            "students.unit_id",
+          ).range(f, t),
         ),
-        unitFilter(
-          supabase
-            .from("attendance")
-            .select("id, meal_type, unit_id, scan_date")
-            .eq("scan_date", today),
+        pageAll((f, t) =>
+          unitFilter(
+            supabase
+              .from("attendance")
+              .select("id, meal_type, unit_id, scan_date")
+              .eq("scan_date", today),
+          ).range(f, t),
         ),
         unitFilter(
           supabase
@@ -106,7 +111,7 @@ function Dashboard() {
 
 
       type Pay = { amount: number; mode: string; student_id: string };
-      const pays = (monthPayments.data ?? []) as unknown as Pay[];
+      const pays = monthPaymentRows as unknown as Pay[];
       const totalCollection = pays.reduce((s, p) => s + Number(p.amount), 0);
       const byMode = pays.reduce<Record<string, number>>((acc, p) => {
         acc[p.mode] = (acc[p.mode] ?? 0) + Number(p.amount);
@@ -132,7 +137,7 @@ function Dashboard() {
 
 
       type Att = { meal_type: string };
-      const atts = (attendanceToday.data ?? []) as Att[];
+      const atts = attendanceRows as unknown as Att[];
       const lunchCount = atts.filter((a) => a.meal_type === "lunch").length;
       const dinnerCount = atts.filter((a) => a.meal_type === "dinner").length;
 
