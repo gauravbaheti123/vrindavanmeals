@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { pageAll } from "@/lib/fetch-all";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,12 +75,15 @@ function DuesPage() {
   const { data: collectedThisMonth } = useQuery({
     queryKey: ["dues-collected-month"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("payments")
-        .select("amount")
-        .eq("status", "success")
-        .gte("created_at", monthStartISO());
-      return (data ?? []).reduce((s, p) => s + Number(p.amount), 0);
+      const data = await pageAll((f, t) =>
+        supabase
+          .from("payments")
+          .select("amount")
+          .eq("status", "success")
+          .gte("created_at", monthStartISO())
+          .range(f, t),
+      );
+      return data.reduce((s, p) => s + Number(p.amount), 0);
     },
   });
 
