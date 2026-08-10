@@ -504,10 +504,10 @@ function ExcelWorkbookTab() {
       <div className="text-xs text-muted-foreground space-y-1">
         <div><strong>Unified format — 2 sheets:</strong></div>
         <ul className="list-disc pl-5 space-y-0.5">
-          <li><strong>Students</strong> — required: <code>Name</code>, <code>Mobile</code>. Optional: Mess No (auto-generated if blank), Unit, Room, Opening Balance, Course, Parent Mobile, Email, Blood Group, Address.</li>
+          <li><strong>Students</strong> — required: <code>Name</code>, <code>Mobile</code>, <code>Status</code> (Active / Inactive). Optional: Mess No (auto-generated if blank), Unit, Room, Opening Balance, Course, Parent Mobile, Email, Blood Group, Address, Joining Date, Exit Date (required when Status = Inactive). Dates in <code>DD-MM-YYYY</code>.</li>
           <li><strong>Transactions</strong> — required: <code>Mobile</code>. Optional: Date, Amount, Mode (Cash/UPI/Card/Razorpay), Subscription Start/End Date (defaults to the transaction month's 1st–last day).</li>
         </ul>
-        <div className="pt-1">Match key is <strong>Mobile number</strong>. Existing students are updated in place — no duplicates. Rows without Amount are skipped (no payment recorded).</div>
+        <div className="pt-1">Match key is <strong>Mobile number</strong>. Existing students are updated in place — no duplicates. Rows without Amount are skipped (no payment recorded). Joining/Exit dates are reference-only — no billing, pivot or refund calculation runs on import.</div>
       </div>
 
       {parsed && !result && (
@@ -517,12 +517,39 @@ function ExcelWorkbookTab() {
             <PanelStat label="Transactions" total={parsed.txnsRaw} valid={parsed.transactions.length} skipped={parsed.skippedTxns} />
           </div>
 
+          {parsed.rowErrors.length > 0 && (
+            <>
+              <div className="text-sm font-medium text-destructive">
+                {parsed.rowErrors.length} row(s) rejected — these will not be imported:
+              </div>
+              <div className="border rounded-md overflow-auto max-h-60">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Section</TableHead><TableHead>Row</TableHead><TableHead>Reason</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {parsed.rowErrors.slice(0, 200).map((e, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="capitalize">{e.section}</TableCell>
+                        <TableCell>{e.row}</TableCell>
+                        <TableCell className="text-xs">{e.reason}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => {
+                const rows = [["section", "row", "reason"], ...parsed.rowErrors.map((e) => [e.section, String(e.row), e.reason])];
+                downloadCsv("student-validation-errors.csv", rows);
+              }}><Download className="h-4 w-4 mr-2" />Download Error CSV</Button>
+            </>
+          )}
+
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
               Existing students matched by <strong>Mobile</strong> will be updated with any filled fields. Transactions without Amount will be skipped.
             </AlertDescription>
           </Alert>
+
 
           <div className="flex gap-2">
             <Button onClick={() => runImport.mutate()} disabled={runImport.isPending}>
