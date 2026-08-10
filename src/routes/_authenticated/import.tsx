@@ -507,42 +507,38 @@ function parseWorkbook(file: File): Promise<Parsed> {
 function downloadMasterTemplate() {
   const wb = XLSX.utils.book_new();
   const students = [
-    ["Mess No*", "Name*", "Mobile", "Roll Number", "Unit", "Room", "Opening Balance", "Course", "Parent Mobile", "Email", "Blood Group", "Joining Date", "Exit Date", "Status*"],
-    ["VM-0001", "Priya Sharma", "9876543210", "CS2024-11", "Unit 1", "A-101", 0, "B.Sc", "9123456789", "priya@example.com", "O+", "01-07-2026", "", "Active"],
-    ["", "Anita Patel", "", "", "", "A-102", 1200, "", "", "", "", "15-04-2026", "31-05-2026", "Inactive"],
+    ["Mess No*", "Name*", "Mobile", "Unit", "Room", "Opening Balance", "Roll Number", "Course", "Joining Date", "Exit Date", "Status*", "Adjustment"],
+    ["VM-0001", "Priya Sharma", "9876543210", "Unit 1", "A-101", 0, "CS2024-11", "B.Sc", "01-07-2026", "", "Active", 0],
+    ["", "Anita Patel", "", "", "A-102", 1200, "", "", "15-04-2026", "31-05-2026", "Inactive", -200],
   ];
   const txns = [
-    ["Mess No*", "Name", "Mobile", "Date", "Amount", "Mode", "Subscription Start Date", "Subscription End Date"],
-    ["VM-0001", "Priya Sharma", "9876543210", "05-07-2026", 3500, "UPI", "01-07-2026", "31-07-2026"],
-    ["VM-0002", "Anita Patel", "", "10-07-2026", 3500, "Cash", "", ""],
+    ["Mess No*", "Name", "Mobile", "Date", "Amount", "Mode", "Remarks", "Subscription Start Date", "Subscription End Date"],
+    ["VM-0001", "Priya Sharma", "9876543210", "05-07-2026", 3500, "UPI", "July fees", "01-07-2026", "31-07-2026"],
+    ["VM-0002", "Anita Patel", "", "10-07-2026", 3500, "Cash", "", "", ""],
   ];
   const instructions = [
     ["Vrindavan Meals — Master Import Template"],
+    [""],
+    ["Columns are matched by HEADER NAME (case-insensitive). Column order does not matter and extra columns are ignored."],
     [""],
     ["Sheet: Students"],
     ["Column", "Required", "Format / Accepted values", "Notes"],
     ["Mess No*", "Yes", "VM-0001 format", "Unique match key — auto-assigned (VM-####) if left blank"],
     ["Name*", "Yes", "Text", "Student full name"],
     ["Mobile", "No", "10-digit number", "Optional — may be left blank"],
-    ["Roll Number", "No", "Text", "College roll number (not the Mess No)"],
     ["Unit", "No", "Existing unit name", "Defaults to Unit 1"],
     ["Room", "No", "Text", ""],
     ["Opening Balance", "No", "Number", "Carry-forward due, posted directly to ledger"],
+    ["Roll Number", "No", "Text", "College roll number (not the Mess No)"],
     ["Course", "No", "Text", ""],
-    ["Parent Mobile", "No", "10-digit number", ""],
-    ["Email", "No", "Text", ""],
-    ["Blood Group", "No", "Text", ""],
     ["Joining Date", "No", "DD-MM-YYYY", "Reference only — no billing calculation"],
     ["Exit Date", "Conditional", "DD-MM-YYYY", "Required when Status = Inactive; must be blank when Active; cannot be in the future"],
     ["Status*", "Yes", "Active / Inactive", "Inactive marks the student deactivated (no refund calculation)"],
+    ["Adjustment", "No", "Number", "Added to the opening balance (negative = credit)"],
     [""],
-    ["Sample Students row"],
-    ["Mess No*", "Name*", "Mobile", "Joining Date", "Exit Date", "Status*"],
-    ["VM-0001", "Priya Sharma", "9876543210", "01-07-2026", "", "Active"],
-    ["", "Anita Patel", "", "15-04-2026", "31-05-2026", "Inactive"],
-    [""],
-    ["Sheet: Transactions — Required: Mess No (or Mobile). Optional: Name, Date, Amount, Mode, Subscription Start/End Date."],
+    ["Sheet: Transactions — Required: Mess No (or Mobile). Optional: Name, Date, Amount, Mode, Remarks, Subscription Start/End Date."],
   ];
+
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(instructions), "Instructions");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(students), "Students");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(txns), "Transactions");
