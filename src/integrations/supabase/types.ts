@@ -570,10 +570,12 @@ export type Database = {
           doc_type: Database["public"]["Enums"]["doc_type"] | null
           doc_url: string | null
           email: string | null
+          exit_date: string | null
           full_name: string
           hostel_room: string | null
           id: string
           is_approved: boolean
+          joining_date: string | null
           mobile: string
           opening_balance: number
           opening_balance_as_of: string | null
@@ -593,10 +595,12 @@ export type Database = {
           doc_type?: Database["public"]["Enums"]["doc_type"] | null
           doc_url?: string | null
           email?: string | null
+          exit_date?: string | null
           full_name: string
           hostel_room?: string | null
           id?: string
           is_approved?: boolean
+          joining_date?: string | null
           mobile: string
           opening_balance?: number
           opening_balance_as_of?: string | null
@@ -616,10 +620,12 @@ export type Database = {
           doc_type?: Database["public"]["Enums"]["doc_type"] | null
           doc_url?: string | null
           email?: string | null
+          exit_date?: string | null
           full_name?: string
           hostel_room?: string | null
           id?: string
           is_approved?: boolean
+          joining_date?: string | null
           mobile?: string
           opening_balance?: number
           opening_balance_as_of?: string | null
