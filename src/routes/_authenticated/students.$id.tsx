@@ -589,6 +589,8 @@ function ProfileEditModal({
     full_name: student.full_name,
     mobile: student.mobile ?? "",
     roll_number: student.roll_number ?? "",
+    college_roll_number: (student as unknown as { college_roll_number?: string | null }).college_roll_number ?? "",
+
     course: student.course ?? "",
     batch_year: student.batch_year?.toString() ?? "",
     hostel_room: student.hostel_room ?? "",
