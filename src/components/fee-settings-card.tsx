@@ -8,8 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchFeeSlabs, formatMonth, prevMonthKey, MONTH_NAMES, type FeeSlab } from "@/lib/fees";
 
@@ -19,6 +23,22 @@ export function FeeSettingsCard() {
   const qc = useQueryClient();
   const { data: slabs } = useQuery({ queryKey: ["fee-settings"], queryFn: fetchFeeSlabs });
   const [open, setOpen] = useState(false);
+  const [editSlab, setEditSlab] = useState<FeeSlab | null>(null);
+
+  const refresh = () => qc.invalidateQueries({ queryKey: ["fee-settings"] });
+
+  async function removeSlab(s: FeeSlab) {
+    const { error } = await supabase.from("fee_settings").delete().eq("id", s.id);
+    if (error) return toast.error(error.message);
+    // If the deleted slab was the ongoing one, re-open the most recent earlier slab.
+    const rest = (slabs ?? []).filter((x) => x.id !== s.id);
+    if (s.effective_to_month === null && rest.length > 0) {
+      const prev = rest.slice().sort((a, b) => (a.effective_month > b.effective_month ? -1 : 1))[0];
+      await supabase.from("fee_settings").update({ effective_to_month: null, is_active: true }).eq("id", prev.id);
+    }
+    toast.success("Fee slab deleted");
+    refresh();
+  }
 
   return (
     <Card>
@@ -39,11 +59,12 @@ export function FeeSettingsCard() {
               <TableHead>From Month</TableHead>
               <TableHead>To Month</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {(slabs ?? []).length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">No fee slabs configured.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No fee slabs configured.</TableCell></TableRow>
             ) : (slabs ?? []).map((s) => (
               <TableRow key={s.id}>
                 <TableCell className="font-semibold">{inr(Number(s.monthly_fee))}</TableCell>
@@ -51,6 +72,33 @@ export function FeeSettingsCard() {
                 <TableCell>{s.effective_to_month ? formatMonth(s.effective_to_month) : "Ongoing"}</TableCell>
                 <TableCell>
                   {s.is_active ? <Badge className="bg-success text-success-foreground">Active</Badge> : <Badge variant="secondary">Ended</Badge>}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-1">
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditSlab(s)}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive">
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete this fee slab?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {inr(Number(s.monthly_fee))} from {formatMonth(s.effective_month)} will be removed.
+                            Months covered by this slab will fall back to the previous slab — re-run “Rebuild All Billing” afterwards.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => removeSlab(s)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -61,12 +109,55 @@ export function FeeSettingsCard() {
         <AddSlabModal
           slabs={slabs ?? []}
           onClose={() => setOpen(false)}
-          onSaved={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["fee-settings"] }); }}
+          onSaved={() => { setOpen(false); refresh(); }}
+        />
+      )}
+      {editSlab && (
+        <EditSlabModal
+          slab={editSlab}
+          onClose={() => setEditSlab(null)}
+          onSaved={() => { setEditSlab(null); refresh(); }}
         />
       )}
     </Card>
   );
 }
+
+function EditSlabModal({ slab, onClose, onSaved }: { slab: FeeSlab; onClose: () => void; onSaved: () => void }) {
+  const [fee, setFee] = useState(String(Number(slab.monthly_fee)));
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const amount = Number(fee);
+    if (!amount || amount <= 0) return toast.error("Monthly fee must be a positive number");
+    setSaving(true);
+    const { error } = await supabase.from("fee_settings").update({ monthly_fee: amount }).eq("id", slab.id);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Fee slab updated — re-run Rebuild All Billing to apply");
+    onSaved();
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>Edit Fee Slab — {formatMonth(slab.effective_month)}</DialogTitle></DialogHeader>
+        <div className="space-y-1">
+          <Label className="text-xs">Monthly Fee (₹)</Label>
+          <Input type="number" value={fee} onChange={(e) => setFee(e.target.value)} />
+          <p className="text-xs text-muted-foreground pt-1">
+            Period stays {formatMonth(slab.effective_month)} → {slab.effective_to_month ? formatMonth(slab.effective_to_month) : "Ongoing"}.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 function AddSlabModal({ slabs, onClose, onSaved }: { slabs: FeeSlab[]; onClose: () => void; onSaved: () => void }) {
   const now = new Date();
