@@ -464,7 +464,9 @@ function parseWorkbook(file: File): Promise<Parsed> {
         if (txnSheet) {
           const tRows = readSheetByHeader(wb.Sheets[txnSheet], TXN_HEADERS);
           txnsRaw = tRows.length;
-          for (const r of tRows) {
+          for (let ti = 0; ti < tRows.length; ti++) {
+            const r = tRows[ti];
+            const rowNumT = ti + 2;
             const isEmpty = Object.values(r).every((v) => v == null || v === "");
             if (isEmpty) { skippedTxns++; continue; }
             const mobileRaw = pick(r, ["Mobile"]);
@@ -472,7 +474,12 @@ function parseWorkbook(file: File): Promise<Parsed> {
             const name = pick(r, ["Name"]);
             const messRawT = pick(r, ["Mess No"]);
             const messNoT = messRawT ? String(messRawT).trim().toUpperCase() : "";
-            if (!mobile && !messNoT) { skippedTxns++; continue; } // no identifier — cannot match
+            if (!mobile && !messNoT) {
+              skippedTxns++;
+              rowErrors.push({ section: "transactions", row: rowNumT, reason: `Row ${rowNumT}: Skipped — no Mess No or Mobile, cannot match a student` });
+              continue;
+            }
+
             const amtRaw = pick(r, ["Amount"]);
             const amount = amtRaw != null && amtRaw !== "" && !isNaN(Number(amtRaw)) ? Number(amtRaw) : null;
             transactions.push({
