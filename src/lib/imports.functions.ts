@@ -392,35 +392,72 @@ export const importAttendance = createServerFn({ method: "POST" })
 // Sheet 1 = Students, Sheet 2 = Transactions.
 // Match key: MESS NO (VM-####, unique). Mobile is optional. Existing students are updated in place.
 
+// Excel cells often arrive as numbers/booleans even for free-text fields (Room, Roll No).
+// Coerce anything scalar to a trimmed string; empty -> null.
+const txt = () =>
+  z.preprocess((v) => {
+    if (v === null || v === undefined) return null;
+    if (typeof v === "string") return v.trim() === "" ? null : v.trim();
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    if (v instanceof Date) return v.toISOString().slice(0, 10);
+    return null;
+  }, z.string().nullable().optional());
+
+// Numbers may arrive as strings like "1,200" or "₹1200".
+const num = () =>
+  z.preprocess((v) => {
+    if (v === null || v === undefined || v === "") return null;
+    if (typeof v === "number") return Number.isFinite(v) ? v : null;
+    if (typeof v === "string") {
+      const n = Number(v.replace(/[^0-9.\-]/g, ""));
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
+  }, z.number().nullable().optional());
+
 const UStudentRow = z.object({
-  full_name: z.string().min(1),
-  mobile: z.string().nullable().optional(),
-  mess_no: z.string().nullable().optional(),
-  unit_name: z.string().nullable().optional(),
-  room: z.string().nullable().optional(),
-  opening_balance: z.number().nullable().optional(),
-  course: z.string().nullable().optional(),
-  parent_mobile: z.string().nullable().optional(),
-  email: z.string().nullable().optional(),
-  blood_group: z.string().nullable().optional(),
-  address: z.string().nullable().optional(),
-  college_roll_number: z.string().nullable().optional(),
-  joining_date: z.string().nullable().optional(),
-  exit_date: z.string().nullable().optional(),
-  status: z.enum(["active", "inactive"]).default("active"),
+  full_name: z.preprocess(
+    (v) => (typeof v === "number" ? String(v) : typeof v === "string" ? v.trim() : v),
+    z.string().min(1),
+  ),
+  mobile: txt(),
+  mess_no: txt(),
+  unit_name: txt(),
+  room: txt(),
+  opening_balance: num(),
+  course: txt(),
+  parent_mobile: txt(),
+  email: txt(),
+  blood_group: txt(),
+  address: txt(),
+  college_roll_number: txt(),
+  joining_date: txt(),
+  exit_date: txt(),
+  status: z
+    .preprocess(
+      (v) => (typeof v === "string" ? v.trim().toLowerCase() : v),
+      z.enum(["active", "inactive"]).catch("active"),
+    )
+    .default("active"),
 });
 
 
 const UTxnRow = z.object({
-  mobile: z.string().nullable().optional(),
-  mess_no: z.string().nullable().optional(),
-  name: z.string().nullable().optional(),
-  date: z.string().nullable().optional(),
-  amount: z.number().nullable().optional(),
-  mode: z.enum(["cash", "upi", "card", "razorpay"]).nullable().optional(),
-  sub_start: z.string().nullable().optional(),
-  sub_end: z.string().nullable().optional(),
+  mobile: txt(),
+  mess_no: txt(),
+  name: txt(),
+  date: txt(),
+  amount: num(),
+  mode: z
+    .preprocess(
+      (v) => (typeof v === "string" ? v.trim().toLowerCase() : v),
+      z.enum(["cash", "upi", "card", "razorpay"]).nullable().optional(),
+    )
+    .optional(),
+  sub_start: txt(),
+  sub_end: txt(),
 });
+
 
 const UnifiedWorkbookSchema = z.object({
   file_name: z.string().default("workbook.xlsx"),
