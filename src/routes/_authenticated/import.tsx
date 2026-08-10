@@ -269,10 +269,84 @@ type Parsed = {
 function pick(r: any, keys: string[]): any {
   for (const k of keys) {
     if (r[k] !== undefined && r[k] !== null && r[k] !== "") return r[k];
-    const upper = Object.keys(r).find((x) => x.trim().toLowerCase() === k.toLowerCase());
-    if (upper && r[upper] !== null && r[upper] !== "") return r[upper];
   }
   return null;
+}
+
+/** normalize a header cell: trim, drop trailing *, collapse spaces, lowercase, strip punctuation */
+function normHeader(v: any): string {
+  return String(v ?? "")
+    .replace(/\*/g, " ")
+    .replace(/[._-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** canonical field -> accepted header aliases (normalized) */
+const STUDENT_HEADERS: Record<string, string[]> = {
+  "Mess No": ["mess no", "messno", "mess number", "mess id", "mess"],
+  Name: ["name", "student name", "full name"],
+  Mobile: ["mobile", "mobile no", "mobile number", "phone", "contact"],
+  Unit: ["unit", "unit name"],
+  Room: ["room", "room no", "hostel room"],
+  "Opening Balance": ["opening balance", "opening bal", "carry forward"],
+  "Roll Number": ["roll number", "roll no", "college roll number", "college roll no"],
+  Course: ["course", "class"],
+  "Joining Date": ["joining date", "join date", "doj"],
+  "Exit Date": ["exit date", "leaving date"],
+  Status: ["status"],
+  Adjustment: ["adjustment", "adjustments"],
+};
+
+const TXN_HEADERS: Record<string, string[]> = {
+  "Mess No": ["mess no", "messno", "mess number", "mess id", "mess"],
+  Name: ["name", "student name", "full name"],
+  Mobile: ["mobile", "mobile no", "mobile number", "phone"],
+  Date: ["date", "payment date", "receipt date"],
+  Amount: ["amount", "amt", "paid amount"],
+  Mode: ["mode", "payment mode", "pay mode"],
+  Remarks: ["remarks", "remark", "note", "notes", "particulars"],
+  "Subscription Start Date": ["subscription start date", "sub start", "start date"],
+  "Subscription End Date": ["subscription end date", "sub end", "end date"],
+};
+
+/**
+ * Read a sheet into objects keyed by CANONICAL field names by matching the
+ * header row's actual text (case/format-insensitive). Unknown columns are
+ * ignored; missing optional columns are simply blank for every row.
+ */
+function readSheetByHeader(sheet: XLSX.WorkSheet, map: Record<string, string[]>): Record<string, any>[] {
+  const aoa = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, raw: true, defval: null, blankrows: false });
+  const alias = new Map<string, string>();
+  for (const [canon, list] of Object.entries(map)) for (const a of list) alias.set(a, canon);
+
+  // find the header row: the row within the first 15 that matches the most known headers
+  let headerIdx = -1;
+  let bestScore = 0;
+  for (let i = 0; i < Math.min(aoa.length, 15); i++) {
+    const score = (aoa[i] ?? []).reduce((acc: number, c: any) => acc + (alias.has(normHeader(c)) ? 1 : 0), 0);
+    if (score > bestScore) { bestScore = score; headerIdx = i; }
+  }
+  if (headerIdx < 0 || bestScore < 1) return [];
+
+  const cols: Array<{ idx: number; canon: string }> = [];
+  (aoa[headerIdx] ?? []).forEach((c: any, idx: number) => {
+    const canon = alias.get(normHeader(c));
+    if (canon && !cols.some((x) => x.canon === canon)) cols.push({ idx, canon });
+  });
+
+  const out: Record<string, any>[] = [];
+  for (let i = headerIdx + 1; i < aoa.length; i++) {
+    const row = aoa[i] ?? [];
+    const obj: Record<string, any> = {};
+    for (const c of cols) {
+      const v = row[c.idx];
+      obj[c.canon] = v === undefined || v === "" ? null : v;
+    }
+    out.push(obj);
+  }
+  return out;
 }
 
 function parseWorkbook(file: File): Promise<Parsed> {
@@ -286,7 +360,11 @@ function parseWorkbook(file: File): Promise<Parsed> {
         const txnSheet = pickSheet(wb, [/^transactions?$/i, /^payments?$/i, /^receipts?$/i]);
         if (!studentsSheet) throw new Error("No 'Students' sheet found. Download the template to see the expected format.");
 
-        const sRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[studentsSheet], { raw: true, defval: null });
+        const sRows = readSheetByHeader(wb.Sheets[studentsSheet], STUDENT_HEADERS);
+        if (sRows.length === 0) {
+          throw new Error("Could not find a header row on the 'Students' sheet. Expected columns like Mess No, Name, Status.");
+        }
+
         const students: StudentRow[] = [];
         const rowErrors: Array<{ section: string; row: number; reason: string }> = [];
         const todayISO = new Date().toISOString().slice(0, 10);
