@@ -231,6 +231,9 @@ function StudentDetail() {
             <Row k="Parent Mobile" v={s.parent_mobile} />
             <Row k="Blood Group" v={s.blood_group} />
             <Row k="Address" v={s.address} />
+            <Row k="Joining Date" v={(s as any).joining_date} />
+            <Row k="Exit Date" v={(s as any).exit_date} />
+
             <Row k="Document" v={s.doc_type ? `${s.doc_type} — ${s.doc_number ?? ""}` : null} />
 
             {s.is_approved && (

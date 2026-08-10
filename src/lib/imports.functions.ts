@@ -404,7 +404,11 @@ const UStudentRow = z.object({
   email: z.string().nullable().optional(),
   blood_group: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
+  joining_date: z.string().nullable().optional(),
+  exit_date: z.string().nullable().optional(),
+  status: z.enum(["active", "inactive"]).default("active"),
 });
+
 
 const UTxnRow = z.object({
   mobile: z.string().min(1),
@@ -420,7 +424,12 @@ const UnifiedWorkbookSchema = z.object({
   file_name: z.string().default("workbook.xlsx"),
   students: z.array(UStudentRow).max(20000),
   transactions: z.array(UTxnRow).max(30000),
+  row_errors: z
+    .array(z.object({ section: z.string(), row: z.number(), reason: z.string() }))
+    .max(20000)
+    .default([]),
 });
+
 
 function monthBounds(iso: string): { start: string; end: string } {
   const d = new Date(iso + "T00:00:00");
@@ -452,7 +461,9 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       .from("system_settings").select("value").eq("key", "grace_period_days").maybeSingle();
     const graceDays = Number(gp?.value ?? 5);
 
-    const errors: Array<{ section: string; row: number; reason: string }> = [];
+    const errors: Array<{ section: string; row: number; reason: string }> = [...data.row_errors];
+    const deactivated: Array<{ row: number; mobile: string; exit_date: string | null; note: string }> = [];
+
     const summary = {
       students: { total: data.students.length, imported: 0, updated: 0, skipped: 0 },
       subscriptions: { total: 0, imported: 0, skipped: 0 },
@@ -480,15 +491,47 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
     const nextMess = () => `MESS-${String(++messCounter).padStart(3, "0")}`;
 
     // ---------- STUDENTS (Sheet 1) ----------
+    const todayISO = new Date().toISOString().slice(0, 10);
     for (let idx = 0; idx < data.students.length; idx++) {
       const s = data.students[idx];
       const rowNum = idx + 2;
       const mobile = normalizeMobile(s.mobile);
       if (!s.full_name?.trim() || !mobile) {
         summary.students.skipped++;
-        errors.push({ section: "students", row: rowNum, reason: "Missing name or mobile" });
+        errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Name and Mobile are mandatory` });
         continue;
       }
+
+      // Status / date validation (reference fields — never trigger billing or refund logic)
+      const status = s.status === "inactive" ? "inactive" : "active";
+      const joiningDate = s.joining_date ? parseDate(s.joining_date) : null;
+      const exitDate = s.exit_date ? parseDate(s.exit_date) : null;
+      if ((s.joining_date && !joiningDate) || (s.exit_date && !exitDate)) {
+        summary.students.skipped++;
+        errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Invalid date format — use DD-MM-YYYY` });
+        continue;
+      }
+      if (status === "inactive" && !exitDate) {
+        summary.students.skipped++;
+        errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Exit Date is required when Status is Inactive` });
+        continue;
+      }
+      if (status === "active" && exitDate) {
+        summary.students.skipped++;
+        errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Exit Date should be blank when Status is Active` });
+        continue;
+      }
+      if (joiningDate && exitDate && exitDate < joiningDate) {
+        summary.students.skipped++;
+        errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Exit Date cannot be before Joining Date` });
+        continue;
+      }
+      if (exitDate && exitDate > todayISO) {
+        summary.students.skipped++;
+        errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Exit Date cannot be in the future` });
+        continue;
+      }
+
       const unitId = s.unit_name
         ? unitMap.get(s.unit_name.trim().toLowerCase()) ?? defaultUnitId
         : defaultUnitId;
@@ -505,11 +548,19 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       };
       Object.keys(patch).forEach((k) => { if (patch[k] === null || patch[k] === "") delete patch[k]; });
 
+      // Same flag the manual Deactivate action uses. No refund/credit pivot calculation runs here.
+      patch.is_approved = status === "active";
+      patch.joining_date = joiningDate;
+      patch.exit_date = status === "inactive" ? exitDate : null;
+
       const existingId = mobileToId.get(mobile);
       if (existingId) {
         const { error } = await supabaseAdmin.from("students").update(patch).eq("id", existingId);
-        if (error) errors.push({ section: "students", row: rowNum, reason: `Update failed: ${error.message}` });
-        else summary.students.updated++;
+        if (error) errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Update failed — ${error.message}` });
+        else {
+          summary.students.updated++;
+          if (status === "inactive") deactivated.push({ row: rowNum, mobile, exit_date: exitDate, note: "Deactivated via Excel Import" });
+        }
       } else {
         const roll = s.mess_no?.trim() || nextMess();
         const { data: ins, error } = await supabaseAdmin.from("students").insert({
@@ -517,16 +568,17 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
           mobile,
           roll_number: roll,
           unit_id: unitId,
-          is_approved: true,
         }).select("id").maybeSingle();
         if (error || !ins) {
-          errors.push({ section: "students", row: rowNum, reason: `Insert failed: ${error?.message || "unknown"}` });
+          errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Insert failed — ${error?.message || "unknown"}` });
         } else {
           mobileToId.set(mobile, ins.id);
           summary.students.imported++;
+          if (status === "inactive") deactivated.push({ row: rowNum, mobile, exit_date: exitDate, note: "Deactivated via Excel Import" });
         }
       }
     }
+
 
     // ---------- TRANSACTIONS (Sheet 2) ----------
     for (let idx = 0; idx < data.transactions.length; idx++) {
@@ -631,10 +683,15 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       imported: summary.students.imported + summary.students.updated + summary.payments.imported,
       skipped: summary.students.skipped + summary.payments.skipped,
       errors: errors.length,
-      errorRows: errors.map((e) => ({ row: e.row, reason: `[${e.section}] ${e.reason}`, data: null })),
+      errorRows: [
+        ...errors.map((e) => ({ row: e.row, reason: `[${e.section}] ${e.reason}`, data: null })),
+        // Audit trail for imported inactive students (mirrors the manual Deactivate flag, without refund calc)
+        ...deactivated.map((d) => ({ row: d.row, reason: `[audit] ${d.note} — ${d.mobile} (exit ${d.exit_date})`, data: null })),
+      ],
     });
 
-    return { ok: true, summary, errors };
+    return { ok: true, summary, errors, deactivated: deactivated.length };
+
   });
 
 

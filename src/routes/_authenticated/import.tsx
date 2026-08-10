@@ -246,6 +246,7 @@ type StudentRow = {
   unit_name: string | null; room: string | null; opening_balance: number | null;
   course: string | null; parent_mobile: string | null; email: string | null;
   blood_group: string | null; address: string | null;
+  joining_date: string | null; exit_date: string | null; status: "active" | "inactive";
 };
 type TxnRow = {
   mobile: string; name: string | null; date: string | null;
@@ -261,7 +262,9 @@ type Parsed = {
   txnsRaw: number;
   skippedStudents: number;
   skippedTxns: number;
+  rowErrors: Array<{ section: string; row: number; reason: string }>;
 };
+
 
 function pick(r: any, keys: string[]): any {
   for (const k of keys) {
@@ -285,12 +288,60 @@ function parseWorkbook(file: File): Promise<Parsed> {
 
         const sRows = XLSX.utils.sheet_to_json<any>(wb.Sheets[studentsSheet], { raw: true, defval: null });
         const students: StudentRow[] = [];
+        const rowErrors: Array<{ section: string; row: number; reason: string }> = [];
+        const todayISO = new Date().toISOString().slice(0, 10);
         let skippedStudents = 0;
-        for (const r of sRows) {
+        for (let i = 0; i < sRows.length; i++) {
+          const r = sRows[i];
+          const rowNum = i + 2;
+          const isEmpty = Object.values(r).every((v) => v == null || v === "");
+          if (isEmpty) { skippedStudents++; continue; }
           const name = String(pick(r, ["Name", "STUDENT NAME", "Student Name", "full_name"]) ?? "").trim();
           const mobileRaw = pick(r, ["Mobile", "MOBILE", "Mobile No", "mobile"]);
           const mobile = mobileRaw ? String(mobileRaw).replace(/\D/g, "").slice(-10) : "";
-          if (!name || !mobile) { skippedStudents++; continue; }
+          if (!name || !mobile) {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Name and Mobile are mandatory` });
+            continue;
+          }
+
+          const statusRaw = String(pick(r, ["Status", "STATUS", "status"]) ?? "").trim().toLowerCase();
+          if (statusRaw !== "active" && statusRaw !== "inactive") {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Status must be 'Active' or 'Inactive'` });
+            continue;
+          }
+
+          const joinRaw = pick(r, ["Joining Date", "JOINING DATE", "joining_date", "Join Date"]);
+          const exitRaw = pick(r, ["Exit Date", "EXIT DATE", "exit_date"]);
+          const joining_date = excelDateToISO(joinRaw);
+          const exit_date = excelDateToISO(exitRaw);
+          if ((joinRaw != null && joinRaw !== "" && !joining_date) || (exitRaw != null && exitRaw !== "" && !exit_date)) {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Invalid date format — use DD-MM-YYYY` });
+            continue;
+          }
+          if (statusRaw === "inactive" && !exit_date) {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Exit Date is required when Status is Inactive` });
+            continue;
+          }
+          if (statusRaw === "active" && exit_date) {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Exit Date should be blank when Status is Active` });
+            continue;
+          }
+          if (joining_date && exit_date && exit_date < joining_date) {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Exit Date cannot be before Joining Date` });
+            continue;
+          }
+          if (exit_date && exit_date > todayISO) {
+            skippedStudents++;
+            rowErrors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Exit Date cannot be in the future` });
+            continue;
+          }
+
           const messRaw = pick(r, ["Mess No", "MESS NO", "mess_no"]);
           const ob = pick(r, ["Opening Balance", "OPENING BALANCE", "opening_balance"]);
           students.push({
@@ -305,8 +356,12 @@ function parseWorkbook(file: File): Promise<Parsed> {
             email: (pick(r, ["Email", "EMAIL", "email"]) ?? null) as any,
             blood_group: (pick(r, ["Blood Group", "BLOOD GROUP", "blood_group"]) ?? null) as any,
             address: (pick(r, ["Address", "ADDRESS", "address"]) ?? null) as any,
+            joining_date,
+            exit_date,
+            status: statusRaw as "active" | "inactive",
           });
         }
+
 
         const transactions: TxnRow[] = [];
         let skippedTxns = 0;
@@ -341,7 +396,7 @@ function parseWorkbook(file: File): Promise<Parsed> {
           students, transactions,
           studentsRaw: sRows.length,
           txnsRaw,
-          skippedStudents, skippedTxns,
+          skippedStudents, skippedTxns, rowErrors,
         });
       } catch (e: any) {
         reject(e);
@@ -354,19 +409,48 @@ function parseWorkbook(file: File): Promise<Parsed> {
 function downloadMasterTemplate() {
   const wb = XLSX.utils.book_new();
   const students = [
-    ["Name*", "Mobile*", "Mess No", "Unit", "Room", "Opening Balance", "Course", "Parent Mobile", "Email", "Blood Group", "Address"],
-    ["Priya Sharma", "9876543210", "MESS-001", "Unit 1", "A-101", 0, "B.Sc", "9123456789", "priya@example.com", "O+", "Latur"],
-    ["Anita Patel", "9876543211", "", "", "A-102", 1200, "", "", "", "", ""],
+    ["Name*", "Mobile*", "Mess No", "Unit", "Room", "Opening Balance", "Course", "Parent Mobile", "Email", "Blood Group", "Address", "Joining Date", "Exit Date", "Status*"],
+    ["Priya Sharma", "9876543210", "MESS-001", "Unit 1", "A-101", 0, "B.Sc", "9123456789", "priya@example.com", "O+", "Latur", "01-07-2026", "", "Active"],
+    ["Anita Patel", "9876543211", "", "", "A-102", 1200, "", "", "", "", "", "15-04-2026", "31-05-2026", "Inactive"],
   ];
   const txns = [
     ["Mobile*", "Name", "Date", "Amount", "Mode", "Subscription Start Date", "Subscription End Date"],
-    ["9876543210", "Priya Sharma", "2026-07-05", 3500, "UPI", "2026-07-01", "2026-07-31"],
-    ["9876543211", "Anita Patel", "2026-07-10", 3500, "Cash", "", ""],
+    ["9876543210", "Priya Sharma", "05-07-2026", 3500, "UPI", "01-07-2026", "31-07-2026"],
+    ["9876543211", "Anita Patel", "10-07-2026", 3500, "Cash", "", ""],
   ];
+  const instructions = [
+    ["Vrindavan Meals — Master Import Template"],
+    [""],
+    ["Sheet: Students"],
+    ["Column", "Required", "Format / Accepted values", "Notes"],
+    ["Name*", "Yes", "Text", "Student full name"],
+    ["Mobile*", "Yes", "10-digit number", "Unique match key — existing students are updated"],
+    ["Mess No", "No", "Text", "Auto-generated if blank"],
+    ["Unit", "No", "Existing unit name", "Defaults to Unit 1"],
+    ["Room", "No", "Text", ""],
+    ["Opening Balance", "No", "Number", "Carry-forward due, posted directly to ledger"],
+    ["Course", "No", "Text", ""],
+    ["Parent Mobile", "No", "10-digit number", ""],
+    ["Email", "No", "Text", ""],
+    ["Blood Group", "No", "Text", ""],
+    ["Address", "No", "Text", ""],
+    ["Joining Date", "No", "DD-MM-YYYY", "Reference only — no billing calculation"],
+    ["Exit Date", "Conditional", "DD-MM-YYYY", "Required when Status = Inactive; must be blank when Active; cannot be in the future"],
+    ["Status*", "Yes", "Active / Inactive", "Inactive marks the student deactivated (no refund calculation)"],
+    [""],
+    ["Sample Students row"],
+    ["Name*", "Mobile*", "Joining Date", "Exit Date", "Status*"],
+    ["Priya Sharma", "9876543210", "01-07-2026", "", "Active"],
+    ["Anita Patel", "9876543211", "15-04-2026", "31-05-2026", "Inactive"],
+    [""],
+    ["Sheet: Transactions — unchanged. Required: Mobile. Optional: Date, Amount, Mode, Subscription Start/End Date."],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(instructions), "Instructions");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(students), "Students");
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(txns), "Transactions");
   XLSX.writeFile(wb, `Vrindavan_Meals_Template.xlsx`);
 }
+
 
 function ExcelWorkbookTab() {
   const [parsed, setParsed] = useState<Parsed | null>(null);
@@ -382,6 +466,8 @@ function ExcelWorkbookTab() {
           file_name: parsed.fileName,
           students: parsed.students,
           transactions: parsed.transactions,
+          row_errors: parsed.rowErrors,
+
         },
       });
     },
@@ -420,10 +506,10 @@ function ExcelWorkbookTab() {
       <div className="text-xs text-muted-foreground space-y-1">
         <div><strong>Unified format — 2 sheets:</strong></div>
         <ul className="list-disc pl-5 space-y-0.5">
-          <li><strong>Students</strong> — required: <code>Name</code>, <code>Mobile</code>. Optional: Mess No (auto-generated if blank), Unit, Room, Opening Balance, Course, Parent Mobile, Email, Blood Group, Address.</li>
+          <li><strong>Students</strong> — required: <code>Name</code>, <code>Mobile</code>, <code>Status</code> (Active / Inactive). Optional: Mess No (auto-generated if blank), Unit, Room, Opening Balance, Course, Parent Mobile, Email, Blood Group, Address, Joining Date, Exit Date (required when Status = Inactive). Dates in <code>DD-MM-YYYY</code>.</li>
           <li><strong>Transactions</strong> — required: <code>Mobile</code>. Optional: Date, Amount, Mode (Cash/UPI/Card/Razorpay), Subscription Start/End Date (defaults to the transaction month's 1st–last day).</li>
         </ul>
-        <div className="pt-1">Match key is <strong>Mobile number</strong>. Existing students are updated in place — no duplicates. Rows without Amount are skipped (no payment recorded).</div>
+        <div className="pt-1">Match key is <strong>Mobile number</strong>. Existing students are updated in place — no duplicates. Rows without Amount are skipped (no payment recorded). Joining/Exit dates are reference-only — no billing, pivot or refund calculation runs on import.</div>
       </div>
 
       {parsed && !result && (
@@ -433,12 +519,39 @@ function ExcelWorkbookTab() {
             <PanelStat label="Transactions" total={parsed.txnsRaw} valid={parsed.transactions.length} skipped={parsed.skippedTxns} />
           </div>
 
+          {parsed.rowErrors.length > 0 && (
+            <>
+              <div className="text-sm font-medium text-destructive">
+                {parsed.rowErrors.length} row(s) rejected — these will not be imported:
+              </div>
+              <div className="border rounded-md overflow-auto max-h-60">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Section</TableHead><TableHead>Row</TableHead><TableHead>Reason</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {parsed.rowErrors.slice(0, 200).map((e, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="capitalize">{e.section}</TableCell>
+                        <TableCell>{e.row}</TableCell>
+                        <TableCell className="text-xs">{e.reason}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => {
+                const rows = [["section", "row", "reason"], ...parsed.rowErrors.map((e) => [e.section, String(e.row), e.reason])];
+                downloadCsv("student-validation-errors.csv", rows);
+              }}><Download className="h-4 w-4 mr-2" />Download Error CSV</Button>
+            </>
+          )}
+
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
               Existing students matched by <strong>Mobile</strong> will be updated with any filled fields. Transactions without Amount will be skipped.
             </AlertDescription>
           </Alert>
+
 
           <div className="flex gap-2">
             <Button onClick={() => runImport.mutate()} disabled={runImport.isPending}>
