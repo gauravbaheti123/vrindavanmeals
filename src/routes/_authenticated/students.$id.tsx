@@ -1087,16 +1087,17 @@ function DeactivateStudentModal({
 /* ---------------- Ledger Adjustment Modal ---------------- */
 
 function AdjustmentModal({
-  studentId, onClose, onSaved,
+  studentId, existing, onClose, onSaved,
 }: {
   studentId: string;
+  existing?: Adjustment | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [kind, setKind] = useState<"credit" | "charge">("credit");
-  const [amount, setAmount] = useState("");
-  const [entryDate, setEntryDate] = useState(todayISO());
-  const [remarks, setRemarks] = useState("");
+  const [kind, setKind] = useState<"credit" | "charge">(existing && Number(existing.amount) > 0 ? "charge" : "credit");
+  const [amount, setAmount] = useState(existing ? String(Math.abs(Number(existing.amount))) : "");
+  const [entryDate, setEntryDate] = useState(existing?.entry_date ?? todayISO());
+  const [remarks, setRemarks] = useState(existing?.remarks ?? "");
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -1106,15 +1107,24 @@ function AdjustmentModal({
     setSaving(true);
     try {
       const { data: userRes } = await supabase.auth.getUser();
-      const { error } = await supabase.from("ledger_adjustments").insert({
-        student_id: studentId,
-        amount: kind === "credit" ? -abs : abs,
-        entry_date: entryDate,
-        remarks: remarks.trim(),
-        created_by: userRes.user?.id ?? null,
-      });
-      if (error) throw new Error(error.message);
-      toast.success(`${kind === "credit" ? "Credit" : "Charge"} of ${inr(abs)} added to ledger`);
+      const signed = kind === "credit" ? -abs : abs;
+      if (existing) {
+        const { error } = await supabase.from("ledger_adjustments")
+          .update({ amount: signed, entry_date: entryDate, remarks: remarks.trim() })
+          .eq("id", existing.id);
+        if (error) throw new Error(error.message);
+        toast.success("Adjustment updated");
+      } else {
+        const { error } = await supabase.from("ledger_adjustments").insert({
+          student_id: studentId,
+          amount: signed,
+          entry_date: entryDate,
+          remarks: remarks.trim(),
+          created_by: userRes.user?.id ?? null,
+        });
+        if (error) throw new Error(error.message);
+        toast.success(`${kind === "credit" ? "Credit" : "Charge"} of ${inr(abs)} added to ledger`);
+      }
       onSaved();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save adjustment");
@@ -1126,7 +1136,8 @@ function AdjustmentModal({
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Add Ledger Adjustment</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{existing ? "Edit Ledger Adjustment" : "Add Ledger Adjustment"}</DialogTitle></DialogHeader>
+
         <div className="space-y-3">
           <Field label="Type">
             <RadioGroup value={kind} onValueChange={(v) => setKind(v as typeof kind)} className="grid grid-cols-2 gap-2">
