@@ -558,6 +558,7 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
         email: s.email?.trim() || null,
         blood_group: s.blood_group?.trim() || null,
         address: s.address?.trim() || null,
+        college_roll_number: s.college_roll_number?.trim() || null,
         opening_balance: s.opening_balance ?? 0,
       };
       Object.keys(patch).forEach((k) => { if (patch[k] === null || patch[k] === "") delete patch[k]; });
