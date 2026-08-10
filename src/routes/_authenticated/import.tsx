@@ -740,16 +740,38 @@ function ExcelWorkbookTab() {
             </AlertDescription>
           </Alert>
 
+          {progress && (
+            <div className="space-y-1">
+              <div className="text-sm font-medium">
+                Importing {progress.phase}... {progress.done} / {progress.total}
+              </div>
+              <div className="h-2 w-full rounded bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 100}%` }}
+                />
+              </div>
+              <div className="text-xs text-muted-foreground">Keep this tab open until the import finishes.</div>
+            </div>
+          )}
+
+          {failure && (
+            <Alert variant="destructive">
+              <XCircle className="h-4 w-4" />
+              <AlertDescription>{failure}</AlertDescription>
+            </Alert>
+          )}
 
           <div className="flex gap-2">
             <Button onClick={() => runImport.mutate()} disabled={runImport.isPending}>
               {runImport.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Confirm Import
+              {runImport.isPending ? "Importing…" : failure ? "Retry Import" : "Confirm Import"}
             </Button>
-            <Button variant="ghost" onClick={() => setParsed(null)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setParsed(null)} disabled={runImport.isPending}>Cancel</Button>
           </div>
         </>
       )}
+
 
       {result && (
         <div className="space-y-3">
