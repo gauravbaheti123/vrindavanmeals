@@ -240,7 +240,9 @@ function PortalModulesCard() {
     { title: "Biometric Mapping", desc: "Map biometric IDs to students", icon: Fingerprint, to: "/biometric" },
     { title: "Users & Roles", desc: "Manage staff and role permissions", icon: Users, to: "/users" },
     { title: "POS Masters", desc: "Manage categories, items, payment modes & tax", icon: ShoppingBag, to: "/pos-masters" },
+    { title: "Activity Log", desc: "Audit trail of every edit and deletion", icon: History, to: "/activity-log" },
   ];
+
   return (
     <Card>
       <CardHeader><CardTitle>Portal Modules</CardTitle></CardHeader>
