@@ -631,6 +631,9 @@ function ExcelWorkbookTab() {
       // History entry is written whether the run succeeded, partially succeeded or failed.
       const total = parsed.students.length + parsed.transactions.length;
       const imported = summary.students.imported + summary.students.updated + summary.payments.imported;
+      // Audit entries are informational side effects — never counted as errors.
+      const genuineErrors = errors.filter((e) => e.section !== "audit");
+      const auditEntries = errors.filter((e) => e.section === "audit");
       try {
         await logFn({
           data: {
@@ -639,16 +642,18 @@ function ExcelWorkbookTab() {
             total,
             imported,
             skipped: summary.students.skipped + summary.payments.skipped,
-            errors: errors.length,
+            errors: genuineErrors.length,
             errorRows: [
               ...(fatal ? [{ row: 0, reason: `[FAILED] ${fatal}` }] : []),
-              ...errors.slice(0, 2000).map((e) => ({ row: e.row, reason: `[${e.section}] ${e.reason}` })),
+              ...genuineErrors.slice(0, 2000).map((e) => ({ row: e.row, reason: `[${e.section}] ${e.reason}` })),
+              ...auditEntries.slice(0, 2000).map((e) => ({ row: e.row, reason: `[audit] ${e.reason}` })),
             ],
           },
         });
       } catch {
         /* history write failure must not hide the import outcome */
       }
+
       setProgress(null);
       if (fatal) {
         setFailure(
