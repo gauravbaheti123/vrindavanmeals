@@ -424,13 +424,47 @@ const UTxnRow = z.object({
 
 const UnifiedWorkbookSchema = z.object({
   file_name: z.string().default("workbook.xlsx"),
-  students: z.array(UStudentRow).max(20000),
-  transactions: z.array(UTxnRow).max(30000),
+  // Large files are imported in chunks: one phase + one slice per request.
+  phase: z.enum(["students", "transactions"]).default("students"),
+  row_offset: z.number().int().min(0).default(0),
+  students: z.array(UStudentRow).max(20000).default([]),
+  transactions: z.array(UTxnRow).max(30000).default([]),
   row_errors: z
     .array(z.object({ section: z.string(), row: z.number(), reason: z.string() }))
     .max(20000)
     .default([]),
 });
+
+const ImportLogSchema = z.object({
+  import_type: z.string().default("excel_workbook"),
+  file_name: z.string().default("workbook.xlsx"),
+  total: z.number().int().min(0),
+  imported: z.number().int().min(0),
+  skipped: z.number().int().min(0),
+  errors: z.number().int().min(0),
+  errorRows: z
+    .array(z.object({ row: z.number(), reason: z.string() }))
+    .max(20000)
+    .default([]),
+});
+
+/** Always called at the end of a chunked run — success, partial or failure. */
+export const logImportRun = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => ImportLogSchema.parse(raw))
+  .handler(async ({ data, context }) => {
+    await assertAdminOrManager(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const log_id = await logImport(supabaseAdmin, context.userId, data.import_type, data.file_name, {
+      total: data.total,
+      imported: data.imported,
+      skipped: data.skipped,
+      errors: data.errors,
+      errorRows: data.errorRows.map((e) => ({ row: e.row, reason: e.reason, data: null })),
+    });
+    return { ok: true, log_id };
+  });
+
 
 
 function monthBounds(iso: string): { start: string; end: string } {
