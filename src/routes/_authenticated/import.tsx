@@ -245,7 +245,7 @@ type StudentRow = {
   full_name: string; mobile: string | null; mess_no: string | null;
   unit_name: string | null; room: string | null; opening_balance: number | null;
   course: string | null; parent_mobile: string | null; email: string | null;
-  blood_group: string | null; address: string | null;
+  blood_group: string | null; address: string | null; college_roll_number: string | null;
   joining_date: string | null; exit_date: string | null; status: "active" | "inactive";
 };
 type TxnRow = {
