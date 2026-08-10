@@ -137,7 +137,7 @@ function Dashboard() {
 
 
       type Att = { meal_type: string };
-      const atts = (attendanceToday.data ?? []) as Att[];
+      const atts = attendanceRows as unknown as Att[];
       const lunchCount = atts.filter((a) => a.meal_type === "lunch").length;
       const dinnerCount = atts.filter((a) => a.meal_type === "dinner").length;
 
