@@ -16,11 +16,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Fingerprint, Pencil, Printer, Plus, Trash2, IndianRupee, X, FileText, UserCheck } from "lucide-react";
+import { ArrowLeft, Fingerprint, Pencil, Printer, Plus, Trash2, IndianRupee, X, FileText, UserCheck, Scale } from "lucide-react";
 import { toast } from "sonner";
 import { isValidMessNo, isMessNoAvailable } from "@/lib/mess-no";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
 import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from "@/lib/billing";
+import { fetchFeeSlabs, feeForMonth, missingSlabMessage, type FeeSlab } from "@/lib/fees";
 import { generateNocPdf } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -34,6 +35,16 @@ type Subscription = Database["public"]["Tables"]["subscriptions"]["Row"];
 type Payment = Database["public"]["Tables"]["payments"]["Row"];
 type Mapping = Database["public"]["Tables"]["biometric_mappings"]["Row"];
 type PaymentMode = Database["public"]["Enums"]["payment_mode"];
+type Adjustment = {
+  id: string;
+  student_id: string;
+  amount: number;
+  remarks: string | null;
+  entry_date: string;
+  created_by: string | null;
+  created_at: string;
+};
+
 
 const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -45,13 +56,14 @@ function StudentDetail() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["student-detail", id],
     queryFn: async () => {
-      const [student, subs, pays, mapping, plans, units] = await Promise.all([
+      const [student, subs, pays, mapping, plans, units, adjs] = await Promise.all([
         supabase.from("students").select("*, units(name)").eq("id", id).maybeSingle(),
         supabase.from("subscriptions").select("*").eq("student_id", id).order("start_date", { ascending: false }),
         supabase.from("payments").select("*").eq("student_id", id).order("created_at", { ascending: true }),
         supabase.from("biometric_mappings").select("*").eq("student_id", id).eq("is_active", true).maybeSingle(),
         supabase.from("subscription_plans").select("*").eq("is_active", true).order("created_at"),
         supabase.from("units").select("id, name").order("name"),
+        supabase.from("ledger_adjustments").select("*").eq("student_id", id).order("entry_date", { ascending: true }),
       ]);
       return {
         student: student.data as Student | null,
@@ -60,14 +72,19 @@ function StudentDetail() {
         mapping: mapping.data as Mapping | null,
         plans: plans.data ?? [],
         units: units.data ?? [],
+        adjs: (adjs.data ?? []) as unknown as Adjustment[],
       };
     },
   });
+
+  const { data: feeSlabs } = useQuery({ queryKey: ["fee-settings"], queryFn: fetchFeeSlabs });
 
   const [editProfile, setEditProfile] = useState(false);
   const [editSub, setEditSub] = useState<Subscription | null>(null);
   const [newSub, setNewSub] = useState(false);
   const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment } | null>(null);
+  const [adjModal, setAdjModal] = useState(false);
+
   const [activateOpen, setActivateOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
   const [nocLoading, setNocLoading] = useState(false);
@@ -78,16 +95,17 @@ function StudentDetail() {
   };
 
   const summary = useMemo(() => {
-    if (!data) return { paid: 0, due: 0, advance: 0, last: null as Payment | null, billed: 0, opening: 0, openingAsOf: null as string | null };
+    if (!data) return { paid: 0, due: 0, advance: 0, last: null as Payment | null, billed: 0, opening: 0, adjustments: 0, openingAsOf: null as string | null };
     const paid = data.pays.filter((p) => p.status === "success").reduce((s, p) => s + Number(p.amount), 0);
     const price = Number(data.plans[0]?.price ?? 3000);
     const opening = Number((data.student as unknown as { opening_balance?: number })?.opening_balance ?? 0);
     const openingAsOf = ((data.student as unknown as { opening_balance_as_of?: string })?.opening_balance_as_of ?? null) as string | null;
+    const adjustments = data.adjs.reduce((s, a) => s + Number(a.amount), 0);
     const subsBilled = data.subs.reduce((sum, sub) => {
       const b = (sub as unknown as { billed_amount?: number | null }).billed_amount;
       return sum + Number(b ?? price);
     }, 0);
-    const billed = subsBilled + opening;
+    const billed = subsBilled + opening + adjustments;
     const balance = billed - paid;
     return {
       paid,
@@ -95,10 +113,12 @@ function StudentDetail() {
       advance: Math.max(0, -balance),
       billed,
       opening,
+      adjustments,
       openingAsOf,
       last: data.pays.filter((p) => p.status === "success").slice(-1)[0] ?? null,
     };
   }, [data]);
+
 
   async function handleIssueNoc() {
     if (!data) return;
@@ -225,7 +245,9 @@ function StudentDetail() {
           </CardHeader>
           <CardContent className="text-sm space-y-1.5">
             <Row k="Mess No" v={s.roll_number} />
+            <Row k="Roll Number" v={(s as unknown as { college_roll_number?: string | null }).college_roll_number} />
             <Row k="Course" v={s.course} />
+
             <Row k="Batch Year" v={s.batch_year?.toString()} />
             <Row k="Hostel Room" v={s.hostel_room} />
             <Row k="Email" v={s.email} />
@@ -292,10 +314,16 @@ function StudentDetail() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base">Payment Ledger</CardTitle>
-          <Button size="sm" className="print:hidden" onClick={() => setPayModal({ mode: "new" })}>
-            <IndianRupee className="h-3 w-3 mr-1" />Record Payment
-          </Button>
+          <div className="flex gap-2 print:hidden">
+            <Button size="sm" variant="outline" onClick={() => setAdjModal(true)}>
+              <Scale className="h-3 w-3 mr-1" />Add Adjustment
+            </Button>
+            <Button size="sm" onClick={() => setPayModal({ mode: "new" })}>
+              <IndianRupee className="h-3 w-3 mr-1" />Record Payment
+            </Button>
+          </div>
         </CardHeader>
+
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -376,10 +404,64 @@ function StudentDetail() {
                   );
                 });
               })()}
+              {data.adjs.map((a) => (
+                <TableRow key={a.id} className="bg-muted/20">
+                  <TableCell className="text-sm">{new Date(a.entry_date).toLocaleDateString("en-IN")}</TableCell>
+                  <TableCell className="text-sm italic">Adjustment</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{Number(a.amount) < 0 ? "Credit" : "Charge"}</Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{a.remarks ?? "—"}</TableCell>
+                  <TableCell className={`text-right font-semibold ${Number(a.amount) < 0 ? "text-success" : ""}`}>
+                    {Number(a.amount) < 0 ? "−" : "+"}{inr(Math.abs(Number(a.amount)))}
+                  </TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                  <TableCell className="text-right print:hidden">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive">
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete this adjustment?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {inr(Math.abs(Number(a.amount)))} · {a.remarks ?? "no remarks"} will be permanently removed from the ledger.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={async () => {
+                              const { error } = await supabase.from("ledger_adjustments").delete().eq("id", a.id);
+                              if (error) return toast.error(error.message);
+                              toast.success("Adjustment deleted");
+                              refresh();
+                            }}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
+          <div className="flex flex-wrap gap-6 border-t px-4 py-3 text-sm">
+            <span>Total Billed: <b>{inr(summary.billed)}</b></span>
+            <span>Total Paid: <b>{inr(summary.paid)}</b></span>
+            {summary.adjustments !== 0 && (
+              <span>Adjustments: <b className={summary.adjustments < 0 ? "text-success" : ""}>{summary.adjustments < 0 ? "−" : "+"}{inr(Math.abs(summary.adjustments))}</b></span>
+            )}
+            <span>Total Due: <b className={summary.due > 0 ? "text-destructive" : ""}>{inr(summary.due)}</b></span>
+            {summary.advance > 0 && <span>Advance: <b className="text-success">{inr(summary.advance)}</b></span>}
+          </div>
         </CardContent>
       </Card>
+
 
       {/* Biometric */}
       <Card>
@@ -450,6 +532,7 @@ function StudentDetail() {
         <ActivateStudentModal
           student={s}
           plan={data.plans[0]}
+          slabs={feeSlabs ?? []}
           onClose={() => setActivateOpen(false)}
           onSaved={() => { setActivateOpen(false); refresh(); }}
         />
@@ -459,10 +542,19 @@ function StudentDetail() {
           student={s}
           advance={summary.advance}
           plan={data.plans[0]}
+          slabs={feeSlabs ?? []}
           onClose={() => setDeactivateOpen(false)}
           onSaved={() => { setDeactivateOpen(false); refresh(); }}
         />
       )}
+      {adjModal && (
+        <AdjustmentModal
+          studentId={s.id}
+          onClose={() => setAdjModal(false)}
+          onSaved={() => { setAdjModal(false); refresh(); }}
+        />
+      )}
+
     </div>
   );
 }
@@ -755,21 +847,25 @@ function PaymentModal({
 /* ---------------- Activate Student Modal ---------------- */
 
 function ActivateStudentModal({
-  student, plan, onClose, onSaved,
+  student, plan, slabs, onClose, onSaved,
 }: {
   student: Student;
   plan: Database["public"]["Tables"]["subscription_plans"]["Row"] | undefined;
+  slabs: FeeSlab[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [joinDate, setJoinDate] = useState(todayISO());
   const [saving, setSaving] = useState(false);
-  const monthlyPrice = Number(plan?.price ?? 3000);
+  const slabFee = feeForMonth(slabs, joinDate);
+  const monthlyPrice = slabFee ?? Number(plan?.price ?? 3000);
   const slice = useMemo(() => computeActivationBilling(joinDate, monthlyPrice), [joinDate, monthlyPrice]);
 
   async function save() {
     if (!plan) return toast.error("No active plan configured");
+    if (slabFee === null) return toast.error(missingSlabMessage(joinDate));
     setSaving(true);
+
     const { error: upErr } = await supabase.from("students").update({ is_approved: true }).eq("id", student.id);
     if (upErr) { setSaving(false); return toast.error(upErr.message); }
     const { error: subErr } = await supabase.from("subscriptions").insert({

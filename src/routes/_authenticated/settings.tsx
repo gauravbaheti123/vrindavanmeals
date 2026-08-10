@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pencil, Plus, Save, Upload, Fingerprint, Users, ChevronRight, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
+import { FeeSettingsCard } from "@/components/fee-settings-card";
+
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — Vrindavan Meals" }] }),
@@ -37,7 +39,9 @@ function SettingsPage() {
       </div>
       <PortalModulesCard />
       <GeneralSettings />
+      <FeeSettingsCard />
       <BrandingCard />
+
       <MealWindowsCard />
       <UnitsCard />
       <IntegrationsCard />

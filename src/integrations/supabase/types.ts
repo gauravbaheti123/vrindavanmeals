@@ -128,6 +128,39 @@ export type Database = {
           },
         ]
       }
+      fee_settings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_month: string
+          effective_to_month: string | null
+          id: string
+          is_active: boolean
+          monthly_fee: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_month: string
+          effective_to_month?: string | null
+          id?: string
+          is_active?: boolean
+          monthly_fee: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_month?: string
+          effective_to_month?: string | null
+          id?: string
+          is_active?: boolean
+          monthly_fee?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       import_logs: {
         Row: {
           created_at: string
@@ -166,6 +199,44 @@ export type Database = {
           total_rows?: number
         }
         Relationships: []
+      }
+      ledger_adjustments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          id: string
+          remarks: string | null
+          student_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          remarks?: string | null
+          student_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          remarks?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ledger_adjustments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       meal_windows: {
         Row: {
@@ -564,6 +635,7 @@ export type Database = {
           address: string | null
           batch_year: number | null
           blood_group: string | null
+          college_roll_number: string | null
           course: string | null
           created_at: string
           doc_number: string | null
@@ -589,6 +661,7 @@ export type Database = {
           address?: string | null
           batch_year?: number | null
           blood_group?: string | null
+          college_roll_number?: string | null
           course?: string | null
           created_at?: string
           doc_number?: string | null
@@ -614,6 +687,7 @@ export type Database = {
           address?: string | null
           batch_year?: number | null
           blood_group?: string | null
+          college_roll_number?: string | null
           course?: string | null
           created_at?: string
           doc_number?: string | null
@@ -874,7 +948,13 @@ export type Database = {
       app_role: "super_admin" | "manager" | "counter_staff" | "accountant"
       doc_type: "college_id" | "aadhar"
       meal_type: "lunch" | "dinner"
-      payment_mode: "cash" | "upi" | "card" | "razorpay"
+      payment_mode:
+        | "cash"
+        | "upi"
+        | "card"
+        | "razorpay"
+        | "rtgs"
+        | "bank_transfer"
       payment_status: "success" | "failed" | "pending"
       scan_type: "biometric" | "manual"
       subscription_status: "active" | "grace" | "expired" | "pending"
@@ -1008,7 +1088,14 @@ export const Constants = {
       app_role: ["super_admin", "manager", "counter_staff", "accountant"],
       doc_type: ["college_id", "aadhar"],
       meal_type: ["lunch", "dinner"],
-      payment_mode: ["cash", "upi", "card", "razorpay"],
+      payment_mode: [
+        "cash",
+        "upi",
+        "card",
+        "razorpay",
+        "rtgs",
+        "bank_transfer",
+      ],
       payment_status: ["success", "failed", "pending"],
       scan_type: ["biometric", "manual"],
       subscription_status: ["active", "grace", "expired", "pending"],

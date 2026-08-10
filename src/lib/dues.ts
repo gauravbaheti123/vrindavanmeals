@@ -6,6 +6,7 @@ export type DuesRow = {
   full_name: string;
   mobile: string | null;
   roll_number: string | null;
+  college_roll_number: string | null;
   unit_name: string | null;
   unit_id: string | null;
   sub_id: string | null;
@@ -15,8 +16,10 @@ export type DuesRow = {
   last_payment_date: string | null;
   due_amount: number;
   opening_balance: number;
+  adjustments: number;
   days_overdue: number;
 };
+
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -26,10 +29,10 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
  * Only students with due > 0 are returned.
  */
 export async function fetchDuesRows(planPrice: number): Promise<DuesRow[]> {
-  const [studentsRes, subsRes, paysRes] = await Promise.all([
+  const [studentsRes, subsRes, paysRes, adjRes] = await Promise.all([
     supabase
       .from("students")
-      .select("id, full_name, mobile, roll_number, unit_id, opening_balance, opening_balance_as_of, units(name)")
+      .select("id, full_name, mobile, roll_number, college_roll_number, unit_id, opening_balance, opening_balance_as_of, units(name)")
       .eq("is_approved", true),
     supabase
       .from("subscriptions")
@@ -39,20 +42,27 @@ export async function fetchDuesRows(planPrice: number): Promise<DuesRow[]> {
       .select("student_id, amount, created_at")
       .eq("status", "success")
       .order("created_at", { ascending: false }),
+    supabase.from("ledger_adjustments").select("student_id, amount"),
   ]);
 
-  type St = { id: string; full_name: string; mobile: string | null; roll_number: string | null; unit_id: string | null; opening_balance: number | null; opening_balance_as_of: string | null; units: { name: string } | null };
+  type St = { id: string; full_name: string; mobile: string | null; roll_number: string | null; college_roll_number: string | null; unit_id: string | null; opening_balance: number | null; opening_balance_as_of: string | null; units: { name: string } | null };
   type Sub = { id: string; student_id: string; status: "active" | "grace" | "expired" | "pending"; start_date: string; end_date: string; grace_end_date: string; billed_amount: number | null };
 
   const students = (studentsRes.data ?? []) as unknown as St[];
   const subs = (subsRes.data ?? []) as unknown as Sub[];
   const pays = (paysRes.data ?? []) as { student_id: string; amount: number; created_at: string }[];
+  const adjs = (adjRes.data ?? []) as unknown as { student_id: string; amount: number }[];
 
   const subsByStudent = new Map<string, Sub[]>();
   for (const s of subs) {
     const arr = subsByStudent.get(s.student_id) ?? [];
     arr.push(s);
     subsByStudent.set(s.student_id, arr);
+  }
+
+  const adjByStudent = new Map<string, number>();
+  for (const a of adjs) {
+    adjByStudent.set(a.student_id, (adjByStudent.get(a.student_id) ?? 0) + Number(a.amount));
   }
 
   const paidByStudent = new Map<string, number>();
@@ -68,9 +78,10 @@ export async function fetchDuesRows(planPrice: number): Promise<DuesRow[]> {
   for (const st of students) {
     const stSubs = subsByStudent.get(st.id) ?? [];
     const opening = Number(st.opening_balance ?? 0);
+    const adjustments = adjByStudent.get(st.id) ?? 0;
     const paid = paidByStudent.get(st.id) ?? 0;
     const subsBilled = stSubs.reduce((sum, sub) => sum + Number(sub.billed_amount ?? planPrice), 0);
-    const billed = subsBilled + opening;
+    const billed = subsBilled + opening + adjustments;
     const due = billed - paid;
     if (due <= 0) continue;
 
@@ -85,6 +96,7 @@ export async function fetchDuesRows(planPrice: number): Promise<DuesRow[]> {
       full_name: st.full_name,
       mobile: st.mobile,
       roll_number: st.roll_number,
+      college_roll_number: st.college_roll_number,
       unit_name: st.units?.name ?? null,
       unit_id: st.unit_id,
       sub_id: latest?.id ?? null,
@@ -94,9 +106,11 @@ export async function fetchDuesRows(planPrice: number): Promise<DuesRow[]> {
       last_payment_date: lastPay,
       due_amount: due,
       opening_balance: opening,
+      adjustments,
       days_overdue: days,
     });
   }
+
 
   rows.sort((a, b) => b.days_overdue - a.days_overdue);
   return rows;
