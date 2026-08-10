@@ -1,45 +1,71 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, UserPlus, Clock } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { StatusBadge, DueAmount } from "@/components/due-status";
+import { applyLedgerFilter, defaultLedgerFilter, LedgerFilterControls, type LedgerFilterState } from "@/components/ledger-filters";
+import { fetchLedgerRows } from "@/lib/dues";
 
 export const Route = createFileRoute("/_authenticated/students/")({
-  head: () => ({ meta: [{ title: "Students — Vrindavan Meals" }] }),
+  head: () => ({
+    meta: [
+      { title: "Students — Vrindavan Meals" },
+      { name: "description", content: "Student records with live status and outstanding dues across all units." },
+    ],
+  }),
   component: StudentList,
 });
 
 function StudentList() {
   const [q, setQ] = useState("");
   const [unit, setUnit] = useState<string>("all");
+  const [filter, setFilter] = useState<LedgerFilterState>({ ...defaultLedgerFilter, sort: "name_asc" });
 
   const { data: units } = useQuery({
     queryKey: ["units"],
     queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
   });
 
-  const { data: students, isLoading } = useQuery({
-    queryKey: ["students", q, unit],
+  const { data: planPrice } = useQuery({
+    queryKey: ["default-plan-price"],
     queryFn: async () => {
-      let query = supabase
-        .from("students")
-        .select("id, full_name, mobile, roll_number, unit_id, is_approved, units(name)")
-        .eq("is_approved", true)
-        .order("created_at", { ascending: false })
-        .limit(200);
-      if (q) query = query.or(`full_name.ilike.%${q}%,mobile.ilike.%${q}%,roll_number.ilike.%${q}%`);
-      if (unit !== "all") query = query.eq("unit_id", unit);
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
+      const { data } = await supabase
+        .from("subscription_plans").select("price").eq("is_active", true)
+        .order("created_at", { ascending: true }).limit(1).maybeSingle();
+      return Number(data?.price ?? 3000);
     },
   });
+
+  const { data: ledger, isLoading } = useQuery({
+    queryKey: ["students-ledger", planPrice],
+    enabled: planPrice !== undefined,
+    queryFn: () => fetchLedgerRows(planPrice ?? 3000),
+  });
+
+  const rows = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    const base = (ledger ?? []).filter((r) => {
+      if (unit !== "all" && r.unit_id !== unit) return false;
+      if (
+        s &&
+        !(
+          r.full_name.toLowerCase().includes(s) ||
+          (r.mobile ?? "").toLowerCase().includes(s) ||
+          (r.roll_number ?? "").toLowerCase().includes(s)
+        )
+      ) return false;
+      return true;
+    });
+    return applyLedgerFilter(base, filter);
+  }, [ledger, unit, q, filter]);
 
   const { data: pendingCount } = useQuery({
     queryKey: ["students-pending-count"],
@@ -68,18 +94,27 @@ function StudentList() {
         </div>
       </div>
 
-      <Card className="p-4 flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by Mess No, name or mobile" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-        <Select value={unit} onValueChange={setUnit}>
-          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Units</SelectItem>
-            {units?.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+      <Card>
+        <CardContent className="pt-4 flex flex-wrap items-end gap-3">
+          <div className="space-y-1 flex-1 min-w-[220px]">
+            <Label className="text-xs">Search</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Search by Mess No, name or mobile" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Unit</Label>
+            <Select value={unit} onValueChange={setUnit}>
+              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Units</SelectItem>
+                {units?.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <LedgerFilterControls value={filter} onChange={setFilter} />
+        </CardContent>
       </Card>
 
       <Card>
@@ -90,27 +125,33 @@ function StudentList() {
               <TableHead>Name</TableHead>
               <TableHead>Mobile</TableHead>
               <TableHead>Unit</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Due</TableHead>
               <TableHead className="w-[100px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
-            ) : students?.length === 0 ? (
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
+            ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-12">
+                <TableCell colSpan={7} className="text-center py-12">
                   <UserPlus className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-muted-foreground">No students yet. Add your first student to get started.</p>
+                  <p className="text-muted-foreground">No students match the filters.</p>
                 </TableCell>
               </TableRow>
-            ) : students?.map((s) => (
-              <TableRow key={s.id}>
+            ) : rows.map((s) => (
+              <TableRow key={s.student_id}>
                 <TableCell className="font-mono text-xs">{s.roll_number || "—"}</TableCell>
                 <TableCell className="font-medium">{s.full_name}</TableCell>
                 <TableCell>{s.mobile || "—"}</TableCell>
-                <TableCell>{(s as unknown as { units?: { name: string } }).units?.name || "—"}</TableCell>
+                <TableCell>{s.unit_name || "—"}</TableCell>
+                <TableCell><StatusBadge status={s.status} /></TableCell>
+                <TableCell className="text-right">
+                  <DueAmount status={s.status} due={s.due_amount} daysOverdue={s.days_overdue} />
+                </TableCell>
                 <TableCell>
-                  <Button asChild size="sm" variant="ghost"><Link to="/students/$id" params={{ id: s.id }}>View</Link></Button>
+                  <Button asChild size="sm" variant="ghost"><Link to="/students/$id" params={{ id: s.student_id }}>View</Link></Button>
                 </TableCell>
               </TableRow>
             ))}
