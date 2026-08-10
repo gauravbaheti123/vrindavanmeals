@@ -101,13 +101,15 @@ function StudentDetail() {
     const price = Number(data.plans[0]?.price ?? 3000);
     const opening = Number((data.student as unknown as { opening_balance?: number })?.opening_balance ?? 0);
     const openingAsOf = ((data.student as unknown as { opening_balance_as_of?: string })?.opening_balance_as_of ?? null) as string | null;
-    const adjustments = data.adjs.reduce((s, a) => s + Number(a.amount), 0);
+    // Net adjustments = manual ledger adjustments + opening balance carried forward.
+    const adjustments = data.adjs.reduce((s, a) => s + Number(a.amount), 0) + opening;
     const subsBilled = data.subs.reduce((sum, sub) => {
       const b = (sub as unknown as { billed_amount?: number | null }).billed_amount;
       return sum + Number(b ?? price);
     }, 0);
-    const billed = subsBilled + opening + adjustments;
-    const balance = billed - paid;
+    // Total Billed is always gross monthly billing — adjustments are tracked separately.
+    const billed = subsBilled;
+    const balance = billed + adjustments - paid;
     return {
       paid,
       due: Math.max(0, balance),
@@ -231,9 +233,14 @@ function StudentDetail() {
       </div>
 
       {/* Summary strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <SummaryTile label="Total Billed" value={inr(summary.billed)} />
         <SummaryTile label="Total Paid" value={inr(summary.paid)} tone="success" />
+        <SummaryTile
+          label="Adjustments"
+          value={(summary.adjustments < 0 ? "−" : summary.adjustments > 0 ? "+" : "") + inr(Math.abs(summary.adjustments))}
+          tone={summary.adjustments < 0 ? "success" : summary.adjustments > 0 ? "destructive" : "muted"}
+        />
         <SummaryTile label={summary.advance > 0 ? "Advance" : "Total Due"} value={inr(summary.advance > 0 ? summary.advance : summary.due)} tone={summary.due > 0 ? "destructive" : "muted"} />
         <SummaryTile label="Last Payment" value={summary.last ? new Date(summary.last.created_at).toLocaleDateString("en-IN") : "—"} />
       </div>
