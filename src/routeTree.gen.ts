@@ -25,6 +25,7 @@ import { Route as AuthenticatedDuesRouteImport } from './routes/_authenticated/d
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedBiometricRouteImport } from './routes/_authenticated/biometric'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
+import { Route as AuthenticatedActivityLogRouteImport } from './routes/_authenticated/activity-log'
 import { Route as AuthenticatedSubscriptionsIndexRouteImport } from './routes/_authenticated/subscriptions.index'
 import { Route as AuthenticatedStudentsIndexRouteImport } from './routes/_authenticated/students.index'
 import { Route as AuthenticatedPaymentsIndexRouteImport } from './routes/_authenticated/payments.index'
@@ -117,6 +118,12 @@ const AuthenticatedAttendanceRoute = AuthenticatedAttendanceRouteImport.update({
   path: '/attendance',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedActivityLogRoute =
+  AuthenticatedActivityLogRouteImport.update({
+    id: '/activity-log',
+    path: '/activity-log',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSubscriptionsIndexRoute =
   AuthenticatedSubscriptionsIndexRouteImport.update({
     id: '/subscriptions/',
@@ -194,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/activity-log': typeof AuthenticatedActivityLogRoute
   '/attendance': typeof AuthenticatedAttendanceRouteWithChildren
   '/biometric': typeof AuthenticatedBiometricRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -223,6 +231,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/activity-log': typeof AuthenticatedActivityLogRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/dues': typeof AuthenticatedDuesRoute
   '/import': typeof AuthenticatedImportRoute
@@ -251,6 +260,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/_authenticated/activity-log': typeof AuthenticatedActivityLogRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRouteWithChildren
   '/_authenticated/biometric': typeof AuthenticatedBiometricRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -282,6 +292,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/login'
     | '/register'
+    | '/activity-log'
     | '/attendance'
     | '/biometric'
     | '/dashboard'
@@ -311,6 +322,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/login'
     | '/register'
+    | '/activity-log'
     | '/dashboard'
     | '/dues'
     | '/import'
@@ -338,6 +350,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/login'
     | '/register'
+    | '/_authenticated/activity-log'
     | '/_authenticated/attendance'
     | '/_authenticated/biometric'
     | '/_authenticated/dashboard'
@@ -485,6 +498,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAttendanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/activity-log': {
+      id: '/_authenticated/activity-log'
+      path: '/activity-log'
+      fullPath: '/activity-log'
+      preLoaderRoute: typeof AuthenticatedActivityLogRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/subscriptions/': {
       id: '/_authenticated/subscriptions/'
       path: '/subscriptions'
@@ -622,6 +642,7 @@ const AuthenticatedStudentsRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedActivityLogRoute: typeof AuthenticatedActivityLogRoute
   AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRouteWithChildren
   AuthenticatedBiometricRoute: typeof AuthenticatedBiometricRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -641,6 +662,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedActivityLogRoute: AuthenticatedActivityLogRoute,
   AuthenticatedAttendanceRoute: AuthenticatedAttendanceRouteWithChildren,
   AuthenticatedBiometricRoute: AuthenticatedBiometricRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
