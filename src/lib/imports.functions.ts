@@ -404,7 +404,11 @@ const UStudentRow = z.object({
   email: z.string().nullable().optional(),
   blood_group: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
+  joining_date: z.string().nullable().optional(),
+  exit_date: z.string().nullable().optional(),
+  status: z.enum(["active", "inactive"]).default("active"),
 });
+
 
 const UTxnRow = z.object({
   mobile: z.string().min(1),
