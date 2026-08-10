@@ -147,8 +147,9 @@ function Dashboard() {
       return {
         collection: { total: totalCollection, byMode },
         outstanding: { amount: outstandingAmount, students: uniqUnpaidStudents.size },
-        expiring,
-        subs: { active, grace, expired, total: eff.length },
+        highDue: { count: highDue.length, amount: highDue.reduce((s, r) => s + r.due_amount, 0) },
+        subs: { active: activeStudents.length, inactive: scopedLedger.length - activeStudents.length, activeDue, total: scopedLedger.length },
+
         attendance: { total: atts.length, lunch: lunchCount, dinner: dinnerCount },
         studentsTotal: studentsCount.count ?? 0,
       };
