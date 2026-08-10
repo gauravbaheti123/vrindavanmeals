@@ -1060,40 +1060,79 @@ function StudentLedger() {
 }
 
 // ================== 6A. GST Report ==================
-function GSTReport() {
+// GST is charged at 5% inclusive: every collected rupee already contains the tax.
+// Taxable value = Gross / 1.05, GST = Gross − Taxable (split equally into CGST 2.5% + SGST 2.5%).
+const GST_RATE = 0.05;
+const GST_DIVISOR = 1 + GST_RATE;
+
+function GSTReport({ from, to }: { from: string; to: string }) {
   const { data } = useQuery({
-    queryKey: ["rpt-gst"],
+    queryKey: ["rpt-gst-5", from, to],
     queryFn: async () => {
-      const since = dISO(new Date(Date.now() - 365 * 86400000));
-      const { data: pays } = await supabase.from("payments").select("amount, created_at, status").eq("status", "success").gte("created_at", since);
-      const map = new Map<string, number>();
-      (pays ?? []).forEach((p) => { const k = p.created_at.slice(0, 7); map.set(k, (map.get(k) ?? 0) + Number(p.amount)); });
-      const months: { month: string; gross: number; taxable: number; gst: number }[] = [];
-      for (let i = 11; i >= 0; i--) {
-        const d = new Date(); d.setMonth(d.getMonth() - i);
-        const k = dISO(d).slice(0, 7); const gross = map.get(k) ?? 0;
-        const taxable = gross / 1.18; const gst = gross - taxable;
-        months.push({ month: k, gross, taxable, gst });
-      }
-      return months;
+      const fromTs = from + "T00:00:00";
+      const toTs = to + "T23:59:59";
+      const db = supabase as unknown as { from: (t: string) => ReturnType<typeof supabase.from> };
+      const [paysRes, posRes] = await Promise.all([
+        supabase.from("payments").select("amount, created_at").eq("status", "success").gte("created_at", fromTs).lte("created_at", toTs),
+        db.from("pos_sales").select("total, sold_at").gte("sold_at", fromTs).lte("sold_at", toTs),
+      ]);
+      const map = new Map<string, { mess: number; pos: number }>();
+      const bump = (k: string, key: "mess" | "pos", amt: number) => {
+        const cur = map.get(k) ?? { mess: 0, pos: 0 };
+        cur[key] += amt;
+        map.set(k, cur);
+      };
+      ((paysRes.data ?? []) as { amount: number; created_at: string }[])
+        .forEach((p) => bump(p.created_at.slice(0, 7), "mess", Number(p.amount)));
+      ((posRes.data ?? []) as unknown as { total: number; sold_at: string }[])
+        .forEach((p) => bump(p.sold_at.slice(0, 7), "pos", Number(p.total)));
+
+      return Array.from(map.entries())
+        .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+        .map(([month, v]) => {
+          const gross = v.mess + v.pos;
+          const taxable = gross / GST_DIVISOR;
+          const gst = gross - taxable;
+          return { month, mess: v.mess, pos: v.pos, gross, taxable, cgst: gst / 2, sgst: gst / 2, gst };
+        });
     },
   });
-  const cols = ["Month", "Gross Turnover", "Taxable (÷1.18)", "GST @18%"];
-  const rows = (data ?? []).map((m) => [m.month, fmtINR(m.gross), fmtINR(m.taxable), fmtINR(m.gst)]);
-  const totals = (data ?? []).reduce((a, m) => ({ gross: a.gross + m.gross, taxable: a.taxable + m.taxable, gst: a.gst + m.gst }), { gross: 0, taxable: 0, gst: 0 });
+
+  const months = data ?? [];
+  const totals = months.reduce(
+    (a, m) => ({ gross: a.gross + m.gross, taxable: a.taxable + m.taxable, gst: a.gst + m.gst }),
+    { gross: 0, taxable: 0, gst: 0 },
+  );
+
+  const cols = ["Month", "Mess Collection", "POS Sales", "Gross (incl. GST)", "Taxable Value", "CGST 2.5%", "SGST 2.5%", "Total GST 5%"];
+  const rows = months.map((m) => [
+    m.month, fmtINR(m.mess), fmtINR(m.pos), fmtINR(m.gross), fmtINR(m.taxable), fmtINR(m.cgst), fmtINR(m.sgst), fmtINR(m.gst),
+  ]);
+  const exportRows = months.map((m) => [
+    m.month, m.mess.toFixed(2), m.pos.toFixed(2), m.gross.toFixed(2), m.taxable.toFixed(2), m.cgst.toFixed(2), m.sgst.toFixed(2), m.gst.toFixed(2),
+  ]);
+  const subtitle = `Period ${from} to ${to} · GST 5% inclusive (Taxable = Gross ÷ 1.05)`;
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-3 gap-3">
-        <KPI label="Total Gross" value={fmtINR(totals.gross)} />
-        <KPI label="Total Taxable" value={fmtINR(totals.taxable)} />
-        <KPI label="Total GST @18%" value={fmtINR(totals.gst)} tone="text-primary" />
+        <KPI label="Gross Turnover (incl. GST)" value={fmtINR(totals.gross)} />
+        <KPI label="Taxable Value" value={fmtINR(totals.taxable)} />
+        <KPI label="GST Payable @5%" value={fmtINR(totals.gst)} tone="text-primary" />
       </div>
-      <ExportBar onPdf={() => exportPdf({ title: "GST Report", columns: cols, rows: (data ?? []).map((m) => [m.month, m.gross.toFixed(2), m.taxable.toFixed(2), m.gst.toFixed(2)]), filename: "gst-report" })}
-        onExcel={() => exportExcel({ title: "GST", columns: cols, rows: (data ?? []).map((m) => [m.month, m.gross.toFixed(2), m.taxable.toFixed(2), m.gst.toFixed(2)]), filename: "gst-report" })} />
-      <DataTable cols={cols} rows={rows} />
+      <p className="text-xs text-muted-foreground">
+        All amounts are GST-inclusive. Taxable value = Gross ÷ 1.05; GST is split as CGST 2.5% + SGST 2.5%.
+        Covers mess payments and walk-in POS sales in the selected period.
+      </p>
+      <ExportBar
+        onPdf={() => exportPdf({ title: "GST Report (5% inclusive)", subtitle, columns: cols, rows: exportRows, filename: "gst-report" })}
+        onExcel={() => exportExcel({ title: "GST 5pct", columns: cols, rows: exportRows, filename: "gst-report" })}
+      />
+      <DataTable cols={cols} rows={rows} empty="No collections in this period." />
     </div>
   );
 }
+
 
 // ================== 6B. Revenue Dashboard ==================
 function RevenueReport() {
