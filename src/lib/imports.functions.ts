@@ -461,7 +461,9 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       .from("system_settings").select("value").eq("key", "grace_period_days").maybeSingle();
     const graceDays = Number(gp?.value ?? 5);
 
-    const errors: Array<{ section: string; row: number; reason: string }> = [];
+    const errors: Array<{ section: string; row: number; reason: string }> = [...data.row_errors];
+    const deactivated: Array<{ row: number; mobile: string; exit_date: string | null; note: string }> = [];
+
     const summary = {
       students: { total: data.students.length, imported: 0, updated: 0, skipped: 0 },
       subscriptions: { total: 0, imported: 0, skipped: 0 },
