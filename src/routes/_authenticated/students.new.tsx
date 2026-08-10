@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getNextMessNo, isValidMessNo, isMessNoAvailable } from "@/lib/mess-no";
 
 export const Route = createFileRoute("/_authenticated/students/new")({
   head: () => ({ meta: [{ title: "Add Student — Vrindavan Meals" }] }),
@@ -29,18 +30,38 @@ function NewStudent() {
     queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
   });
 
+  const { data: suggested } = useQuery({
+    queryKey: ["next-mess-no"],
+    queryFn: getNextMessNo,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+  const [messTouched, setMessTouched] = useState(false);
+  useEffect(() => {
+    if (suggested && !messTouched && !form.roll_number) setForm((f) => ({ ...f, roll_number: suggested }));
+  }, [suggested, messTouched, form.roll_number]);
+
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.full_name.trim() || !form.mobile.trim()) {
-      return toast.error("Full name and mobile are required");
+    if (!form.full_name.trim()) return toast.error("Full name is required");
+    const messNo = form.roll_number.trim();
+    if (!messNo) return toast.error("Mess No is required");
+    if (!isValidMessNo(messNo)) return toast.error("Mess No must follow format VM-0001");
+    const mobile = form.mobile.trim();
+    if (mobile && !/^\d{10}$/.test(mobile.replace(/\D/g, "").slice(-10))) {
+      return toast.error("Mobile must be a 10-digit number");
     }
     setBusy(true);
+    if (!(await isMessNoAvailable(messNo))) {
+      setBusy(false);
+      return toast.error("Mess No already in use — duplicate");
+    }
     const { error } = await supabase.from("students").insert({
       full_name: form.full_name.trim(),
-      mobile: form.mobile.trim(),
-      roll_number: form.roll_number || null,
+      mobile: mobile || null,
+      roll_number: messNo,
       course: form.course || null,
       hostel_room: form.hostel_room || null,
       parent_mobile: form.parent_mobile || null,
@@ -66,15 +87,15 @@ function NewStudent() {
       </div>
       <div>
         <h1 className="text-3xl font-bold">Add Student</h1>
-        <p className="text-muted-foreground">Only Full Name and Mobile are required.</p>
+        <p className="text-muted-foreground">Mess No and Full Name are required. Mobile is optional.</p>
       </div>
       <Card>
         <CardHeader><CardTitle>Student details</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
+            <Field label="Mess No *" v={form.roll_number} onChange={(v) => { setMessTouched(true); set("roll_number", v); }} required />
             <Field label="Full Name *" v={form.full_name} onChange={(v) => set("full_name", v)} required />
-            <Field label="Mobile *" v={form.mobile} onChange={(v) => set("mobile", v)} required />
-            <Field label="Roll Number" v={form.roll_number} onChange={(v) => set("roll_number", v)} />
+            <Field label="Mobile" v={form.mobile} onChange={(v) => set("mobile", v)} />
             <Field label="Course" v={form.course} onChange={(v) => set("course", v)} />
             <Field label="Hostel Room" v={form.hostel_room} onChange={(v) => set("hostel_room", v)} />
             <Field label="Parent Mobile" v={form.parent_mobile} onChange={(v) => set("parent_mobile", v)} />
