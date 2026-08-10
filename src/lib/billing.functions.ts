@@ -19,31 +19,58 @@ export type RebuildSummary = {
   samples: { roll_number: string | null; full_name: string; before: number; after: number }[];
 };
 
-/**
- * One-time (repeatable) backfill: regenerates every student's month-by-month
- * billing from their joining date to today (or exit date), using the Fee
- * Settings slab for each month and the 15th-pivot rule for first/last month.
- * Payments and adjustments are never touched.
- */
-export const rebuildBilling = createServerFn({ method: "POST" })
+export type BatchResult = { processed: number; before: number; after: number };
+
+/** Clears the audit log and returns the number of students to process. */
+export const startRebuild = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<RebuildSummary> => {
+  .handler(async ({ context }): Promise<{ total: number }> => {
     await assertSuperAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const { data, error } = await supabaseAdmin.rpc("rebuild_all_billing");
+    const { data, error } = await supabaseAdmin.rpc("rebuild_billing_reset");
     if (error) throw new Error(error.message);
-    const row = (Array.isArray(data) ? data[0] : data) as
+    return { total: Number(data ?? 0) };
+  });
+
+/**
+ * Rebuilds one chunk of students (month-by-month billing from joining date to
+ * today/exit, Fee Settings slab per month, 15th-pivot first/last month).
+ * Each chunk commits on its own, so partial progress is never lost and the
+ * whole run is safe to repeat. Payments and adjustments are never touched.
+ */
+export const rebuildBillingBatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { offset: number; limit: number }) => d)
+  .handler(async ({ data, context }): Promise<BatchResult> => {
+    await assertSuperAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin.rpc("rebuild_billing_batch", {
+      p_offset: data.offset,
+      p_limit: data.limit,
+    });
+    if (error) throw new Error(error.message);
+    const row = (Array.isArray(rows) ? rows[0] : rows) as
       | { students_processed: number; before_total: number; after_total: number }
       | undefined;
+    return {
+      processed: Number(row?.students_processed ?? 0),
+      before: Number(row?.before_total ?? 0),
+      after: Number(row?.after_total ?? 0),
+    };
+  });
 
+/** Top changed students from the last rebuild, for the summary panel. */
+export const rebuildSamples = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<RebuildSummary["samples"]> => {
+    await assertSuperAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: logs } = await supabaseAdmin
       .from("billing_backfill_log")
       .select("before_billed, after_billed, students(full_name, roll_number)")
       .order("after_billed", { ascending: false })
-      .limit(500);
-
-    const samples = ((logs ?? []) as unknown as {
+      .limit(50);
+    return ((logs ?? []) as unknown as {
       before_billed: number; after_billed: number;
       students: { full_name: string; roll_number: string | null } | null;
     }[]).map((l) => ({
@@ -52,13 +79,6 @@ export const rebuildBilling = createServerFn({ method: "POST" })
       before: Number(l.before_billed),
       after: Number(l.after_billed),
     }));
-
-    return {
-      students_processed: Number(row?.students_processed ?? 0),
-      before_total: Number(row?.before_total ?? 0),
-      after_total: Number(row?.after_total ?? 0),
-      samples,
-    };
   });
 
 /**
