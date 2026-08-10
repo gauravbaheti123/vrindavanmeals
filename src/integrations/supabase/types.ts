@@ -990,6 +990,15 @@ export type Database = {
           students_processed: number
         }[]
       }
+      rebuild_billing_batch: {
+        Args: { p_limit: number; p_offset: number }
+        Returns: {
+          after_total: number
+          before_total: number
+          students_processed: number
+        }[]
+      }
+      rebuild_billing_reset: { Args: never; Returns: number }
       rebuild_student_billing: { Args: { p_student: string }; Returns: number }
     }
     Enums: {
