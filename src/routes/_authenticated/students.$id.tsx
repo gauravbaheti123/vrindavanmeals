@@ -362,7 +362,7 @@ function StudentDetail() {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base">Payment Ledger</CardTitle>
           <div className="flex gap-2 print:hidden">
-            <Button size="sm" variant="outline" onClick={() => setAdjModal(true)}>
+            <Button size="sm" variant="outline" onClick={() => setAdjModal({ existing: null })}>
               <Scale className="h-3 w-3 mr-1" />Add Adjustment
             </Button>
             <Button size="sm" onClick={() => setPayModal({ mode: "new" })}>
