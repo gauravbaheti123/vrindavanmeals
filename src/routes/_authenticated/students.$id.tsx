@@ -339,7 +339,7 @@ function StudentDetail() {
                                   const { error } = await supabase.from("subscriptions").delete().eq("id", sub.id);
                                   if (error) return toast.error(error.message);
                                   await logAudit({
-                                    action: "delete", entity: "subscription", entityId: sub.id, studentId: student.id,
+                                    action: "delete", entity: "subscription", entityId: sub.id, studentId: s.id,
                                     label: `Billing charge for ${monthLabel(sub.start_date)}`,
                                     oldValues: {
                                       start_date: sub.start_date, end_date: sub.end_date,
@@ -446,7 +446,7 @@ function StudentDetail() {
                                     const { error } = await supabase.from("payments").delete().eq("id", p.id);
                                     if (error) return toast.error(error.message);
                                     await logAudit({
-                                      action: "delete", entity: "payment", entityId: p.id, studentId: student.id,
+                                      action: "delete", entity: "payment", entityId: p.id, studentId: s.id,
                                       label: `${inr(Number(p.amount))} · ${p.mode} · ${new Date(p.created_at).toLocaleDateString("en-IN")}`,
                                       oldValues: { amount: p.amount, mode: p.mode, date: p.created_at.slice(0, 10), status: p.status },
                                     });
@@ -503,7 +503,7 @@ function StudentDetail() {
                               const { error } = await supabase.from("ledger_adjustments").delete().eq("id", a.id);
                               if (error) return toast.error(error.message);
                               await logAudit({
-                                action: "delete", entity: "adjustment", entityId: a.id, studentId: student.id,
+                                action: "delete", entity: "adjustment", entityId: a.id, studentId: s.id,
                                 label: a.remarks ?? "Ledger adjustment",
                                 oldValues: { amount: a.amount, entry_date: a.entry_date, remarks: a.remarks },
                               });
