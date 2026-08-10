@@ -88,7 +88,7 @@ function StudentDetail() {
   const [editSub, setEditSub] = useState<Subscription | null>(null);
   const [newSub, setNewSub] = useState(false);
   const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment } | null>(null);
-  const [adjModal, setAdjModal] = useState(false);
+  const [adjModal, setAdjModal] = useState<{ existing: Adjustment | null } | null>(null);
 
   const [activateOpen, setActivateOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
