@@ -26,6 +26,25 @@ export type DuesRow = {
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
+const PAGE = 1000;
+
+/**
+ * PostgREST caps a single response at 1000 rows. Ledger maths must see EVERY
+ * subscription/payment row, so page through until a short page comes back.
+ */
+async function fetchAll<T>(
+  run: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data } = await run(from, from + PAGE - 1);
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
+
 /**
  * Single source of truth for the student ledger.
  * Due = Total Billed (monthly auto-billing rows) + Opening Balance + Adjustments − Payments received.
@@ -33,20 +52,28 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
  * never by payments.
  */
 export async function fetchLedgerRows(planPrice: number): Promise<DuesRow[]> {
-  const [studentsRes, subsRes, paysRes, adjRes] = await Promise.all([
+  const [studentsRes, subs, pays, adjs] = await Promise.all([
     supabase
       .from("students")
       .select(
         "id, full_name, mobile, roll_number, college_roll_number, unit_id, opening_balance, opening_balance_as_of, joining_date, exit_date, units(name)",
       )
-      .eq("is_approved", true),
-    supabase.from("subscriptions").select("id, student_id, start_date, end_date, billed_amount"),
-    supabase
-      .from("payments")
-      .select("student_id, amount, created_at")
-      .eq("status", "success")
-      .order("created_at", { ascending: false }),
-    supabase.from("ledger_adjustments").select("student_id, amount"),
+      .eq("is_approved", true)
+      .limit(10000),
+    fetchAll<{ id: string; student_id: string; start_date: string; end_date: string; billed_amount: number | null }>(
+      (from, to) => supabase.from("subscriptions").select("id, student_id, start_date, end_date, billed_amount").range(from, to),
+    ),
+    fetchAll<{ student_id: string; amount: number; created_at: string }>((from, to) =>
+      supabase
+        .from("payments")
+        .select("student_id, amount, created_at")
+        .eq("status", "success")
+        .order("created_at", { ascending: false })
+        .range(from, to),
+    ),
+    fetchAll<{ student_id: string; amount: number }>((from, to) =>
+      supabase.from("ledger_adjustments").select("student_id, amount").range(from, to),
+    ),
   ]);
 
   type St = {
