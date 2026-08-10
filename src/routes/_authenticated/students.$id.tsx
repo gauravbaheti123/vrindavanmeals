@@ -597,10 +597,12 @@ function StudentDetail() {
       {adjModal && (
         <AdjustmentModal
           studentId={s.id}
-          onClose={() => setAdjModal(false)}
-          onSaved={() => { setAdjModal(false); refresh(); }}
+          existing={adjModal.existing}
+          onClose={() => setAdjModal(null)}
+          onSaved={() => { setAdjModal(null); refresh(); }}
         />
       )}
+
 
     </div>
   );
