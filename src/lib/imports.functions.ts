@@ -436,7 +436,7 @@ const UStudentRow = z.object({
   status: z
     .preprocess(
       (v) => (typeof v === "string" ? v.trim().toLowerCase() : v),
-      z.enum(["active", "inactive"]).catch("active"),
+      z.enum(["active", "inactive"]),
     )
     .default("active"),
 });
