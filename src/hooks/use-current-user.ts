@@ -20,6 +20,10 @@ export function useCurrentUser(): CurrentUserData {
 
   useEffect(() => {
     let mounted = true;
+    // Tracks the user we've already loaded so background auth events
+    // (TOKEN_REFRESHED / SIGNED_IN fired on browser tab focus) never re-enter
+    // the loading state — that would unmount the page and wipe in-progress forms.
+    let loadedUserId: string | null = null;
 
     const load = async (uid: string) => {
       const [{ data: r }, { data: p }] = await Promise.all([
@@ -27,6 +31,7 @@ export function useCurrentUser(): CurrentUserData {
         supabase.from("profiles").select("id,name,email,unit_id").eq("id", uid).maybeSingle(),
       ]);
       if (!mounted) return;
+      loadedUserId = uid;
       setRoles((r ?? []).map((row) => row.role as AppRole));
       setProfile(p ?? null);
       setLoading(false);
@@ -40,11 +45,16 @@ export function useCurrentUser(): CurrentUserData {
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        setLoading(true);
-        load(session.user.id);
+      const nextUser = session?.user ?? null;
+      setUser((prev) => (prev?.id === nextUser?.id ? prev : nextUser));
+
+      if (nextUser) {
+        // Same user (token refresh / tab focus): refresh roles silently in the
+        // background, keeping the current render mounted.
+        if (loadedUserId !== nextUser.id) setLoading(true);
+        load(nextUser.id);
       } else {
+        loadedUserId = null;
         setRoles([]);
         setProfile(null);
         setLoading(false);
@@ -55,6 +65,7 @@ export function useCurrentUser(): CurrentUserData {
       sub.subscription.unsubscribe();
     };
   }, []);
+
 
   return { user, loading, roles, profile };
 }
