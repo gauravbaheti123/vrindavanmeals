@@ -424,13 +424,47 @@ const UTxnRow = z.object({
 
 const UnifiedWorkbookSchema = z.object({
   file_name: z.string().default("workbook.xlsx"),
-  students: z.array(UStudentRow).max(20000),
-  transactions: z.array(UTxnRow).max(30000),
+  // Large files are imported in chunks: one phase + one slice per request.
+  phase: z.enum(["students", "transactions"]).default("students"),
+  row_offset: z.number().int().min(0).default(0),
+  students: z.array(UStudentRow).max(20000).default([]),
+  transactions: z.array(UTxnRow).max(30000).default([]),
   row_errors: z
     .array(z.object({ section: z.string(), row: z.number(), reason: z.string() }))
     .max(20000)
     .default([]),
 });
+
+const ImportLogSchema = z.object({
+  import_type: z.string().default("excel_workbook"),
+  file_name: z.string().default("workbook.xlsx"),
+  total: z.number().int().min(0),
+  imported: z.number().int().min(0),
+  skipped: z.number().int().min(0),
+  errors: z.number().int().min(0),
+  errorRows: z
+    .array(z.object({ row: z.number(), reason: z.string() }))
+    .max(20000)
+    .default([]),
+});
+
+/** Always called at the end of a chunked run — success, partial or failure. */
+export const logImportRun = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => ImportLogSchema.parse(raw))
+  .handler(async ({ data, context }) => {
+    await assertAdminOrManager(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const log_id = await logImport(supabaseAdmin, context.userId, data.import_type, data.file_name, {
+      total: data.total,
+      imported: data.imported,
+      skipped: data.skipped,
+      errors: data.errors,
+      errorRows: data.errorRows.map((e) => ({ row: e.row, reason: e.reason, data: null })),
+    });
+    return { ok: true, log_id };
+  });
+
 
 
 function monthBounds(iso: string): { start: string; end: string } {
@@ -497,9 +531,9 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
 
     // ---------- STUDENTS (Sheet 1) ----------
     const todayISO = new Date().toISOString().slice(0, 10);
-    for (let idx = 0; idx < data.students.length; idx++) {
+    for (let idx = 0; idx < (data.phase === "students" ? data.students.length : 0); idx++) {
       const s = data.students[idx];
-      const rowNum = idx + 2;
+      const rowNum = idx + data.row_offset + 2;
       const mobile = s.mobile ? normalizeMobile(s.mobile) : "";
       if (!s.full_name?.trim()) {
         summary.students.skipped++;
@@ -605,9 +639,9 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
 
 
     // ---------- TRANSACTIONS (Sheet 2) ----------
-    for (let idx = 0; idx < data.transactions.length; idx++) {
+    for (let idx = 0; idx < (data.phase === "transactions" ? data.transactions.length : 0); idx++) {
       const t = data.transactions[idx];
-      const rowNum = idx + 2;
+      const rowNum = idx + data.row_offset + 2;
       const mobile = t.mobile ? normalizeMobile(t.mobile) : "";
       const txnMess = (t.mess_no ?? "").trim().toUpperCase();
       if (!txnMess && !mobile) {
@@ -707,20 +741,15 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       }
     }
 
-    await logImport(supabaseAdmin, context.userId, "excel_workbook", data.file_name, {
-      total: summary.students.total + summary.payments.total,
-      imported: summary.students.imported + summary.students.updated + summary.payments.imported,
-      skipped: summary.students.skipped + summary.payments.skipped,
-      errors: errors.length,
-      errorRows: [
-        ...errors.map((e) => ({ row: e.row, reason: `[${e.section}] ${e.reason}`, data: null })),
-        // Audit trail for imported inactive students (mirrors the manual Deactivate flag, without refund calc)
-        ...deactivated.map((d) => ({ row: d.row, reason: `[audit] ${d.note} — ${d.mess_no} (exit ${d.exit_date})`, data: null })),
-      ],
-    });
-
-    return { ok: true, summary, errors, deactivated: deactivated.length };
-
+    // No import_logs write here — chunked runs are logged once by the caller
+    // via logImportRun, so a partial/failed run still produces exactly one entry.
+    return {
+      ok: true,
+      summary,
+      errors,
+      deactivated: deactivated.map((d) => ({ row: d.row, mess_no: d.mess_no, exit_date: d.exit_date, note: d.note })),
+    };
   });
+
 
 

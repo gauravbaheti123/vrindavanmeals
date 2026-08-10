@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Download, Upload, AlertTriangle, CheckCircle2, XCircle, Loader2, FileText, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
-import { importPayments, importAttendance, importExcelWorkbook } from "@/lib/imports.functions";
+import { importPayments, importAttendance, importExcelWorkbook, logImportRun } from "@/lib/imports.functions";
 
 export const Route = createFileRoute("/_authenticated/import")({
   head: () => ({ meta: [{ title: "Import Data — Vrindavan Meals" }] }),
@@ -546,38 +546,132 @@ function downloadMasterTemplate() {
 }
 
 
+const BATCH_SIZE = 50;
+
+type Progress = { phase: "students" | "transactions"; done: number; total: number } | null;
+
 function ExcelWorkbookTab() {
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [result, setResult] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<Progress>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   const runFn = useServerFn(importExcelWorkbook);
+  const logFn = useServerFn(logImportRun);
 
   const runImport = useMutation({
     mutationFn: async () => {
       if (!parsed) throw new Error("Nothing to import");
-      return runFn({
-        data: {
-          file_name: parsed.fileName,
-          students: parsed.students,
-          transactions: parsed.transactions,
-          row_errors: parsed.rowErrors,
+      setFailure(null);
 
-        },
-      });
+      const summary = {
+        students: { total: parsed.students.length, imported: 0, updated: 0, skipped: 0 },
+        subscriptions: { total: 0, imported: 0, skipped: 0 },
+        payments: { total: 0, imported: 0, skipped: 0, total_amount: 0 },
+      };
+      const errors: Array<{ section: string; row: number; reason: string }> = [...parsed.rowErrors];
+      const processedMessNos: string[] = [];
+      let fatal: string | null = null;
+
+      const merge = (res: any) => {
+        const s = res.summary;
+        summary.students.imported += s.students.imported;
+        summary.students.updated += s.students.updated;
+        summary.students.skipped += s.students.skipped;
+        summary.subscriptions.total += s.subscriptions.total;
+        summary.subscriptions.imported += s.subscriptions.imported;
+        summary.subscriptions.skipped += s.subscriptions.skipped;
+        summary.payments.total += s.payments.total;
+        summary.payments.imported += s.payments.imported;
+        summary.payments.skipped += s.payments.skipped;
+        summary.payments.total_amount += s.payments.total_amount;
+        errors.push(...(res.errors ?? []));
+        (res.deactivated ?? []).forEach((d: any) =>
+          errors.push({ section: "audit", row: d.row, reason: `${d.note} — ${d.mess_no} (exit ${d.exit_date})` }),
+        );
+      };
+
+      // Each batch commits on its own — a later failure never rolls back earlier progress.
+      outer: for (const phase of ["students", "transactions"] as const) {
+        const rows = phase === "students" ? parsed.students : parsed.transactions;
+        setProgress({ phase, done: 0, total: rows.length });
+        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+          const slice = rows.slice(i, i + BATCH_SIZE);
+          try {
+            const res: any = await runFn({
+              data: {
+                file_name: parsed.fileName,
+                phase,
+                row_offset: i,
+                students: phase === "students" ? (slice as any) : [],
+                transactions: phase === "transactions" ? (slice as any) : [],
+                row_errors: [],
+              },
+            });
+            merge(res);
+            if (phase === "students") {
+              slice.forEach((r: any) => r.mess_no && processedMessNos.push(String(r.mess_no)));
+            }
+          } catch (e: any) {
+            fatal = `${phase === "students" ? "Students" : "Transactions"} rows ${i + 2}–${i + slice.length + 1} failed: ${e?.message || "Unknown error"}`;
+            errors.push({ section: phase, row: i + 2, reason: fatal });
+            break outer;
+          }
+          setProgress({ phase, done: Math.min(i + BATCH_SIZE, rows.length), total: rows.length });
+        }
+      }
+
+      // History entry is written whether the run succeeded, partially succeeded or failed.
+      const total = parsed.students.length + parsed.transactions.length;
+      const imported = summary.students.imported + summary.students.updated + summary.payments.imported;
+      try {
+        await logFn({
+          data: {
+            import_type: "excel_workbook",
+            file_name: parsed.fileName,
+            total,
+            imported,
+            skipped: summary.students.skipped + summary.payments.skipped,
+            errors: errors.length,
+            errorRows: [
+              ...(fatal ? [{ row: 0, reason: `[FAILED] ${fatal}` }] : []),
+              ...errors.slice(0, 2000).map((e) => ({ row: e.row, reason: `[${e.section}] ${e.reason}` })),
+            ],
+          },
+        });
+      } catch {
+        /* history write failure must not hide the import outcome */
+      }
+      setProgress(null);
+      if (fatal) {
+        setFailure(
+          `${fatal}. ${imported} row(s) were already imported and kept — fix the file and re-run it; matching by Mess No means re-importing is safe (no duplicates).`,
+        );
+      }
+      return { summary, errors, fatal, processedMessNos };
     },
     onSuccess: (res: any) => {
       setResult(res);
-      toast.success(`Import complete — ${res.summary.students.imported} new, ${res.summary.students.updated} updated, ${res.summary.payments.imported} payments`);
+      if (res.fatal) toast.error(res.fatal);
+      else
+        toast.success(
+          `Import complete — ${res.summary.students.imported} new, ${res.summary.students.updated} updated, ${res.summary.payments.imported} payments`,
+        );
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => {
+      setProgress(null);
+      setFailure(e?.message || "Import failed");
+      toast.error(e?.message || "Import failed");
+    },
   });
 
   async function onFile(f: File) {
-    setBusy(true); setResult(null); setParsed(null);
+    setBusy(true); setResult(null); setParsed(null); setFailure(null);
     try { setParsed(await parseWorkbook(f)); }
     catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
   }
+
 
   return (
     <Card className="mt-4"><CardContent className="p-6 space-y-4">
@@ -646,16 +740,38 @@ function ExcelWorkbookTab() {
             </AlertDescription>
           </Alert>
 
+          {progress && (
+            <div className="space-y-1">
+              <div className="text-sm font-medium">
+                Importing {progress.phase}... {progress.done} / {progress.total}
+              </div>
+              <div className="h-2 w-full rounded bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 100}%` }}
+                />
+              </div>
+              <div className="text-xs text-muted-foreground">Keep this tab open until the import finishes.</div>
+            </div>
+          )}
+
+          {failure && (
+            <Alert variant="destructive">
+              <XCircle className="h-4 w-4" />
+              <AlertDescription>{failure}</AlertDescription>
+            </Alert>
+          )}
 
           <div className="flex gap-2">
             <Button onClick={() => runImport.mutate()} disabled={runImport.isPending}>
               {runImport.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Confirm Import
+              {runImport.isPending ? "Importing…" : failure ? "Retry Import" : "Confirm Import"}
             </Button>
-            <Button variant="ghost" onClick={() => setParsed(null)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setParsed(null)} disabled={runImport.isPending}>Cancel</Button>
           </div>
         </>
       )}
+
 
       {result && (
         <div className="space-y-3">
