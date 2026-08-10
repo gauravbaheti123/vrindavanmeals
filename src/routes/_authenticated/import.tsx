@@ -396,7 +396,7 @@ function parseWorkbook(file: File): Promise<Parsed> {
           students, transactions,
           studentsRaw: sRows.length,
           txnsRaw,
-          skippedStudents, skippedTxns,
+          skippedStudents, skippedTxns, rowErrors,
         });
       } catch (e: any) {
         reject(e);
