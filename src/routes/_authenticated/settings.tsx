@@ -40,6 +40,8 @@ function SettingsPage() {
       <PortalModulesCard />
       <GeneralSettings />
       <FeeSettingsCard />
+      <BillingEngineCard />
+
       <BrandingCard />
 
       <MealWindowsCard />
