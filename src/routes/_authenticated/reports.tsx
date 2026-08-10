@@ -468,7 +468,7 @@ function NoShowReport({ from, to, unit }: { from: string; to: string; unit: stri
       let sq = supabase.from("subscriptions").select("student_id, unit_id, status, students(id, full_name, mobile, roll_number), units(name)").in("status", ["active", "grace"]);
       if (unit !== "all") sq = sq.eq("unit_id", unit);
       const subs = await pageAll((f, t) => sq.range(f, t));
-      const att = await pageAll((f, t) => supabase.from("attendance").select("student_id, scan_date").gte("scan_date", from).lte("scan_date", to.range(f, t));
+      const att = await pageAll((f, t) => supabase.from("attendance").select("student_id, scan_date").gte("scan_date", from).lte("scan_date", to).range(f, t));
       const lastByStudent = new Map<string, string>();
       (att ?? []).forEach((a) => { if (!a.scan_date) return; const cur = lastByStudent.get(a.student_id); if (!cur || a.scan_date > cur) lastByStudent.set(a.student_id, a.scan_date); });
       const attended = new Set((att ?? []).map((a) => a.student_id));
@@ -551,7 +551,7 @@ function MonthlyCollection() {
     queryKey: ["rpt-monthly-coll"],
     queryFn: async () => {
       const since = dISO(new Date(Date.now() - 365 * 86400000));
-      const pays = await pageAll((f, t) => supabase.from("payments").select("amount, created_at, status").eq("status", "success").gte("created_at", since.range(f, t));
+      const pays = await pageAll((f, t) => supabase.from("payments").select("amount, created_at, status").eq("status", "success").gte("created_at", since).range(f, t));
       const map = new Map<string, number>();
       (pays ?? []).forEach((p) => { const k = p.created_at.slice(0, 7); map.set(k, (map.get(k) ?? 0) + Number(p.amount)); });
       const months: { month: string; amount: number }[] = [];
@@ -589,9 +589,9 @@ function OutstandingReport({ unit }: { unit: string }) {
       const subs = await pageAll((f, t) => sq.range(f, t));
       const ids = subs.map((s) => s.student_id);
       if (ids.length === 0) return [];
-      const pays = await pageAll((f, t) => supabase.from("payments").select("student_id, amount, created_at, status").in("student_id", ids).eq("status", "success").gte("created_at", monthStartD + "T00:00:00".range(f, t));
+      const pays = await pageAll((f, t) => supabase.from("payments").select("student_id, amount, created_at, status").in("student_id", ids).eq("status", "success").gte("created_at", monthStartD + "T00:00:00").range(f, t));
       const paidThisMonth = new Set((pays ?? []).map((p) => p.student_id));
-      const allPays = await pageAll((f, t) => supabase.from("payments").select("student_id, amount, created_at, status").in("student_id", ids).eq("status", "success").order("created_at", { ascending: false }.range(f, t));
+      const allPays = await pageAll((f, t) => supabase.from("payments").select("student_id, amount, created_at, status").in("student_id", ids).eq("status", "success").order("created_at", { ascending: false }).range(f, t));
       const lastByStudent = new Map<string, { amount: number; date: string }>();
       (allPays ?? []).forEach((p) => { if (!lastByStudent.has(p.student_id)) lastByStudent.set(p.student_id, { amount: Number(p.amount), date: p.created_at }); });
       return subs.filter((s) => !paidThisMonth.has(s.student_id)).map((s) => ({ ...s, last: lastByStudent.get(s.student_id) ?? null }));
@@ -893,7 +893,7 @@ function EnrollmentsReport() {
     queryKey: ["rpt-enrol"],
     queryFn: async () => {
       const since = dISO(new Date(Date.now() - 365 * 86400000));
-      const subs = await pageAll((f, t) => supabase.from("subscriptions").select("start_date, end_date, student_id").gte("start_date", since.range(f, t));
+      const subs = await pageAll((f, t) => supabase.from("subscriptions").select("start_date, end_date, student_id").gte("start_date", since).range(f, t));
       const map = new Map<string, { month: string; count: number }>();
       (subs ?? []).forEach((s) => { const k = s.start_date.slice(0, 7); const cur = map.get(k) ?? { month: k, count: 0 }; cur.count++; map.set(k, cur); });
       const months: { month: string; count: number }[] = [];
@@ -1146,9 +1146,9 @@ function RevenueReport() {
     queryKey: ["rpt-revenue-dash"],
     queryFn: async () => {
       const since = dISO(new Date(Date.now() - 365 * 86400000));
-      const [{ data: pays }, { data: subs }] = await Promise.all([
-        supabase.from("payments").select("amount, created_at, status").eq("status", "success").gte("created_at", since),
-        supabase.from("subscriptions").select("start_date, subscription_plans(price)").gte("start_date", since),
+      const [pays, subs] = await Promise.all([
+        pageAll((f, t) => supabase.from("payments").select("amount, created_at, status").eq("status", "success").gte("created_at", since).range(f, t)),
+        pageAll((f, t) => supabase.from("subscriptions").select("start_date, subscription_plans(price)").gte("start_date", since).range(f, t)),
       ]);
       const collected = new Map<string, number>();
       (pays ?? []).forEach((p) => { const k = p.created_at.slice(0, 7); collected.set(k, (collected.get(k) ?? 0) + Number(p.amount)); });
