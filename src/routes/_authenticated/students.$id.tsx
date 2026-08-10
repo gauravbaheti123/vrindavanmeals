@@ -24,6 +24,7 @@ import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from 
 import { fetchFeeSlabs, feeForMonth, missingSlabMessage, type FeeSlab } from "@/lib/fees";
 import { generateNocPdf } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
+import { StudentPhoto, StudentPhotoEditor } from "@/components/student-photo";
 
 export const Route = createFileRoute("/_authenticated/students/$id")({
   head: () => ({ meta: [{ title: "Student — Vrindavan Meals" }] }),
@@ -247,20 +248,19 @@ function StudentDetail() {
             </Button>
           </CardHeader>
           <CardContent className="text-sm space-y-1.5">
+            <div className="pb-3 mb-2 border-b">
+              <StudentPhotoEditor studentId={s.id} path={s.photo_url} onChanged={refresh} />
+            </div>
             <Row k="Mess No" v={s.roll_number} />
             <Row k="Roll Number" v={(s as unknown as { college_roll_number?: string | null }).college_roll_number} />
             <Row k="Course" v={s.course} />
-
-            <Row k="Batch Year" v={s.batch_year?.toString()} />
             <Row k="Hostel Room" v={s.hostel_room} />
             <Row k="Email" v={s.email} />
             <Row k="Parent Mobile" v={s.parent_mobile} />
             <Row k="Blood Group" v={s.blood_group} />
-            <Row k="Address" v={s.address} />
-            <Row k="Joining Date" v={(s as any).joining_date} />
-            <Row k="Exit Date" v={(s as any).exit_date} />
+            <Row k="Joining Date" v={(s as unknown as { joining_date?: string | null }).joining_date} />
+            <Row k="Exit Date" v={(s as unknown as { exit_date?: string | null }).exit_date} />
 
-            <Row k="Document" v={s.doc_type ? `${s.doc_type} — ${s.doc_number ?? ""}` : null} />
 
             {s.is_approved && (
               <div className="pt-3 mt-3 border-t print:hidden">
