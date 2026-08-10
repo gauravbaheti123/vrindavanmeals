@@ -173,38 +173,96 @@ function ResultBox({ icon: Icon, label, value, color }: any) {
 }
 
 function ImportHistory() {
+  const [open, setOpen] = useState<string | null>(null);
   const { data } = useQuery({
     queryKey: ["import_logs"],
     queryFn: async () => (await supabase.from("import_logs").select("*").order("created_at", { ascending: false }).limit(20)).data ?? [],
   });
+
+  function splitReport(report: any) {
+    const rows: Array<{ row: number; reason: string }> = Array.isArray(report) ? report : [];
+    const audit = rows.filter((r) => String(r.reason).startsWith("[audit]"));
+    const errs = rows.filter((r) => !String(r.reason).startsWith("[audit]"));
+    const clean = (s: string) => String(s).replace(/^\[[a-z_]+\]\s*/i, "");
+    return { audit: audit.map((r) => ({ ...r, reason: clean(r.reason) })), errs: errs.map((r) => ({ ...r, reason: clean(r.reason) })) };
+  }
+
   return (
     <Card>
       <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Import History</CardTitle></CardHeader>
       <CardContent className="p-0">
         <Table>
           <TableHeader><TableRow>
+            <TableHead className="w-8"></TableHead>
             <TableHead>Type</TableHead><TableHead>File</TableHead><TableHead>Total</TableHead>
             <TableHead>Imported</TableHead><TableHead>Skipped</TableHead><TableHead>Errors</TableHead><TableHead>Date</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {(data ?? []).length === 0 ? <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No imports yet</TableCell></TableRow>
-              : (data ?? []).map((l) => (
-                <TableRow key={l.id}>
-                  <TableCell className="capitalize">{l.import_type}</TableCell>
-                  <TableCell className="text-xs">{l.file_name}</TableCell>
-                  <TableCell>{l.total_rows}</TableCell>
-                  <TableCell className="text-emerald-600">{l.imported_rows}</TableCell>
-                  <TableCell className="text-amber-600">{l.skipped_rows}</TableCell>
-                  <TableCell className="text-red-600">{l.error_rows}</TableCell>
-                  <TableCell className="text-xs">{new Date(l.created_at).toLocaleString()}</TableCell>
-                </TableRow>
-              ))}
+            {(data ?? []).length === 0 ? <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No imports yet</TableCell></TableRow>
+              : (data ?? []).flatMap((l) => {
+                const { audit, errs } = splitReport(l.error_report);
+                const expandable = audit.length + errs.length > 0;
+                const isOpen = open === l.id;
+                const rows = [
+                  <TableRow key={l.id} className={expandable ? "cursor-pointer" : ""} onClick={() => expandable && setOpen(isOpen ? null : l.id)}>
+                    <TableCell>{expandable ? (isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />) : null}</TableCell>
+                    <TableCell className="capitalize">{l.import_type}</TableCell>
+                    <TableCell className="text-xs">{l.file_name}</TableCell>
+                    <TableCell>{l.total_rows}</TableCell>
+                    <TableCell className="text-emerald-600">{l.imported_rows}</TableCell>
+                    <TableCell className="text-amber-600">{l.skipped_rows}</TableCell>
+                    <TableCell className="text-red-600">{errs.length || l.error_rows}</TableCell>
+                    <TableCell className="text-xs">{new Date(l.created_at).toLocaleString()}</TableCell>
+                  </TableRow>,
+                ];
+                if (isOpen) {
+                  rows.push(
+                    <TableRow key={l.id + "-detail"}>
+                      <TableCell colSpan={8} className="bg-muted/30">
+                        <div className="space-y-4 py-2">
+                          {errs.length > 0 && (
+                            <div className="space-y-2">
+                              <div className="text-sm font-medium text-destructive flex items-center gap-2"><XCircle className="h-4 w-4" />Errors ({errs.length})</div>
+                              <div className="border border-destructive/30 rounded-md bg-background max-h-60 overflow-auto">
+                                <Table>
+                                  <TableHeader><TableRow><TableHead className="w-20">Row</TableHead><TableHead>Reason</TableHead></TableRow></TableHeader>
+                                  <TableBody>{errs.slice(0, 300).map((e, i) => (
+                                    <TableRow key={i}><TableCell>{e.row}</TableCell><TableCell className="text-xs">{e.reason}</TableCell></TableRow>
+                                  ))}</TableBody>
+                                </Table>
+                              </div>
+                              <Button variant="outline" size="sm" onClick={() => downloadCsv(`import-errors-${l.id.slice(0, 8)}.csv`, [["row", "reason"], ...errs.map((e) => [String(e.row), e.reason])])}>
+                                <Download className="h-4 w-4 mr-2" />Download Error CSV
+                              </Button>
+                            </div>
+                          )}
+                          {audit.length > 0 && (
+                            <div className="space-y-2">
+                              <div className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Info className="h-4 w-4" />Audit Log ({audit.length})</div>
+                              <div className="border rounded-md bg-background max-h-60 overflow-auto">
+                                <Table>
+                                  <TableHeader><TableRow><TableHead className="w-20">Row</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
+                                  <TableBody>{audit.slice(0, 300).map((e, i) => (
+                                    <TableRow key={i}><TableCell>{e.row}</TableCell><TableCell className="text-xs">{e.reason}</TableCell></TableRow>
+                                  ))}</TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>,
+                  );
+                }
+                return rows;
+              })}
           </TableBody>
         </Table>
       </CardContent>
     </Card>
   );
 }
+
 
 // ============ Excel Workbook — Unified 2-sheet format ============
 
