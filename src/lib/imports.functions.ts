@@ -521,6 +521,26 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
     await assertAdminOrManager(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // ---- Concurrency guard ----------------------------------------------------
+    // Backstop for a double-clicked "Confirm Import": only one run may process a
+    // given file at a time. Locks older than 15 minutes are considered stale.
+    if (data.run_id) {
+      const LOCK_KEY = "import_run_lock";
+      const now = Date.now();
+      const { data: lockRow } = await supabaseAdmin
+        .from("system_settings").select("value").eq("key", LOCK_KEY).maybeSingle();
+      let lock: { run_id?: string; file_name?: string; at?: number } = {};
+      try { lock = lockRow?.value ? JSON.parse(lockRow.value) : {}; } catch { lock = {}; }
+      const fresh = lock.at && now - Number(lock.at) < 15 * 60 * 1000;
+      if (fresh && lock.run_id && lock.run_id !== data.run_id && lock.file_name === data.file_name) {
+        throw new Error("Another import of this file is already running — wait for it to finish before starting a new one.");
+      }
+      await supabaseAdmin.from("system_settings").upsert({
+        key: LOCK_KEY,
+        value: JSON.stringify({ run_id: data.run_id, file_name: data.file_name, at: now }),
+      });
+    }
+
     const { data: units } = await supabaseAdmin.from("units").select("id,name");
     const unitMap = new Map((units ?? []).map((u) => [u.name.trim().toLowerCase(), u.id]));
     const defaultUnitId =
