@@ -450,7 +450,7 @@ function UnitsCard() {
     if (isActive) {
       const { count } = await supabase
         .from("students").select("id", { count: "exact", head: true })
-        .eq("unit_id", id).eq("is_approved", true);
+        .eq("unit_id", id).eq("is_approved", true).is("exit_date", null);
       if (!confirm(
         `Archive "${name}"?\n\n${count ?? 0} active student(s) stay linked and all history is kept — the unit just stops appearing in new forms.`,
       )) return;

@@ -97,7 +97,8 @@ function Dashboard() {
           supabase
             .from("students")
             .select("id", { count: "exact", head: true })
-            .eq("is_approved", true),
+            .eq("is_approved", true)
+            .is("exit_date", null),
         ),
       ]);
 
