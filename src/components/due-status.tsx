@@ -1,12 +1,21 @@
 import { Badge } from "@/components/ui/badge";
 import type { LedgerStatus } from "@/lib/dues";
+import { useDueThresholds, DEFAULT_DUE_THRESHOLDS, type DueThresholds } from "@/hooks/use-due-thresholds";
 
 export const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 
-/** Colour tone for an outstanding amount, based on how long it has been overdue. */
-export function dueTone(due: number, daysOverdue: number): "settled" | "recent" | "old" {
+/**
+ * Colour tone for an outstanding amount.
+ * "high" (red) = crosses either configured threshold in Settings → Billing Engine
+ * (Due Amount Threshold OR Days Overdue Threshold — whichever crosses first).
+ */
+export function dueTone(
+  due: number,
+  daysOverdue: number,
+  thresholds: DueThresholds = DEFAULT_DUE_THRESHOLDS,
+): "settled" | "recent" | "high" {
   if (due <= 0) return "settled";
-  return daysOverdue >= 30 ? "old" : "recent";
+  return due >= thresholds.amount || daysOverdue >= thresholds.days ? "high" : "recent";
 }
 
 export function StatusBadge({ status }: { status: LedgerStatus }) {
@@ -34,7 +43,8 @@ export function DueAmount({
   due: number;
   daysOverdue: number;
 }) {
-  const tone = dueTone(due, daysOverdue);
+  const thresholds = useDueThresholds();
+  const tone = dueTone(due, daysOverdue, thresholds);
   if (tone === "settled") {
     return (
       <span className="text-sm text-muted-foreground">
@@ -43,7 +53,7 @@ export function DueAmount({
     );
   }
   return (
-    <span className={`text-sm font-semibold ${tone === "old" ? "text-destructive" : "text-warning-foreground"}`}>
+    <span className={`text-sm font-semibold ${tone === "high" ? "text-destructive" : "text-warning-foreground"}`}>
       {inr(due)} due
     </span>
   );

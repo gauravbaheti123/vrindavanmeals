@@ -10,6 +10,7 @@ import {
   Utensils, RefreshCw, ArrowRight,
 } from "lucide-react";
 import { fetchLedgerRows } from "@/lib/dues";
+import { useDueThresholds } from "@/hooks/use-due-thresholds";
 
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -54,19 +55,10 @@ function Dashboard() {
   });
   const planPrice = Number(plan?.price ?? 3000);
 
-  const { data: thresholds } = useQuery({
-    queryKey: ["due-thresholds"],
-    queryFn: async () => {
-      const { data } = await supabase.from("system_settings").select("key,value");
-      const map = Object.fromEntries((data ?? []).map((s) => [s.key, s.value]));
-      return {
-        amount: Number(map["due_amount_threshold"] ?? 3000),
-        days: Number(map["days_overdue_threshold"] ?? 15),
-      };
-    },
-  });
-  const dueAmountThreshold = thresholds?.amount ?? 3000;
-  const daysOverdueThreshold = thresholds?.days ?? 15;
+  const thresholds = useDueThresholds();
+  const dueAmountThreshold = thresholds.amount;
+  const daysOverdueThreshold = thresholds.days;
+
 
 
   const { data: agg } = useQuery({

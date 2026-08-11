@@ -34,14 +34,17 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
  * never by payments.
  */
 export async function fetchLedgerRows(planPrice: number): Promise<DuesRow[]> {
+  void planPrice; // billing amounts always come from the generated billing rows
   const [studentsRes, subs, pays, adjs] = await Promise.all([
-    supabase
-      .from("students")
-      .select(
-        "id, full_name, mobile, roll_number, college_roll_number, unit_id, opening_balance, opening_balance_as_of, joining_date, exit_date, units(name)",
-      )
-      .eq("is_approved", true)
-      .limit(10000),
+    pageAll<Record<string, unknown>>((from, to) =>
+      supabase
+        .from("students")
+        .select(
+          "id, full_name, mobile, roll_number, college_roll_number, unit_id, opening_balance, opening_balance_as_of, joining_date, exit_date, units(name)",
+        )
+        .range(from, to),
+    ),
+
     pageAll<{ id: string; student_id: string; start_date: string; end_date: string; billed_amount: number | null }>(
       (from, to) => supabase.from("subscriptions").select("id, student_id, start_date, end_date, billed_amount").range(from, to),
     ),
@@ -66,7 +69,7 @@ export async function fetchLedgerRows(planPrice: number): Promise<DuesRow[]> {
   };
   type Sub = { id: string; student_id: string; start_date: string; end_date: string; billed_amount: number | null };
 
-  const students = (studentsRes.data ?? []) as unknown as St[];
+  const students = studentsRes as unknown as St[];
 
   const subsByStudent = new Map<string, Sub[]>();
   for (const s of subs) {
@@ -95,7 +98,7 @@ export async function fetchLedgerRows(planPrice: number): Promise<DuesRow[]> {
     const opening = Number(st.opening_balance ?? 0);
     const adjustments = adjByStudent.get(st.id) ?? 0;
     const paid = paidByStudent.get(st.id) ?? 0;
-    const subsBilled = stSubs.reduce((sum, sub) => sum + Number(sub.billed_amount ?? planPrice), 0);
+    const subsBilled = stSubs.reduce((sum, sub) => sum + Number(sub.billed_amount ?? 0), 0);
     const totalBilled = subsBilled;
     const due = subsBilled + opening + adjustments - paid;
 
