@@ -187,7 +187,7 @@ function StudentDetail() {
           <Link to="/students"><ArrowLeft className="h-4 w-4 mr-1" />Students</Link>
         </Button>
         <div className="flex gap-2 flex-wrap">
-          {!s.is_approved && (
+          {(!s.is_approved || (s as unknown as { exit_date?: string | null }).exit_date) && (
             <Button size="sm" onClick={() => setActivateOpen(true)}>
               <UserCheck className="h-4 w-4 mr-1" />Activate Student
             </Button>
@@ -228,7 +228,8 @@ function StudentDetail() {
               {effStatus}
             </Badge>
           )}
-          {!s.is_approved && <Badge variant="outline">Pending</Badge>}
+          {!s.is_approved && <Badge variant="outline">Pending Approval</Badge>}
+          {(s as unknown as { exit_date?: string | null }).exit_date && <Badge variant="outline" className="bg-muted">Inactive</Badge>}
           {data.mapping ? (
             <Badge className="bg-success text-success-foreground"><Fingerprint className="h-3 w-3 mr-1" />Mapped</Badge>
           ) : (
@@ -274,7 +275,7 @@ function StudentDetail() {
             <Row k="Exit Date" v={(s as unknown as { exit_date?: string | null }).exit_date} />
 
 
-            {s.is_approved && (
+            {s.is_approved && !(s as unknown as { exit_date?: string | null }).exit_date && (
               <div className="pt-3 mt-3 border-t print:hidden">
                 <Button
                   size="sm"
@@ -969,7 +970,7 @@ function ActivateStudentModal({
     if (slabFee === null) return toast.error(missingSlabMessage(joinDate));
     setSaving(true);
 
-    const { error: upErr } = await supabase.from("students").update({ is_approved: true }).eq("id", student.id);
+    const { error: upErr } = await supabase.from("students").update({ is_approved: true, exit_date: null }).eq("id", student.id);
     if (upErr) { setSaving(false); return toast.error(upErr.message); }
     const { error: subErr } = await supabase.from("subscriptions").insert({
       student_id: student.id,
@@ -1057,7 +1058,7 @@ function DeactivateStudentModal({
         if (error) throw new Error(error.message);
       }
       // "credit" leaves the advance as-is (still visible on ledger). "none" also leaves it.
-      const { error: dErr } = await supabase.from("students").update({ is_approved: false }).eq("id", student.id);
+      const { error: dErr } = await supabase.from("students").update({ exit_date: deactivateDate }).eq("id", student.id);
       if (dErr) throw new Error(dErr.message);
       toast.success("Student deactivated");
       onSaved();
