@@ -10,6 +10,7 @@ import {
   Utensils, RefreshCw, ArrowRight,
 } from "lucide-react";
 import { fetchLedgerRows } from "@/lib/dues";
+import { useDueThresholds } from "@/hooks/use-due-thresholds";
 
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
