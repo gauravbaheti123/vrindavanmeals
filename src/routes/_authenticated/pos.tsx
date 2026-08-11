@@ -138,6 +138,8 @@ function POSPage() {
     printReceipt(saleRow.sale_number, cart, subtotal, discountAmount, taxRate, taxAmount, total, paymentMode);
     clearCart();
     qc.invalidateQueries({ queryKey: ["pos-sales"] });
+    qc.invalidateQueries({ queryKey: ["pos-item-sales"] });
+    qc.invalidateQueries({ queryKey: ["rpt-revenue-dash"] });
   }
 
   return (

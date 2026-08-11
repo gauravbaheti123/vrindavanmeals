@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { STALE } from "@/lib/query-cache";
+import { STALE, invalidateLedger } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -99,7 +99,7 @@ function StudentDetail() {
 
   const refresh = () => {
     refetch();
-    qc.invalidateQueries({ queryKey: ["dues-list"] });
+    invalidateLedger(qc);
   };
 
   const summary = useMemo(() => {

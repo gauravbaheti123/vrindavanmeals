@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { STALE } from "@/lib/query-cache";
-import { useQuery } from "@tanstack/react-query";
+import { STALE, invalidateLedger } from "@/lib/query-cache";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +30,7 @@ const MODES = [
 
 function NewPayment() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const search = Route.useSearch();
   const [student, setStudent] = useState<StudentOption | null>(null);
   const [subscriptionId, setSubscriptionId] = useState<string | null>(search.subscription ?? null);
@@ -119,6 +120,7 @@ function NewPayment() {
       }
     }
     setSaving(false);
+    invalidateLedger(qc);
     toast.success("Payment recorded successfully");
     navigate({ to: "/payments" });
   }

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { STALE } from "@/lib/query-cache";
+import { STALE, invalidateLedger } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -86,7 +86,7 @@ function SubscriptionDetail() {
     }).select("id").single();
     setRenewing(false);
     if (error) { toast.error(error.message); return; }
-    qc.invalidateQueries({ queryKey: ["subscriptions"] });
+    invalidateLedger(qc);
     toast.success("Renewal created");
     navigate({ to: "/subscriptions/$id", params: { id: data.id } });
   }

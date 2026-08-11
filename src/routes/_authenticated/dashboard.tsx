@@ -66,6 +66,7 @@ function Dashboard() {
 
   const { data: agg } = useQuery({
     queryKey: ["dashboard-agg-v3", unitId, planPrice, dueAmountThreshold, daysOverdueThreshold],
+    staleTime: STALE.DASHBOARD,
     refetchInterval: REFRESH_MS,
     queryFn: async () => {
       const today = todayISO();
