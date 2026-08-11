@@ -464,6 +464,8 @@ const UnifiedWorkbookSchema = z.object({
   // Large files are imported in chunks: one phase + one slice per request.
   phase: z.enum(["students", "transactions"]).default("students"),
   row_offset: z.number().int().min(0).default(0),
+  // Identifies one end-to-end run so a second, concurrent run of the same file is rejected.
+  run_id: z.string().default(""),
   students: z.array(UStudentRow).max(20000).default([]),
   transactions: z.array(UTxnRow).max(30000).default([]),
   row_errors: z
@@ -518,6 +520,26 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdminOrManager(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // ---- Concurrency guard ----------------------------------------------------
+    // Backstop for a double-clicked "Confirm Import": only one run may process a
+    // given file at a time. Locks older than 15 minutes are considered stale.
+    if (data.run_id) {
+      const LOCK_KEY = "import_run_lock";
+      const now = Date.now();
+      const { data: lockRow } = await supabaseAdmin
+        .from("system_settings").select("value").eq("key", LOCK_KEY).maybeSingle();
+      let lock: { run_id?: string; file_name?: string; at?: number } = {};
+      try { lock = lockRow?.value ? JSON.parse(lockRow.value) : {}; } catch { lock = {}; }
+      const fresh = lock.at && now - Number(lock.at) < 15 * 60 * 1000;
+      if (fresh && lock.run_id && lock.run_id !== data.run_id && lock.file_name === data.file_name) {
+        throw new Error("Another import of this file is already running — wait for it to finish before starting a new one.");
+      }
+      await supabaseAdmin.from("system_settings").upsert({
+        key: LOCK_KEY,
+        value: JSON.stringify({ run_id: data.run_id, file_name: data.file_name, at: now }),
+      });
+    }
 
     const { data: units } = await supabaseAdmin.from("units").select("id,name");
     const unitMap = new Map((units ?? []).map((u) => [u.name.trim().toLowerCase(), u.id]));
@@ -640,7 +662,10 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       patch.joining_date = joiningDate;
       patch.exit_date = status === "inactive" ? exitDate : null;
 
-      const existingId = existingByMess ?? (mobile ? mobileToId.get(mobile) : undefined);
+      // Mess No is authoritative: when the incoming row carries a valid Mess No we NEVER
+      // fall back to mobile — two different students may legitimately share one number
+      // (siblings / parent's phone) and merging them silently destroys a record.
+      const existingId = messNo ? existingByMess : (mobile ? mobileToId.get(mobile) : undefined);
       if (existingId) {
         const { error } = await supabaseAdmin.from("students").update(patch).eq("id", existingId);
         if (error) errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Update failed — ${error.message}` });
@@ -686,7 +711,8 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
         errors.push({ section: "transactions", row: rowNum, reason: `Row ${rowNum}: Mess No or Mobile is required` });
         continue;
       }
-      let studentId = (txnMess ? messToId.get(txnMess) : undefined) ?? (mobile ? mobileToId.get(mobile) : undefined);
+      // Same rule for transactions: a Mess No on the row wins outright.
+      let studentId = txnMess ? messToId.get(txnMess) : (mobile ? mobileToId.get(mobile) : undefined);
 
       if (!studentId) {
         const roll = txnMess && /^VM-\d{4}$/.test(txnMess) && !takenMess.has(txnMess)
@@ -797,3 +823,36 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
 
 
 
+
+/**
+ * Compares the Mess No values in an uploaded workbook against the students table
+ * and reports which ones are missing — used by the "Verify" panel to find records
+ * that an earlier faulty run merged away, without needing a full re-import.
+ */
+export const diffMessNos = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({ mess_nos: z.array(z.string()).max(50000) }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdminOrManager(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const present = new Set<string>();
+    let from = 0;
+    for (;;) {
+      const { data: rows, error } = await supabaseAdmin
+        .from("students").select("roll_number").range(from, from + 999);
+      if (error) throw new Error(error.message);
+      (rows ?? []).forEach((r) => r.roll_number && present.add(r.roll_number.trim().toUpperCase()));
+      if (!rows || rows.length < 1000) break;
+      from += 1000;
+    }
+    const file = Array.from(
+      new Set(data.mess_nos.map((m) => m.trim().toUpperCase()).filter(Boolean)),
+    );
+    return {
+      file_count: file.length,
+      db_count: present.size,
+      missing: file.filter((m) => !present.has(m)),
+    };
+  });

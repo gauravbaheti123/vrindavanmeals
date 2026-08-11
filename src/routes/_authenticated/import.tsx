@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Download, Upload, AlertTriangle, CheckCircle2, XCircle, Loader2, FileText, FileSpreadsheet, Info, ChevronRight, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
-import { importPayments, importAttendance, importExcelWorkbook, logImportRun } from "@/lib/imports.functions";
+import { importPayments, importAttendance, importExcelWorkbook, logImportRun, diffMessNos } from "@/lib/imports.functions";
 
 export const Route = createFileRoute("/_authenticated/import")({
   head: () => ({ meta: [{ title: "Import Data — Vrindavan Meals" }] }),
@@ -621,13 +621,22 @@ function ExcelWorkbookTab() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<Progress>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [diff, setDiff] = useState<{ file_count: number; db_count: number; missing: string[] } | null>(null);
   const runFn = useServerFn(importExcelWorkbook);
   const logFn = useServerFn(logImportRun);
+  const diffFn = useServerFn(diffMessNos);
+  // Hard lock: survives re-renders, so a rapid second click can never start a second run.
+  const runningRef = useRef(false);
+  const runIdRef = useRef<string>("");
 
   const runImport = useMutation({
     mutationFn: async () => {
       if (!parsed) throw new Error("Nothing to import");
+      if (runningRef.current) throw new Error("An import is already running");
+      runningRef.current = true;
+      runIdRef.current = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       setFailure(null);
+
 
       const summary = {
         students: { total: parsed.students.length, imported: 0, updated: 0, skipped: 0 },
@@ -666,6 +675,7 @@ function ExcelWorkbookTab() {
             const res: any = await runFn({
               data: {
                 file_name: parsed.fileName,
+                run_id: runIdRef.current,
                 phase,
                 row_offset: i,
                 students: phase === "students" ? (slice as any) : [],
@@ -733,6 +743,58 @@ function ExcelWorkbookTab() {
       setFailure(e?.message || "Import failed");
       toast.error(e?.message || "Import failed");
     },
+    onSettled: () => { runningRef.current = false; },
+  });
+
+  // Compares the uploaded file's Mess No values against the database so any student
+  // an earlier run merged away can be spotted — and re-created — without a full re-import.
+  const verify = useMutation({
+    mutationFn: async () => {
+      if (!parsed) throw new Error("Upload a workbook first");
+      const list = parsed.students.map((r: any) => String(r.mess_no ?? "")).filter(Boolean);
+      return await diffFn({ data: { mess_nos: list } });
+    },
+    onSuccess: (d: any) => setDiff(d),
+    onError: (e: any) => toast.error(e?.message || "Verification failed"),
+  });
+
+  const createMissing = useMutation({
+    mutationFn: async () => {
+      if (!parsed || !diff?.missing.length) throw new Error("Nothing to restore");
+      if (runningRef.current) throw new Error("An import is already running");
+      runningRef.current = true;
+      runIdRef.current = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const want = new Set(diff.missing.map((m) => m.toUpperCase()));
+      const rows = parsed.students.filter((r: any) => want.has(String(r.mess_no ?? "").trim().toUpperCase()));
+      let created = 0;
+      const errs: any[] = [];
+      setProgress({ phase: "students", done: 0, total: rows.length });
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        const slice = rows.slice(i, i + BATCH_SIZE);
+        const res: any = await runFn({
+          data: {
+            file_name: parsed.fileName,
+            run_id: runIdRef.current,
+            phase: "students",
+            row_offset: i,
+            students: slice as any,
+            transactions: [],
+            row_errors: [],
+          },
+        });
+        created += res.summary.students.imported;
+        errs.push(...(res.errors ?? []).filter((e: any) => e.section !== "audit"));
+        setProgress({ phase: "students", done: Math.min(i + BATCH_SIZE, rows.length), total: rows.length });
+      }
+      setProgress(null);
+      return { created, errs };
+    },
+    onSuccess: (r: any) => {
+      toast.success(`${r.created} missing student(s) restored`);
+      verify.mutate();
+    },
+    onError: (e: any) => { setProgress(null); toast.error(e?.message || "Restore failed"); },
+    onSettled: () => { runningRef.current = false; },
   });
 
   async function onFile(f: File) {
@@ -767,7 +829,7 @@ function ExcelWorkbookTab() {
           <li><strong>Students</strong> — required: <code>Mess No</code> (VM-0001 format, auto-assigned if blank), <code>Name</code>, <code>Status</code> (Active / Inactive). Optional: Mobile, Unit, Room, Opening Balance, Roll Number, Course, Joining Date, Exit Date (required when Status = Inactive), Adjustment. Dates in <code>DD-MM-YYYY</code>.</li>
           <li><strong>Transactions</strong> — required: <code>Mess No</code> (or Mobile). Optional: Name, Date, Amount, Mode (Cash/UPI/Card/Razorpay), Remarks, Subscription Start/End Date (defaults to the transaction month's 1st–last day).</li>
         </ul>
-        <div className="pt-1">Columns are matched by <strong>header name</strong> (case-insensitive, <code>*</code> ignored) — column order doesn't matter, extra columns are ignored and missing optional columns are treated as blank. Match key is <strong>Mess No</strong> (mobile is used as a fallback when present). Existing students are updated in place — no duplicates. Rows without Amount are skipped (no payment recorded). Joining/Exit dates are reference-only — no billing, pivot or refund calculation runs on import.</div>
+        <div className="pt-1">Columns are matched by <strong>header name</strong> (case-insensitive, <code>*</code> ignored) — column order doesn't matter, extra columns are ignored and missing optional columns are treated as blank. Match key is <strong>Mess No</strong> — always authoritative when present. Mobile is only used when the Mess No cell is blank, so two students sharing one phone number are never merged. Existing students are updated in place — no duplicates. Rows without Amount are skipped (no payment recorded). Joining/Exit dates are reference-only — no billing, pivot or refund calculation runs on import.</div>
       </div>
 
       {parsed && !result && (
@@ -832,13 +894,53 @@ function ExcelWorkbookTab() {
             </Alert>
           )}
 
-          <div className="flex gap-2">
-            <Button onClick={() => runImport.mutate()} disabled={runImport.isPending}>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              onClick={() => runImport.mutate()}
+              disabled={runImport.isPending || createMissing.isPending || runningRef.current}
+            >
               {runImport.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {runImport.isPending ? "Importing…" : failure ? "Retry Import" : "Confirm Import"}
             </Button>
-            <Button variant="ghost" onClick={() => setParsed(null)} disabled={runImport.isPending}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => verify.mutate()}
+              disabled={verify.isPending || runImport.isPending || createMissing.isPending}
+            >
+              {verify.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Verify against database
+            </Button>
+            <Button variant="ghost" onClick={() => { setParsed(null); setDiff(null); }} disabled={runImport.isPending || createMissing.isPending}>Cancel</Button>
           </div>
+
+          {diff && (
+            <Alert variant={diff.missing.length ? "destructive" : "default"}>
+              {diff.missing.length ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+              <AlertDescription className="space-y-2">
+                <div>
+                  File has <strong>{diff.file_count}</strong> distinct Mess No values; the database currently holds{" "}
+                  <strong>{diff.db_count}</strong> students.{" "}
+                  {diff.missing.length
+                    ? `${diff.missing.length} Mess No from the file are missing in the database.`
+                    : "Every Mess No in the file exists in the database."}
+                </div>
+                {diff.missing.length > 0 && (
+                  <>
+                    <div className="text-xs font-mono max-h-32 overflow-auto">{diff.missing.join(", ")}</div>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button size="sm" variant="outline" onClick={() =>
+                        downloadCsv("missing-mess-numbers.csv", [["mess_no"], ...diff.missing.map((m) => [m])])
+                      }><Download className="h-4 w-4 mr-2" />Download List</Button>
+                      <Button size="sm" onClick={() => createMissing.mutate()} disabled={createMissing.isPending}>
+                        {createMissing.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Create {diff.missing.length} Missing Student(s)
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
         </>
       )}
 
