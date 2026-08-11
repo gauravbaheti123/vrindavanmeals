@@ -894,13 +894,53 @@ function ExcelWorkbookTab() {
             </Alert>
           )}
 
-          <div className="flex gap-2">
-            <Button onClick={() => runImport.mutate()} disabled={runImport.isPending}>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              onClick={() => runImport.mutate()}
+              disabled={runImport.isPending || createMissing.isPending || runningRef.current}
+            >
               {runImport.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {runImport.isPending ? "Importing…" : failure ? "Retry Import" : "Confirm Import"}
             </Button>
-            <Button variant="ghost" onClick={() => setParsed(null)} disabled={runImport.isPending}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => verify.mutate()}
+              disabled={verify.isPending || runImport.isPending || createMissing.isPending}
+            >
+              {verify.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Verify against database
+            </Button>
+            <Button variant="ghost" onClick={() => { setParsed(null); setDiff(null); }} disabled={runImport.isPending || createMissing.isPending}>Cancel</Button>
           </div>
+
+          {diff && (
+            <Alert variant={diff.missing.length ? "destructive" : "default"}>
+              {diff.missing.length ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+              <AlertDescription className="space-y-2">
+                <div>
+                  File has <strong>{diff.file_count}</strong> distinct Mess No values; the database currently holds{" "}
+                  <strong>{diff.db_count}</strong> students.{" "}
+                  {diff.missing.length
+                    ? `${diff.missing.length} Mess No from the file are missing in the database.`
+                    : "Every Mess No in the file exists in the database."}
+                </div>
+                {diff.missing.length > 0 && (
+                  <>
+                    <div className="text-xs font-mono max-h-32 overflow-auto">{diff.missing.join(", ")}</div>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button size="sm" variant="outline" onClick={() =>
+                        downloadCsv("missing-mess-numbers.csv", [["mess_no"], ...diff.missing.map((m) => [m])])
+                      }><Download className="h-4 w-4 mr-2" />Download List</Button>
+                      <Button size="sm" onClick={() => createMissing.mutate()} disabled={createMissing.isPending}>
+                        {createMissing.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Create {diff.missing.length} Missing Student(s)
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
         </>
       )}
 
