@@ -98,7 +98,7 @@ export async function fetchLedgerRows(planPrice: number): Promise<DuesRow[]> {
     const opening = Number(st.opening_balance ?? 0);
     const adjustments = adjByStudent.get(st.id) ?? 0;
     const paid = paidByStudent.get(st.id) ?? 0;
-    const subsBilled = stSubs.reduce((sum, sub) => sum + Number(sub.billed_amount ?? planPrice), 0);
+    const subsBilled = stSubs.reduce((sum, sub) => sum + Number(sub.billed_amount ?? 0), 0);
     const totalBilled = subsBilled;
     const due = subsBilled + opening + adjustments - paid;
 
