@@ -257,7 +257,7 @@ function StudentMaster({ unit }: { unit: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-master", unit],
     queryFn: async () => {
-      let query = supabase.from("students").select("id, full_name, mobile, roll_number, hostel_room, unit_id, created_at, is_approved, units(name)").order("full_name");
+      let query = supabase.from("students").select("id, full_name, mobile, roll_number, hostel_room, unit_id, created_at, is_approved, exit_date, units(name)").order("full_name");
       if (unit !== "all") query = query.eq("unit_id", unit);
       const students = await pageAll((f, t) => query.range(f, t));
       const ids = students.map((s) => s.id);
@@ -284,23 +284,23 @@ function StudentMaster({ unit }: { unit: string }) {
 
   const filtered = useMemo(() => (data ?? []).filter((s) => {
     if (subStatus !== "all" && s.subStatus !== subStatus) return false;
-    if (status === "active" && !s.is_approved) return false;
-    if (status === "inactive" && s.is_approved) return false;
+    if (status === "active" && s.exit_date) return false;
+    if (status === "inactive" && !s.exit_date) return false;
     if (q) { const l = q.toLowerCase(); if (!s.full_name.toLowerCase().includes(l) && !(s.roll_number ?? "").toLowerCase().includes(l)) return false; }
     return true;
   }), [data, subStatus, status, q]);
 
-  const activeCount = filtered.filter((s) => s.is_approved).length;
+  const activeCount = filtered.filter((s) => !s.exit_date).length;
   const cols = ["Mess No", "Name", "Room", "Unit", "Joined", "Status", "Subscription", "Mobile"];
   const badge = (s: string) => ({ active: "bg-success text-success-foreground", grace: "bg-warning text-warning-foreground", expired: "bg-destructive text-destructive-foreground", pending: "bg-muted", none: "bg-muted" } as Record<string, string>)[s];
   const rows = filtered.map((s) => [
     s.roll_number ?? "—", s.full_name, s.hostel_room ?? "—", s.units?.name ?? "—",
     new Date(s.created_at).toLocaleDateString("en-IN"),
-    <Badge key="st" className={s.is_approved ? "bg-success text-success-foreground" : "bg-muted"}>{s.is_approved ? "Active" : "Inactive"}</Badge>,
+    <Badge key="st" className={!s.exit_date ? "bg-success text-success-foreground" : "bg-muted"}>{s.exit_date ? "Inactive" : "Active"}</Badge>,
     <Badge key="ss" className={badge(s.subStatus)}>{s.subStatus}</Badge>,
     s.mobile,
   ]);
-  const exportRows = filtered.map((s) => [s.roll_number ?? "", s.full_name, s.hostel_room ?? "", s.units?.name ?? "", new Date(s.created_at).toLocaleDateString("en-IN"), s.is_approved ? "Active" : "Inactive", s.subStatus, s.mobile ?? ""]);
+  const exportRows = filtered.map((s) => [s.roll_number ?? "", s.full_name, s.hostel_room ?? "", s.units?.name ?? "", new Date(s.created_at).toLocaleDateString("en-IN"), s.exit_date ? "Inactive" : "Active", s.subStatus, s.mobile ?? ""]);
 
   return (
     <div className="space-y-3">
@@ -374,7 +374,7 @@ function InactiveStudents({ unit }: { unit: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-inactive", unit],
     queryFn: async () => {
-      let sq = supabase.from("students").select("id, full_name, roll_number, hostel_room, mobile, created_at, is_approved, unit_id, units(name)").order("full_name");
+      let sq = supabase.from("students").select("id, full_name, roll_number, hostel_room, mobile, created_at, is_approved, exit_date, unit_id, units(name)").order("full_name");
       if (unit !== "all") sq = sq.eq("unit_id", unit);
       const students = await pageAll((f, t) => sq.range(f, t));
       const ids = students.map((s) => s.id);
@@ -399,10 +399,10 @@ function InactiveStudents({ unit }: { unit: string }) {
       return students.map((s) => {
         const latest = latestByStudent.get(s.id);
         const exitedActiveSub = latest && today > latest.grace_end_date;
-        const isInactive = !s.is_approved || exitedActiveSub || !latest;
+        const isInactive = !!s.exit_date || exitedActiveSub || !latest;
         const start = firstByStudent.get(s.id) ?? s.created_at.slice(0, 10);
         const months = latest ? Math.max(1, Math.round((new Date(latest.end_date).getTime() - new Date(start).getTime()) / (30 * 86400000))) : 0;
-        return { ...s, isInactive, start, exit: exitedActiveSub && latest ? latest.grace_end_date : null, months, paid: paidByStudent.get(s.id) ?? 0 };
+        return { ...s, isInactive, start, exit: s.exit_date ?? (exitedActiveSub && latest ? latest.grace_end_date : null), months, paid: paidByStudent.get(s.id) ?? 0 };
       }).filter((s) => s.isInactive);
     },
   });
@@ -1153,7 +1153,7 @@ function SingleStudentLedger() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Badge className={ledger.student.is_approved ? "bg-success text-success-foreground" : "bg-muted"}>{ledger.student.is_approved ? "Active" : "Inactive"}</Badge>
+                <Badge className={!ledger.student.exit_date ? "bg-success text-success-foreground" : "bg-muted"}>{ledger.student.exit_date ? "Inactive" : "Active"}</Badge>
                 <Button size="sm" variant="outline" onClick={printLedger}><Printer className="h-4 w-4 mr-1" />Print</Button>
               </div>
             </div>

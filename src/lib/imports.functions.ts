@@ -634,8 +634,9 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       };
       Object.keys(patch).forEach((k) => { if (patch[k] === null || patch[k] === "") delete patch[k]; });
 
-      // Same flag the manual Deactivate action uses. No refund/credit pivot calculation runs here.
-      patch.is_approved = status === "active";
+      // Bulk import always creates APPROVED records — the pending-approval flow is only
+      // for public /register submissions. Active vs Inactive is driven by exit_date.
+      patch.is_approved = true;
       patch.joining_date = joiningDate;
       patch.exit_date = status === "inactive" ? exitDate : null;
 

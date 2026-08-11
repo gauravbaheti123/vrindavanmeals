@@ -34,6 +34,7 @@ export function StudentPicker({
         .from("students")
         .select("id, full_name, mobile, roll_number, unit_id")
         .eq("is_approved", true)
+        .is("exit_date", null)
         .order("roll_number")
         .limit(50);
       if (q) query = query.or(`full_name.ilike.%${q}%,mobile.ilike.%${q}%,roll_number.ilike.%${q}%`);
