@@ -69,7 +69,7 @@ export async function fetchLedgerRows(planPrice: number): Promise<DuesRow[]> {
   };
   type Sub = { id: string; student_id: string; start_date: string; end_date: string; billed_amount: number | null };
 
-  const students = (studentsRes.data ?? []) as unknown as St[];
+  const students = studentsRes as unknown as St[];
 
   const subsByStudent = new Map<string, Sub[]>();
   for (const s of subs) {
