@@ -675,6 +675,7 @@ function ExcelWorkbookTab() {
             const res: any = await runFn({
               data: {
                 file_name: parsed.fileName,
+                run_id: runIdRef.current,
                 phase,
                 row_offset: i,
                 students: phase === "students" ? (slice as any) : [],
@@ -742,6 +743,58 @@ function ExcelWorkbookTab() {
       setFailure(e?.message || "Import failed");
       toast.error(e?.message || "Import failed");
     },
+    onSettled: () => { runningRef.current = false; },
+  });
+
+  // Compares the uploaded file's Mess No values against the database so any student
+  // an earlier run merged away can be spotted — and re-created — without a full re-import.
+  const verify = useMutation({
+    mutationFn: async () => {
+      if (!parsed) throw new Error("Upload a workbook first");
+      const list = parsed.students.map((r: any) => String(r.mess_no ?? "")).filter(Boolean);
+      return await diffFn({ data: { mess_nos: list } });
+    },
+    onSuccess: (d: any) => setDiff(d),
+    onError: (e: any) => toast.error(e?.message || "Verification failed"),
+  });
+
+  const createMissing = useMutation({
+    mutationFn: async () => {
+      if (!parsed || !diff?.missing.length) throw new Error("Nothing to restore");
+      if (runningRef.current) throw new Error("An import is already running");
+      runningRef.current = true;
+      runIdRef.current = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const want = new Set(diff.missing.map((m) => m.toUpperCase()));
+      const rows = parsed.students.filter((r: any) => want.has(String(r.mess_no ?? "").trim().toUpperCase()));
+      let created = 0;
+      const errs: any[] = [];
+      setProgress({ phase: "students", done: 0, total: rows.length });
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        const slice = rows.slice(i, i + BATCH_SIZE);
+        const res: any = await runFn({
+          data: {
+            file_name: parsed.fileName,
+            run_id: runIdRef.current,
+            phase: "students",
+            row_offset: i,
+            students: slice as any,
+            transactions: [],
+            row_errors: [],
+          },
+        });
+        created += res.summary.students.imported;
+        errs.push(...(res.errors ?? []).filter((e: any) => e.section !== "audit"));
+        setProgress({ phase: "students", done: Math.min(i + BATCH_SIZE, rows.length), total: rows.length });
+      }
+      setProgress(null);
+      return { created, errs };
+    },
+    onSuccess: (r: any) => {
+      toast.success(`${r.created} missing student(s) restored`);
+      verify.mutate();
+    },
+    onError: (e: any) => { setProgress(null); toast.error(e?.message || "Restore failed"); },
+    onSettled: () => { runningRef.current = false; },
   });
 
   async function onFile(f: File) {
