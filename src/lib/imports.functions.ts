@@ -640,7 +640,10 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
       patch.joining_date = joiningDate;
       patch.exit_date = status === "inactive" ? exitDate : null;
 
-      const existingId = existingByMess ?? (mobile ? mobileToId.get(mobile) : undefined);
+      // Mess No is authoritative: when the incoming row carries a valid Mess No we NEVER
+      // fall back to mobile — two different students may legitimately share one number
+      // (siblings / parent's phone) and merging them silently destroys a record.
+      const existingId = messNo ? existingByMess : (mobile ? mobileToId.get(mobile) : undefined);
       if (existingId) {
         const { error } = await supabaseAdmin.from("students").update(patch).eq("id", existingId);
         if (error) errors.push({ section: "students", row: rowNum, reason: `Row ${rowNum}: Update failed — ${error.message}` });
