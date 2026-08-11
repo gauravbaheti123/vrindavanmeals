@@ -823,3 +823,36 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
 
 
 
+
+/**
+ * Compares the Mess No values in an uploaded workbook against the students table
+ * and reports which ones are missing — used by the "Verify" panel to find records
+ * that an earlier faulty run merged away, without needing a full re-import.
+ */
+export const diffMessNos = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({ mess_nos: z.array(z.string()).max(50000) }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdminOrManager(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const present = new Set<string>();
+    let from = 0;
+    for (;;) {
+      const { data: rows, error } = await supabaseAdmin
+        .from("students").select("roll_number").range(from, from + 999);
+      if (error) throw new Error(error.message);
+      (rows ?? []).forEach((r) => r.roll_number && present.add(r.roll_number.trim().toUpperCase()));
+      if (!rows || rows.length < 1000) break;
+      from += 1000;
+    }
+    const file = Array.from(
+      new Set(data.mess_nos.map((m) => m.trim().toUpperCase()).filter(Boolean)),
+    );
+    return {
+      file_count: file.length,
+      db_count: present.size,
+      missing: file.filter((m) => !present.has(m)),
+    };
+  });
