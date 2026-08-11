@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,6 +74,7 @@ function ReportsPage() {
 
   const { data: units } = useQuery({
     queryKey: ["units"],
+    staleTime: STALE.MASTER,
     queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
   });
 
@@ -178,6 +180,7 @@ function PosItemSales({ from, to }: { from: string; to: string }) {
   const db = supabase as unknown as { from: (t: string) => ReturnType<typeof supabase.from> };
   const { data = [] } = useQuery({
     queryKey: ["pos-item-sales", from, to],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       const data = await pageAll((f2, t2) => db
         .from("pos_sale_items")
@@ -256,6 +259,7 @@ function StudentMaster({ unit }: { unit: string }) {
 
   const { data } = useQuery({
     queryKey: ["rpt-master", unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let query = supabase.from("students").select("id, full_name, mobile, roll_number, hostel_room, unit_id, created_at, is_approved, exit_date, units(name)").order("full_name");
       if (unit !== "all") query = query.eq("unit_id", unit);
@@ -333,6 +337,7 @@ function ActiveStudents({ unit }: { unit: string }) {
   const today = dISO(new Date());
   const { data } = useQuery({
     queryKey: ["rpt-active", unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let q = supabase.from("subscriptions").select("id, start_date, end_date, grace_end_date, status, students(id, full_name, roll_number, mobile, hostel_room, unit_id), units(name), subscription_plans(name, price)")
         .in("status", ["active", "grace"]).gte("grace_end_date", today).order("end_date");
@@ -373,6 +378,7 @@ function ActiveStudents({ unit }: { unit: string }) {
 function InactiveStudents({ unit }: { unit: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-inactive", unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let sq = supabase.from("students").select("id, full_name, roll_number, hostel_room, mobile, created_at, is_approved, exit_date, unit_id, units(name)").order("full_name");
       if (unit !== "all") sq = sq.eq("unit_id", unit);
@@ -435,6 +441,7 @@ function ExpiringReport({ unit }: { unit: string }) {
   const future = dISO(new Date(Date.now() + days * 86400000));
   const { data } = useQuery({
     queryKey: ["rpt-expiring", days, unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let q = supabase.from("subscriptions").select("id, end_date, grace_end_date, status, unit_id, students(id, full_name, mobile, roll_number), units(name), subscription_plans(price)")
         .gte("end_date", today).lte("end_date", future).order("end_date");
@@ -468,6 +475,7 @@ function ExpiringReport({ unit }: { unit: string }) {
 function NoShowReport({ from, to, unit }: { from: string; to: string; unit: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-noshow", from, to, unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let sq = supabase.from("subscriptions").select("student_id, unit_id, status, students(id, full_name, mobile, roll_number), units(name)").in("status", ["active", "grace"]);
       if (unit !== "all") sq = sq.eq("unit_id", unit);
@@ -499,6 +507,7 @@ function CollectionReport({ from, to, unit }: { from: string; to: string; unit: 
   const [mode, setMode] = useState("all");
   const { data } = useQuery({
     queryKey: ["rpt-coll", from, to, unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       const q = supabase.from("payments").select("amount, mode, status, created_at, subscription_id, student_id, subscriptions(unit_id), students(full_name, roll_number, unit_id)")
         .eq("status", "success").gte("created_at", from + "T00:00:00").lte("created_at", to + "T23:59:59").order("created_at", { ascending: false });
@@ -553,6 +562,7 @@ function CollectionReport({ from, to, unit }: { from: string; to: string; unit: 
 function MonthlyCollection() {
   const { data } = useQuery({
     queryKey: ["rpt-monthly-coll"],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       const since = dISO(new Date(Date.now() - 365 * 86400000));
       const pays = await pageAll((f, t) => supabase.from("payments").select("amount, created_at, status").eq("status", "success").gte("created_at", since).range(f, t));
@@ -586,6 +596,7 @@ function MonthlyCollection() {
 function OutstandingReport({ unit }: { unit: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-outstanding", unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       const monthStartD = monthStart();
       let sq = supabase.from("subscriptions").select("student_id, end_date, grace_end_date, status, unit_id, students(id, full_name, mobile, roll_number), units(name), subscription_plans(price)").in("status", ["active", "grace"]);
@@ -625,6 +636,7 @@ function OutstandingReport({ unit }: { unit: string }) {
 function AdvanceReport({ unit }: { unit: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-advance", unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let sq = supabase.from("students").select("id, full_name, roll_number, unit_id, units(name)");
       if (unit !== "all") sq = sq.eq("unit_id", unit);
@@ -658,6 +670,7 @@ const MODE_COLORS = ["hsl(var(--primary))", "#3b82f6", "#8b5cf6", "#f59e0b"];
 function ModeReport({ from, to, unit }: { from: string; to: string; unit: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-mode", from, to, unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       const data = await pageAll((f2, t2) => supabase.from("payments").select("amount, mode, status, students(unit_id)").eq("status", "success")
         .gte("created_at", from + "T00:00:00").lte("created_at", to + "T23:59:59").range(f2, t2));
@@ -692,6 +705,7 @@ function ModeReport({ from, to, unit }: { from: string; to: string; unit: string
 function DailyAttendance({ date, unit }: { date: string; unit: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-daily-att", date, unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let q = supabase.from("attendance").select("token_number, meal_type, scan_time, scan_type, is_override, students(full_name, roll_number, hostel_room), units(name)")
         .eq("scan_date", date).order("scan_time");
@@ -731,6 +745,7 @@ function MonthlyAttendance({ unit }: { unit: string }) {
   const monthFirst = month + "-01";
   const { data } = useQuery({
     queryKey: ["rpt-monthly-att", month, unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let q = supabase.from("attendance").select("student_id, meal_type, scan_date, students(full_name, roll_number, unit_id)").gte("scan_date", monthFirst).lte("scan_date", monthEnd);
       if (unit !== "all") q = q.eq("unit_id", unit);
@@ -768,6 +783,7 @@ function MonthlyAttendance({ unit }: { unit: string }) {
 function AttendanceTrend({ from, to, unit }: { from: string; to: string; unit: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-att-trend", from, to, unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let q = supabase.from("attendance").select("meal_type, scan_date").gte("scan_date", from).lte("scan_date", to);
       if (unit !== "all") q = q.eq("unit_id", unit);
@@ -795,6 +811,7 @@ function AttendanceTrend({ from, to, unit }: { from: string; to: string; unit: s
 function ManualLog({ from, to, unit }: { from: string; to: string; unit: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-manual", from, to, unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let q = supabase.from("attendance").select("scan_date, scan_time, meal_type, override_reason, is_override, students(full_name), units(name)")
         .eq("scan_type", "manual").gte("scan_date", from).lte("scan_date", to).order("scan_date", { ascending: false });
@@ -824,6 +841,7 @@ function ManualLog({ from, to, unit }: { from: string; to: string; unit: string 
 function UnmappedLog({ from, to, unit }: { from: string; to: string; unit: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-unmapped", from, to, unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let q = supabase.from("unmapped_scans").select("device_user_id, scan_time, resolved, units(name)")
         .gte("scan_time", from + "T00:00:00").lte("scan_time", to + "T23:59:59").order("scan_time", { ascending: false });
@@ -852,6 +870,7 @@ const STATUS_COLORS = { active: "hsl(var(--success))", grace: "hsl(var(--warning
 function SubStatusSummary({ unit }: { unit: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-sub-status", unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let q = supabase.from("subscriptions").select("id, status, start_date, end_date, grace_end_date, students(full_name, roll_number), units(name)");
       if (unit !== "all") q = q.eq("unit_id", unit);
@@ -895,6 +914,7 @@ function SubStatusSummary({ unit }: { unit: string }) {
 function EnrollmentsReport() {
   const { data } = useQuery({
     queryKey: ["rpt-enrol"],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       const since = dISO(new Date(Date.now() - 365 * 86400000));
       const subs = await pageAll((f, t) => supabase.from("subscriptions").select("start_date, end_date, student_id").gte("start_date", since).range(f, t));
@@ -926,6 +946,7 @@ function RenewalsReport({ unit }: { unit: string }) {
   const monthEnd = useMemo(() => { const d = new Date(); return dISO(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }, []);
   const { data } = useQuery({
     queryKey: ["rpt-renewals", unit],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       let q = supabase.from("subscriptions").select("id, end_date, grace_end_date, status, students(id, full_name, mobile, roll_number), units(name), subscription_plans(price)")
         .gte("end_date", today).lte("end_date", monthEnd).order("end_date");
@@ -971,11 +992,13 @@ function BulkLedgerSummary() {
 
   const { data: units } = useQuery({
     queryKey: ["units"],
+    staleTime: STALE.MASTER,
     queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
   });
 
   const { data: planPrice } = useQuery({
     queryKey: ["default-plan-price"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase.from("subscription_plans").select("price").eq("is_active", true)
         .order("created_at", { ascending: true }).limit(1).maybeSingle();
@@ -985,6 +1008,7 @@ function BulkLedgerSummary() {
 
   const { data: ledger, isLoading } = useQuery({
     queryKey: ["bulk-ledger", planPrice],
+    staleTime: STALE.REPORT,
     enabled: planPrice !== undefined,
     queryFn: () => fetchLedgerRows(planPrice ?? 3000),
   });
@@ -1107,6 +1131,7 @@ function SingleStudentLedger() {
   const [student, setStudent] = useState<StudentOption | null>(null);
   const { data: ledger } = useQuery({
     queryKey: ["ledger", student?.id],
+    staleTime: STALE.REPORT,
     enabled: !!student,
     queryFn: async () => {
       if (!student) return null;
@@ -1230,6 +1255,7 @@ const GST_DIVISOR = 1 + GST_RATE;
 function GSTReport({ from, to }: { from: string; to: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-gst-5", from, to],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       const fromTs = from + "T00:00:00";
       const toTs = to + "T23:59:59";
@@ -1302,6 +1328,7 @@ function GSTReport({ from, to }: { from: string; to: string }) {
 function RevenueReport() {
   const { data } = useQuery({
     queryKey: ["rpt-revenue-dash"],
+    staleTime: STALE.REPORT,
     queryFn: async () => {
       const since = dISO(new Date(Date.now() - 365 * 86400000));
       const [pays, subs] = await Promise.all([
@@ -1345,6 +1372,7 @@ function RevenueReport() {
 function ReprintLog({ from, to }: { from: string; to: string }) {
   const { data } = useQuery({
     queryKey: ["rpt-reprint", from, to],
+    staleTime: STALE.REPORT,
     queryFn: async () => (await supabase.from("token_reprints").select("created_at, reason, attendance:attendance_id(scan_date, meal_type, token_number, students(full_name), units(name))")
       .gte("created_at", from + "T00:00:00").lte("created_at", to + "T23:59:59").order("created_at", { ascending: false })).data ?? [],
   });

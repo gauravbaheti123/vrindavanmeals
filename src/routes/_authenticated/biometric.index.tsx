@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useRef } from "react";
 import Papa from "papaparse";
@@ -46,11 +47,13 @@ function BiometricMappingPage() {
 
   const { data: units } = useQuery({
     queryKey: ["units"],
+    staleTime: STALE.MASTER,
     queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
   });
 
   const { data: mappings, isLoading } = useQuery({
     queryKey: ["biometric-mappings", unit],
+    staleTime: STALE.LIST,
     queryFn: async () => {
       let query = supabase.from("biometric_mappings")
         .select("id, device_user_id, device_name, unit_id, is_active, mapped_at, mapped_by, student_id, students(id, full_name, roll_number), units(name)")

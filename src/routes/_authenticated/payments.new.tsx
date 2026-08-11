@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { z } from "zod";
@@ -40,6 +41,7 @@ function NewPayment() {
 
   const { data: settings } = useQuery({
     queryKey: ["system-settings"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase.from("system_settings").select("key,value");
       return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
@@ -67,6 +69,7 @@ function NewPayment() {
   // Fetch subscriptions for the selected student
   const { data: subs } = useQuery({
     queryKey: ["student-subs", student?.id],
+    staleTime: STALE.LIST,
     enabled: !!student,
     queryFn: async () => {
       const { data } = await supabase.from("subscriptions")

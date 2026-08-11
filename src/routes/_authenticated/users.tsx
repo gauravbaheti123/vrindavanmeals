@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -69,11 +70,13 @@ function UsersTab() {
 
   const { data: units } = useQuery({
     queryKey: ["units"],
+    staleTime: STALE.MASTER,
     queryFn: async () => (await supabase.from("units").select("id,name").eq("is_active", true)).data ?? [],
   });
 
   const { data: users, refetch, isFetching } = useQuery({
     queryKey: ["users-list"],
+    staleTime: STALE.LIST,
     queryFn: async () => {
       const [{ data: profiles }, { data: roles }] = await Promise.all([
         supabase.from("profiles").select("id,name,email,mobile,unit_id,is_active,created_at"),
@@ -282,6 +285,7 @@ function PermissionsTab() {
   const qc = useQueryClient();
   const { data: perms, isFetching } = useQuery({
     queryKey: ["role_permissions"],
+    staleTime: STALE.MASTER,
     queryFn: async () => (await supabase.from("role_permissions").select("*")).data ?? [],
   });
 

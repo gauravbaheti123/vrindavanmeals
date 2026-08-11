@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useHydratedState } from "@/hooks/use-hydrated-state";
@@ -59,6 +60,7 @@ function BrandingCard() {
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ["system-settings"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase.from("system_settings").select("key,value");
       return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
@@ -182,6 +184,7 @@ function IntegrationsCard() {
   const [backing, setBacking] = useState(false);
   const { data: settings } = useQuery({
     queryKey: ["system-settings"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase.from("system_settings").select("key,value");
       return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
@@ -272,6 +275,7 @@ function GeneralSettings() {
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ["system-settings"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase.from("system_settings").select("key,value");
       return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
@@ -336,6 +340,7 @@ interface Window { id: string; unit_id: string; meal_type: "lunch" | "dinner"; s
 function MealWindowsCard() {
   const { data: units } = useQuery({
     queryKey: ["units"],
+    staleTime: STALE.MASTER,
     queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
   });
 
@@ -364,6 +369,7 @@ function UnitMealWindows({ unitId }: { unitId: string }) {
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ["meal-windows", unitId],
+    staleTime: STALE.MASTER,
     queryFn: async () => (await supabase.from("meal_windows").select("*").eq("unit_id", unitId)).data ?? [],
   });
   const [state, setState] = useState<Record<"lunch" | "dinner", { start: string; end: string }>>({
@@ -422,6 +428,7 @@ function UnitsCard() {
   const qc = useQueryClient();
   const { data: units } = useQuery({
     queryKey: ["units"],
+    staleTime: STALE.MASTER,
     queryFn: async () => (await supabase.from("units").select("id,name,is_active").order("name")).data ?? [],
   });
   const [newName, setNewName] = useState("");

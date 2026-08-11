@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +35,7 @@ function Dashboard() {
 
   const { data: units } = useQuery({
     queryKey: ["units-list"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase.from("units").select("id, name").order("name");
       return data ?? [];
@@ -42,6 +44,7 @@ function Dashboard() {
 
   const { data: plan } = useQuery({
     queryKey: ["default-plan"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase
         .from("subscription_plans")
