@@ -464,6 +464,8 @@ const UnifiedWorkbookSchema = z.object({
   // Large files are imported in chunks: one phase + one slice per request.
   phase: z.enum(["students", "transactions"]).default("students"),
   row_offset: z.number().int().min(0).default(0),
+  // Identifies one end-to-end run so a second, concurrent run of the same file is rejected.
+  run_id: z.string().default(""),
   students: z.array(UStudentRow).max(20000).default([]),
   transactions: z.array(UTxnRow).max(30000).default([]),
   row_errors: z
