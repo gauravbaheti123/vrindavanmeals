@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { STALE } from "@/lib/query-cache";
+import { STALE, invalidateLedger } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -252,7 +252,7 @@ function DuesPage() {
         onClose={() => setPayFor(null)}
         onSaved={() => {
           setPayFor(null);
-          qc.invalidateQueries({ queryKey: ["dues-list"] });
+          invalidateLedger(qc);
           qc.invalidateQueries({ queryKey: ["dues-collected-month"] });
         }}
       />
