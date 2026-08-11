@@ -689,7 +689,8 @@ export const importExcelWorkbook = createServerFn({ method: "POST" })
         errors.push({ section: "transactions", row: rowNum, reason: `Row ${rowNum}: Mess No or Mobile is required` });
         continue;
       }
-      let studentId = (txnMess ? messToId.get(txnMess) : undefined) ?? (mobile ? mobileToId.get(mobile) : undefined);
+      // Same rule for transactions: a Mess No on the row wins outright.
+      let studentId = txnMess ? messToId.get(txnMess) : (mobile ? mobileToId.get(mobile) : undefined);
 
       if (!studentId) {
         const roll = txnMess && /^VM-\d{4}$/.test(txnMess) && !takenMess.has(txnMess)
