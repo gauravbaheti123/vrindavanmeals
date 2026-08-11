@@ -28,20 +28,11 @@ export function BillingEngineCard() {
   const [amount, setAmount] = useState<string | null>(null);
   const [days, setDays] = useState<string | null>(null);
 
-  const { data: settings } = useQuery({
-    queryKey: ["due-thresholds"],
-    queryFn: async () => {
-      const { data } = await supabase.from("system_settings").select("key,value");
-      const map = Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
-      return {
-        amount: map["due_amount_threshold"] ?? "3000",
-        days: map["days_overdue_threshold"] ?? "15",
-      };
-    },
-  });
+  const { data: settings } = useQuery(dueThresholdsQuery);
 
-  const amountValue = amount ?? settings?.amount ?? "3000";
-  const daysValue = days ?? settings?.days ?? "15";
+  const amountValue = amount ?? String(settings?.amount ?? 3000);
+  const daysValue = days ?? String(settings?.days ?? 15);
+
 
   async function saveThresholds() {
     const { error } = await supabase.from("system_settings").upsert(
