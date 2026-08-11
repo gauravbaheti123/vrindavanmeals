@@ -1,0 +1,1 @@
+SELECT public.rebuild_student_billing(id) FROM public.students ORDER BY roll_number NULLS LAST;
