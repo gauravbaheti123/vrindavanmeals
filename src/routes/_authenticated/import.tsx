@@ -621,13 +621,22 @@ function ExcelWorkbookTab() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<Progress>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [diff, setDiff] = useState<{ file_count: number; db_count: number; missing: string[] } | null>(null);
   const runFn = useServerFn(importExcelWorkbook);
   const logFn = useServerFn(logImportRun);
+  const diffFn = useServerFn(diffMessNos);
+  // Hard lock: survives re-renders, so a rapid second click can never start a second run.
+  const runningRef = useRef(false);
+  const runIdRef = useRef<string>("");
 
   const runImport = useMutation({
     mutationFn: async () => {
       if (!parsed) throw new Error("Nothing to import");
+      if (runningRef.current) throw new Error("An import is already running");
+      runningRef.current = true;
+      runIdRef.current = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       setFailure(null);
+
 
       const summary = {
         students: { total: parsed.students.length, imported: 0, updated: 0, skipped: 0 },
