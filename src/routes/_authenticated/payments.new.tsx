@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { STALE, invalidateLedger } from "@/lib/query-cache";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +30,7 @@ const MODES = [
 
 function NewPayment() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const search = Route.useSearch();
   const [student, setStudent] = useState<StudentOption | null>(null);
   const [subscriptionId, setSubscriptionId] = useState<string | null>(search.subscription ?? null);
@@ -40,6 +42,7 @@ function NewPayment() {
 
   const { data: settings } = useQuery({
     queryKey: ["system-settings"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase.from("system_settings").select("key,value");
       return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
@@ -67,6 +70,7 @@ function NewPayment() {
   // Fetch subscriptions for the selected student
   const { data: subs } = useQuery({
     queryKey: ["student-subs", student?.id],
+    staleTime: STALE.LIST,
     enabled: !!student,
     queryFn: async () => {
       const { data } = await supabase.from("subscriptions")
@@ -116,6 +120,7 @@ function NewPayment() {
       }
     }
     setSaving(false);
+    invalidateLedger(qc);
     toast.success("Payment recorded successfully");
     navigate({ to: "/payments" });
   }

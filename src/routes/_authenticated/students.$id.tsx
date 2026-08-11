@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { STALE, invalidateLedger } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,6 +62,7 @@ function StudentDetail() {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["student-detail", id],
+    staleTime: STALE.LIST,
     queryFn: async () => {
       const [student, subs, pays, mapping, plans, units, adjs] = await Promise.all([
         supabase.from("students").select("*, units(name)").eq("id", id).maybeSingle(),
@@ -97,7 +99,7 @@ function StudentDetail() {
 
   const refresh = () => {
     refetch();
-    qc.invalidateQueries({ queryKey: ["dues-list"] });
+    invalidateLedger(qc);
   };
 
   const summary = useMemo(() => {

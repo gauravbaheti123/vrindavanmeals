@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,6 +34,7 @@ function AttendanceCounter() {
 
   const { data: units } = useQuery({
     queryKey: ["units"],
+    staleTime: STALE.MASTER,
     queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
   });
   useEffect(() => { if (!unitId && units?.[0]) setUnitId(units[0].id); }, [units, unitId]);

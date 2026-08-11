@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,11 +27,13 @@ function PaymentList() {
 
   const { data: units } = useQuery({
     queryKey: ["units"],
+    staleTime: STALE.MASTER,
     queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
   });
 
   const { data: payments, isLoading } = useQuery({
     queryKey: ["payments", mode, unit, from, to, status],
+    staleTime: STALE.LIST,
     queryFn: async () => {
       let q = supabase.from("payments")
         .select("id, amount, mode, status, created_at, subscription_id, students(full_name, unit_id, units(name)), subscriptions(start_date, end_date), profiles:recorded_by(name)")

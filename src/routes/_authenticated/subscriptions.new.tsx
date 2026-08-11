@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,11 +24,13 @@ function NewSubscription() {
 
   const { data: plan } = useQuery({
     queryKey: ["default-plan"],
+    staleTime: STALE.MASTER,
     queryFn: async () => (await supabase.from("subscription_plans").select("*").eq("is_active", true).order("created_at").limit(1).maybeSingle()).data,
   });
 
   const { data: settings } = useQuery({
     queryKey: ["system-settings"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase.from("system_settings").select("key,value");
       return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
@@ -36,6 +39,7 @@ function NewSubscription() {
 
   const { data: unitName } = useQuery({
     queryKey: ["student-unit", student?.unit_id],
+    staleTime: STALE.MASTER,
     enabled: !!student?.unit_id,
     queryFn: async () => (await supabase.from("units").select("name").eq("id", student!.unit_id!).maybeSingle()).data?.name ?? "—",
   });

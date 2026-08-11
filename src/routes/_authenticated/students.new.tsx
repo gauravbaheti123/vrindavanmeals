@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +32,7 @@ function NewStudent() {
 
   const { data: units } = useQuery({
     queryKey: ["units-active"],
+    staleTime: STALE.MASTER,
     queryFn: async () =>
       (await supabase.from("units").select("id,name").eq("is_active", true).order("name")).data ?? [],
   });

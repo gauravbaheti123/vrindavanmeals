@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,11 +32,13 @@ function SubscriptionList() {
 
   const { data: units } = useQuery({
     queryKey: ["units"],
+    staleTime: STALE.MASTER,
     queryFn: async () => (await supabase.from("units").select("id,name").order("name")).data ?? [],
   });
 
   const { data: planPrice } = useQuery({
     queryKey: ["default-plan-price"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase
         .from("subscription_plans").select("price").eq("is_active", true)
@@ -46,6 +49,7 @@ function SubscriptionList() {
 
   const { data: ledger, isLoading } = useQuery({
     queryKey: ["subscription-ledger", planPrice],
+    staleTime: STALE.LIST,
     enabled: planPrice !== undefined,
     queryFn: () => fetchLedgerRows(planPrice ?? 3000),
   });

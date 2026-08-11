@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -176,6 +177,7 @@ function ImportHistory() {
   const [open, setOpen] = useState<string | null>(null);
   const { data } = useQuery({
     queryKey: ["import_logs"],
+    staleTime: STALE.LIST,
     queryFn: async () => (await supabase.from("import_logs").select("*").order("created_at", { ascending: false }).limit(20)).data ?? [],
   });
 

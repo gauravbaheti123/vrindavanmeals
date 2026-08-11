@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ function Pending() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["students-pending"],
+    staleTime: STALE.LIST,
     queryFn: async () => (await supabase.from("students").select("*").eq("is_approved", false).order("created_at", { ascending: false })).data ?? [],
   });
 

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,18 +41,22 @@ function POSPage() {
 
   const { data: categories = [] } = useQuery({
     queryKey: ["pos-cats"],
+    staleTime: STALE.MASTER,
     queryFn: async () => ((await db.from("pos_categories").select("*").eq("is_active", true).order("sort_order")).data ?? []) as unknown as Category[],
   });
   const { data: items = [] } = useQuery({
     queryKey: ["pos-items"],
+    staleTime: STALE.MASTER,
     queryFn: async () => ((await db.from("pos_items").select("*").eq("is_active", true).order("name")).data ?? []) as unknown as Item[],
   });
   const { data: modes = [] } = useQuery({
     queryKey: ["pos-modes"],
+    staleTime: STALE.MASTER,
     queryFn: async () => ((await db.from("pos_payment_modes").select("*").eq("is_active", true).order("sort_order")).data ?? []) as unknown as PayMode[],
   });
   const { data: settings } = useQuery({
     queryKey: ["system-settings"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase.from("system_settings").select("key,value");
       return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
@@ -133,6 +138,8 @@ function POSPage() {
     printReceipt(saleRow.sale_number, cart, subtotal, discountAmount, taxRate, taxAmount, total, paymentMode);
     clearCart();
     qc.invalidateQueries({ queryKey: ["pos-sales"] });
+    qc.invalidateQueries({ queryKey: ["pos-item-sales"] });
+    qc.invalidateQueries({ queryKey: ["rpt-revenue-dash"] });
   }
 
   return (

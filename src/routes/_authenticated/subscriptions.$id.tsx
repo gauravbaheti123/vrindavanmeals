@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { STALE, invalidateLedger } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +30,7 @@ function SubscriptionDetail() {
 
   const { data: sub } = useQuery({
     queryKey: ["subscription", id],
+    staleTime: STALE.LIST,
     queryFn: async () => {
       const { data, error } = await supabase.from("subscriptions")
         .select("*, students(id, full_name, mobile, roll_number), units(name), subscription_plans(name, price, duration_days)")
@@ -40,6 +42,7 @@ function SubscriptionDetail() {
 
   const { data: payments } = useQuery({
     queryKey: ["subscription-payments", id],
+    staleTime: STALE.LIST,
     queryFn: async () => {
       const { data } = await supabase.from("payments").select("id, amount, mode, status, created_at").eq("subscription_id", id).order("created_at", { ascending: false });
       return data ?? [];
@@ -48,6 +51,7 @@ function SubscriptionDetail() {
 
   const { data: settings } = useQuery({
     queryKey: ["system-settings"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase.from("system_settings").select("key,value");
       return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
@@ -82,7 +86,7 @@ function SubscriptionDetail() {
     }).select("id").single();
     setRenewing(false);
     if (error) { toast.error(error.message); return; }
-    qc.invalidateQueries({ queryKey: ["subscriptions"] });
+    invalidateLedger(qc);
     toast.success("Renewal created");
     navigate({ to: "/subscriptions/$id", params: { id: data.id } });
   }

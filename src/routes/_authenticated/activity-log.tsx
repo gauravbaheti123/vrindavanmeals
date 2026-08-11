@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -74,6 +75,7 @@ function ActivityLogPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["audit-log"],
+    staleTime: STALE.LIST,
     queryFn: async () => {
       const { data: logs, error } = await supabase
         .from("audit_log")

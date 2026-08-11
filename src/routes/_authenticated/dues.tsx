@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { STALE, invalidateLedger } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,6 +46,7 @@ function DuesPage() {
 
   const { data: units } = useQuery({
     queryKey: ["units-list"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase.from("units").select("id, name").order("name");
       return data ?? [];
@@ -53,6 +55,7 @@ function DuesPage() {
 
   const { data: plan } = useQuery({
     queryKey: ["default-plan-price"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase
         .from("subscription_plans")
@@ -68,6 +71,7 @@ function DuesPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["dues-list", planPrice, includeSettled],
+    staleTime: STALE.LIST,
     queryFn: () => (includeSettled ? fetchLedgerRows(planPrice) : fetchDuesRows(planPrice)),
     enabled: plan !== undefined,
   });
@@ -248,7 +252,7 @@ function DuesPage() {
         onClose={() => setPayFor(null)}
         onSaved={() => {
           setPayFor(null);
-          qc.invalidateQueries({ queryKey: ["dues-list"] });
+          invalidateLedger(qc);
           qc.invalidateQueries({ queryKey: ["dues-collected-month"] });
         }}
       />

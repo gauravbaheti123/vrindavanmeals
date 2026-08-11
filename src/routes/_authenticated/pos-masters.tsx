@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { STALE } from "@/lib/query-cache";
 import { useEffect, useState } from "react";
 import { useHydratedState } from "@/hooks/use-hydrated-state";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -37,18 +38,22 @@ function PosMastersPage() {
 
   const { data: cats = [] } = useQuery({
     queryKey: ["settings-pos-cats"],
+    staleTime: STALE.MASTER,
     queryFn: async () => ((await db.from("pos_categories").select("*").order("sort_order")).data ?? []) as unknown as PosCategory[],
   });
   const { data: items = [] } = useQuery({
     queryKey: ["settings-pos-items"],
+    staleTime: STALE.MASTER,
     queryFn: async () => ((await db.from("pos_items").select("*").order("name")).data ?? []) as unknown as PosItem[],
   });
   const { data: modes = [] } = useQuery({
     queryKey: ["settings-pos-modes"],
+    staleTime: STALE.MASTER,
     queryFn: async () => ((await db.from("pos_payment_modes").select("*").order("sort_order")).data ?? []) as unknown as PosPayMode[],
   });
   const { data: settings } = useQuery({
     queryKey: ["system-settings"],
+    staleTime: STALE.MASTER,
     queryFn: async () => {
       const { data } = await supabase.from("system_settings").select("key,value");
       return Object.fromEntries((data ?? []).map((s) => [s.key, s.value])) as Record<string, string>;
