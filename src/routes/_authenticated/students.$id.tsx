@@ -381,6 +381,9 @@ function StudentDetail() {
             <Button size="sm" variant="outline" onClick={() => setAdjModal({ existing: null })}>
               <Scale className="h-3 w-3 mr-1" />Add Adjustment
             </Button>
+            <Button size="sm" variant="outline" onClick={() => setHolidayModal({ existing: null })}>
+              <CalendarDays className="h-3 w-3 mr-1" />Add Holiday / Leave
+            </Button>
             <Button size="sm" onClick={() => setPayModal({ mode: "new" })}>
               <IndianRupee className="h-3 w-3 mr-1" />Record Payment
             </Button>
