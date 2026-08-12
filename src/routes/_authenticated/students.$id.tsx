@@ -95,6 +95,7 @@ function StudentDetail() {
   const [newSub, setNewSub] = useState(false);
   const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment } | null>(null);
   const [adjModal, setAdjModal] = useState<{ existing: Adjustment | null } | null>(null);
+  const [holidayModal, setHolidayModal] = useState<{ existing: Adjustment | null } | null>(null);
 
   const [activateOpen, setActivateOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
