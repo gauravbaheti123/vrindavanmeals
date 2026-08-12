@@ -475,21 +475,38 @@ function StudentDetail() {
                   );
                 });
               })()}
-              {data.adjs.map((a) => (
-                <TableRow key={a.id} className="bg-muted/20">
+              {data.adjs.map((a) => {
+                const isHoliday = a.kind === "holiday";
+                const hDays = isHoliday && a.from_date && a.to_date
+                  ? Math.round((Date.parse(a.to_date) - Date.parse(a.from_date)) / 86400000) + 1
+                  : 0;
+                const rangeLabel = isHoliday && a.from_date && a.to_date
+                  ? `${formatDMY(a.from_date)} → ${formatDMY(a.to_date)} (${hDays} day${hDays === 1 ? "" : "s"})`
+                  : null;
+                return (
+                <TableRow key={a.id} className={isHoliday ? "bg-success/5" : "bg-muted/20"}>
                   <TableCell className="text-sm">{new Date(a.entry_date).toLocaleDateString("en-IN")}</TableCell>
-                  <TableCell className="text-sm italic">Adjustment</TableCell>
+                  <TableCell className="text-sm italic">{isHoliday ? "Holiday Deduction" : "Adjustment"}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{Number(a.amount) < 0 ? "Credit" : "Charge"}</Badge>
+                    {isHoliday
+                      ? <Badge className="bg-success text-success-foreground">Holiday</Badge>
+                      : <Badge variant="secondary">{Number(a.amount) < 0 ? "Credit" : "Charge"}</Badge>}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{a.remarks ?? "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {isHoliday
+                      ? <span>{rangeLabel}{a.remarks ? ` · ${a.remarks}` : ""}</span>
+                      : (a.remarks ?? "—")}
+                  </TableCell>
                   <TableCell className={`text-right font-semibold ${Number(a.amount) < 0 ? "text-success" : ""}`}>
                     {Number(a.amount) < 0 ? "−" : "+"}{inr(Math.abs(Number(a.amount)))}
                   </TableCell>
                   <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
                   <TableCell className="text-right print:hidden">
                     <div className="flex justify-end gap-1">
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setAdjModal({ existing: a })}>
+                    <Button
+                      size="icon" variant="ghost" className="h-7 w-7"
+                      onClick={() => (isHoliday ? setHolidayModal({ existing: a }) : setAdjModal({ existing: a }))}
+                    >
                       <Pencil className="h-3 w-3" />
                     </Button>
                     <AlertDialog>
@@ -501,9 +518,9 @@ function StudentDetail() {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Delete this adjustment?</AlertDialogTitle>
+                          <AlertDialogTitle>{isHoliday ? "Delete this holiday deduction?" : "Delete this adjustment?"}</AlertDialogTitle>
                           <AlertDialogDescription>
-                            {inr(Math.abs(Number(a.amount)))} · {a.remarks ?? "no remarks"} will be permanently removed from the ledger.
+                            {inr(Math.abs(Number(a.amount)))} · {rangeLabel ?? a.remarks ?? "no remarks"} will be permanently removed from the ledger.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
