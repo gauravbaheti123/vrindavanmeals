@@ -23,7 +23,7 @@ import { logAudit, diffValues } from "@/lib/audit";
 import { isValidMessNo, isMessNoAvailable } from "@/lib/mess-no";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
 import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from "@/lib/billing";
-import { fetchFeeSlabs, feeForMonth, missingSlabMessage, type FeeSlab } from "@/lib/fees";
+import { fetchFeeSlabs, feeForMonth, missingSlabMessage, computeHolidayDeduction, formatDMY, formatMonth, type FeeSlab } from "@/lib/fees";
 import { generateNocPdf } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
 import { StudentPhoto, StudentPhotoEditor } from "@/components/student-photo";
