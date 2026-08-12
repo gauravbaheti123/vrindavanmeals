@@ -530,11 +530,11 @@ function StudentDetail() {
                               const { error } = await supabase.from("ledger_adjustments").delete().eq("id", a.id);
                               if (error) return toast.error(error.message);
                               await logAudit({
-                                action: "delete", entity: "adjustment", entityId: a.id, studentId: s.id,
-                                label: a.remarks ?? "Ledger adjustment",
-                                oldValues: { amount: a.amount, entry_date: a.entry_date, remarks: a.remarks },
+                                action: "delete", entity: isHoliday ? "holiday" : "adjustment", entityId: a.id, studentId: s.id,
+                                label: rangeLabel ?? a.remarks ?? "Ledger adjustment",
+                                oldValues: { amount: a.amount, entry_date: a.entry_date, remarks: a.remarks, from_date: a.from_date, to_date: a.to_date },
                               });
-                              toast.success("Adjustment deleted");
+                              toast.success(isHoliday ? "Holiday deduction deleted" : "Adjustment deleted");
                               refresh();
                             }}
                           >
@@ -547,7 +547,8 @@ function StudentDetail() {
                   </TableCell>
 
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
           <div className="flex flex-wrap gap-6 border-t px-4 py-3 text-sm">
