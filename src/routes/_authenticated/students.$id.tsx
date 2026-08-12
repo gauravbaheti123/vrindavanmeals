@@ -656,6 +656,15 @@ function StudentDetail() {
           onSaved={() => { setAdjModal(null); refresh(); }}
         />
       )}
+      {holidayModal && (
+        <HolidayModal
+          studentId={s.id}
+          slabs={feeSlabs ?? []}
+          existing={holidayModal.existing}
+          onClose={() => setHolidayModal(null)}
+          onSaved={() => { setHolidayModal(null); refresh(); }}
+        />
+      )}
 
 
     </div>
