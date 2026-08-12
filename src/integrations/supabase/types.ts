@@ -288,27 +288,36 @@ export type Database = {
           created_at: string
           created_by: string | null
           entry_date: string
+          from_date: string | null
           id: string
+          kind: string
           remarks: string | null
           student_id: string
+          to_date: string | null
         }
         Insert: {
           amount: number
           created_at?: string
           created_by?: string | null
           entry_date?: string
+          from_date?: string | null
           id?: string
+          kind?: string
           remarks?: string | null
           student_id: string
+          to_date?: string | null
         }
         Update: {
           amount?: number
           created_at?: string
           created_by?: string | null
           entry_date?: string
+          from_date?: string | null
           id?: string
+          kind?: string
           remarks?: string | null
           student_id?: string
+          to_date?: string | null
         }
         Relationships: [
           {
