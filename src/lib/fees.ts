@@ -56,3 +56,45 @@ export function feeForMonth(slabs: FeeSlab[], dateISO: string): number | null {
 export function missingSlabMessage(dateISO: string): string {
   return `No fee slab configured for ${formatMonth(monthKey(dateISO))} — add it in Settings → Fee Settings first`;
 }
+
+/* ---------------- Holiday / Leave deduction ---------------- */
+
+export type HolidaySegment = { month: string; days: number; monthlyFee: number; daysInMonth: number; amount: number };
+export type HolidayCalc = { days: number; amount: number; segments: HolidaySegment[]; missingMonths: string[] };
+
+function daysInMonth(monthISO: string): number {
+  const [y, m] = monthISO.split("-").map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
+/**
+ * Per-day rate = monthly fee (slab active for that month) ÷ days in that month.
+ * A range spanning months is split so each month uses its own rate.
+ */
+export function computeHolidayDeduction(slabs: FeeSlab[], fromISO: string, toISO: string): HolidayCalc {
+  const start = new Date(fromISO + "T00:00:00");
+  const end = new Date(toISO + "T00:00:00");
+  const byMonth = new Map<string, number>();
+  let days = 0;
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    byMonth.set(key, (byMonth.get(key) ?? 0) + 1);
+    days += 1;
+  }
+  const segments: HolidaySegment[] = [];
+  const missingMonths: string[] = [];
+  let amount = 0;
+  for (const [month, count] of byMonth) {
+    const fee = feeForMonth(slabs, month);
+    if (fee === null) { missingMonths.push(month); continue; }
+    const dim = daysInMonth(month);
+    const seg = (fee / dim) * count;
+    amount += seg;
+    segments.push({ month, days: count, monthlyFee: fee, daysInMonth: dim, amount: Math.round(seg) });
+  }
+  return { days, amount: Math.round(amount), segments, missingMonths };
+}
+
+export function formatDMY(iso: string): string {
+  return new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}

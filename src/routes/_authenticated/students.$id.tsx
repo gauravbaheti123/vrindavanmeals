@@ -17,13 +17,13 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Fingerprint, Pencil, Printer, Plus, Trash2, IndianRupee, X, FileText, UserCheck, Scale } from "lucide-react";
+import { ArrowLeft, Fingerprint, Pencil, Printer, Plus, Trash2, IndianRupee, X, FileText, UserCheck, Scale, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 import { logAudit, diffValues } from "@/lib/audit";
 import { isValidMessNo, isMessNoAvailable } from "@/lib/mess-no";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
 import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from "@/lib/billing";
-import { fetchFeeSlabs, feeForMonth, missingSlabMessage, type FeeSlab } from "@/lib/fees";
+import { fetchFeeSlabs, feeForMonth, missingSlabMessage, computeHolidayDeduction, formatDMY, formatMonth, type FeeSlab } from "@/lib/fees";
 import { generateNocPdf } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
 import { StudentPhoto, StudentPhotoEditor } from "@/components/student-photo";
@@ -46,6 +46,9 @@ type Adjustment = {
   entry_date: string;
   created_by: string | null;
   created_at: string;
+  kind: string;
+  from_date: string | null;
+  to_date: string | null;
 };
 
 
@@ -92,6 +95,7 @@ function StudentDetail() {
   const [newSub, setNewSub] = useState(false);
   const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment } | null>(null);
   const [adjModal, setAdjModal] = useState<{ existing: Adjustment | null } | null>(null);
+  const [holidayModal, setHolidayModal] = useState<{ existing: Adjustment | null } | null>(null);
 
   const [activateOpen, setActivateOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
@@ -377,6 +381,9 @@ function StudentDetail() {
             <Button size="sm" variant="outline" onClick={() => setAdjModal({ existing: null })}>
               <Scale className="h-3 w-3 mr-1" />Add Adjustment
             </Button>
+            <Button size="sm" variant="outline" onClick={() => setHolidayModal({ existing: null })}>
+              <CalendarDays className="h-3 w-3 mr-1" />Add Holiday / Leave
+            </Button>
             <Button size="sm" onClick={() => setPayModal({ mode: "new" })}>
               <IndianRupee className="h-3 w-3 mr-1" />Record Payment
             </Button>
@@ -468,21 +475,38 @@ function StudentDetail() {
                   );
                 });
               })()}
-              {data.adjs.map((a) => (
-                <TableRow key={a.id} className="bg-muted/20">
+              {data.adjs.map((a) => {
+                const isHoliday = a.kind === "holiday";
+                const hDays = isHoliday && a.from_date && a.to_date
+                  ? Math.round((Date.parse(a.to_date) - Date.parse(a.from_date)) / 86400000) + 1
+                  : 0;
+                const rangeLabel = isHoliday && a.from_date && a.to_date
+                  ? `${formatDMY(a.from_date)} → ${formatDMY(a.to_date)} (${hDays} day${hDays === 1 ? "" : "s"})`
+                  : null;
+                return (
+                <TableRow key={a.id} className={isHoliday ? "bg-success/5" : "bg-muted/20"}>
                   <TableCell className="text-sm">{new Date(a.entry_date).toLocaleDateString("en-IN")}</TableCell>
-                  <TableCell className="text-sm italic">Adjustment</TableCell>
+                  <TableCell className="text-sm italic">{isHoliday ? "Holiday Deduction" : "Adjustment"}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{Number(a.amount) < 0 ? "Credit" : "Charge"}</Badge>
+                    {isHoliday
+                      ? <Badge className="bg-success text-success-foreground">Holiday</Badge>
+                      : <Badge variant="secondary">{Number(a.amount) < 0 ? "Credit" : "Charge"}</Badge>}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{a.remarks ?? "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {isHoliday
+                      ? <span>{rangeLabel}{a.remarks ? ` · ${a.remarks}` : ""}</span>
+                      : (a.remarks ?? "—")}
+                  </TableCell>
                   <TableCell className={`text-right font-semibold ${Number(a.amount) < 0 ? "text-success" : ""}`}>
                     {Number(a.amount) < 0 ? "−" : "+"}{inr(Math.abs(Number(a.amount)))}
                   </TableCell>
                   <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
                   <TableCell className="text-right print:hidden">
                     <div className="flex justify-end gap-1">
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setAdjModal({ existing: a })}>
+                    <Button
+                      size="icon" variant="ghost" className="h-7 w-7"
+                      onClick={() => (isHoliday ? setHolidayModal({ existing: a }) : setAdjModal({ existing: a }))}
+                    >
                       <Pencil className="h-3 w-3" />
                     </Button>
                     <AlertDialog>
@@ -494,9 +518,9 @@ function StudentDetail() {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Delete this adjustment?</AlertDialogTitle>
+                          <AlertDialogTitle>{isHoliday ? "Delete this holiday deduction?" : "Delete this adjustment?"}</AlertDialogTitle>
                           <AlertDialogDescription>
-                            {inr(Math.abs(Number(a.amount)))} · {a.remarks ?? "no remarks"} will be permanently removed from the ledger.
+                            {inr(Math.abs(Number(a.amount)))} · {rangeLabel ?? a.remarks ?? "no remarks"} will be permanently removed from the ledger.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -506,11 +530,11 @@ function StudentDetail() {
                               const { error } = await supabase.from("ledger_adjustments").delete().eq("id", a.id);
                               if (error) return toast.error(error.message);
                               await logAudit({
-                                action: "delete", entity: "adjustment", entityId: a.id, studentId: s.id,
-                                label: a.remarks ?? "Ledger adjustment",
-                                oldValues: { amount: a.amount, entry_date: a.entry_date, remarks: a.remarks },
+                                action: "delete", entity: isHoliday ? "holiday" : "adjustment", entityId: a.id, studentId: s.id,
+                                label: rangeLabel ?? a.remarks ?? "Ledger adjustment",
+                                oldValues: { amount: a.amount, entry_date: a.entry_date, remarks: a.remarks, from_date: a.from_date, to_date: a.to_date },
                               });
-                              toast.success("Adjustment deleted");
+                              toast.success(isHoliday ? "Holiday deduction deleted" : "Adjustment deleted");
                               refresh();
                             }}
                           >
@@ -523,7 +547,8 @@ function StudentDetail() {
                   </TableCell>
 
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
           <div className="flex flex-wrap gap-6 border-t px-4 py-3 text-sm">
@@ -629,6 +654,15 @@ function StudentDetail() {
           existing={adjModal.existing}
           onClose={() => setAdjModal(null)}
           onSaved={() => { setAdjModal(null); refresh(); }}
+        />
+      )}
+      {holidayModal && (
+        <HolidayModal
+          studentId={s.id}
+          slabs={feeSlabs ?? []}
+          existing={holidayModal.existing}
+          onClose={() => setHolidayModal(null)}
+          onSaved={() => { setHolidayModal(null); refresh(); }}
         />
       )}
 
@@ -1229,3 +1263,122 @@ function AdjustmentModal({
   );
 }
 
+
+/* ---------------- Holiday / Leave Modal ---------------- */
+
+function HolidayModal({
+  studentId, slabs, existing, onClose, onSaved,
+}: {
+  studentId: string;
+  slabs: FeeSlab[];
+  existing?: Adjustment | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [fromDate, setFromDate] = useState(existing?.from_date ?? todayISO());
+  const [toDate, setToDate] = useState(existing?.to_date ?? todayISO());
+  const [remarks, setRemarks] = useState(existing?.remarks ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const valid = Boolean(fromDate && toDate && toDate >= fromDate);
+  const calc = useMemo(
+    () => (valid ? computeHolidayDeduction(slabs, fromDate, toDate) : null),
+    [valid, slabs, fromDate, toDate],
+  );
+
+  async function save() {
+    if (!valid) return toast.error("To Date must be on or after From Date");
+    if (!calc || calc.missingMonths.length > 0) {
+      return toast.error(missingSlabMessage((calc?.missingMonths[0] ?? fromDate)));
+    }
+    if (calc.amount <= 0) return toast.error("Deduction works out to ₹0 — check the fee slab");
+    setSaving(true);
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
+      const payload = {
+        amount: -calc.amount,
+        entry_date: fromDate,
+        from_date: fromDate,
+        to_date: toDate,
+        kind: "holiday",
+        remarks: remarks.trim() || null,
+      };
+      const label = `Holiday ${formatDMY(fromDate)} → ${formatDMY(toDate)} (${calc.days} days)`;
+      if (existing) {
+        const { error } = await supabase.from("ledger_adjustments").update(payload).eq("id", existing.id);
+        if (error) throw new Error(error.message);
+        const d = diffValues(
+          { amount: existing.amount, from_date: existing.from_date, to_date: existing.to_date, remarks: existing.remarks },
+          { amount: payload.amount, from_date: fromDate, to_date: toDate, remarks: payload.remarks },
+        );
+        await logAudit({ action: "update", entity: "holiday", entityId: existing.id, studentId, label, oldValues: d.old, newValues: d.new });
+        toast.success("Holiday deduction updated");
+      } else {
+        const { error } = await supabase.from("ledger_adjustments").insert({
+          student_id: studentId, created_by: userRes.user?.id ?? null, ...payload,
+        });
+        if (error) throw new Error(error.message);
+        await logAudit({ action: "create", entity: "holiday", studentId, label, newValues: payload });
+        toast.success(`Holiday credit of ${inr(calc.amount)} applied`);
+      }
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save holiday deduction");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{existing ? "Edit Holiday / Leave" : "Add Holiday / Leave"}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="From Date">
+              <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+            </Field>
+            <Field label="To Date">
+              <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+            </Field>
+          </div>
+          <Field label="Remarks (optional)">
+            <Input value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="e.g. Went home for Diwali" />
+          </Field>
+
+          <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+            {!valid ? (
+              <p className="text-destructive">To Date must be on or after From Date.</p>
+            ) : calc && calc.missingMonths.length > 0 ? (
+              <p className="text-destructive">{missingSlabMessage(calc.missingMonths[0])}</p>
+            ) : calc ? (
+              <>
+                {calc.segments.map((seg) => (
+                  <div key={seg.month} className="flex justify-between text-xs text-muted-foreground">
+                    <span>
+                      {formatMonth(seg.month)} — {seg.days} day{seg.days === 1 ? "" : "s"} ×{" "}
+                      {inr(seg.monthlyFee)}/{seg.daysInMonth}
+                    </span>
+                    <span>−{inr(seg.amount)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between font-semibold pt-1 border-t">
+                  <span>{calc.days} holiday day{calc.days === 1 ? "" : "s"}</span>
+                  <span className="text-success">−{inr(calc.amount)}</span>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving || !valid}>{saving ? "Saving…" : "Save Holiday Deduction"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

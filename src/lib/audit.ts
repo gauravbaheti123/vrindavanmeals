@@ -5,6 +5,7 @@ export type AuditAction = "create" | "update" | "delete";
 export type AuditEntity =
   | "payment"
   | "adjustment"
+  | "holiday"
   | "subscription"
   | "fee_slab"
   | "biometric_mapping";
@@ -12,6 +13,7 @@ export type AuditEntity =
 export const ENTITY_LABEL: Record<AuditEntity, string> = {
   payment: "Payment",
   adjustment: "Adjustment",
+  holiday: "Holiday Deduction",
   subscription: "Subscription",
   fee_slab: "Fee Slab",
   biometric_mapping: "Biometric Mapping",
