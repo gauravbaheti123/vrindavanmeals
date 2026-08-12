@@ -46,6 +46,9 @@ type Adjustment = {
   entry_date: string;
   created_by: string | null;
   created_at: string;
+  kind: string;
+  from_date: string | null;
+  to_date: string | null;
 };
 
 
