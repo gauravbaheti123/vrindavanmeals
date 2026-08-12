@@ -1263,3 +1263,122 @@ function AdjustmentModal({
   );
 }
 
+
+/* ---------------- Holiday / Leave Modal ---------------- */
+
+function HolidayModal({
+  studentId, slabs, existing, onClose, onSaved,
+}: {
+  studentId: string;
+  slabs: FeeSlab[];
+  existing?: Adjustment | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [fromDate, setFromDate] = useState(existing?.from_date ?? todayISO());
+  const [toDate, setToDate] = useState(existing?.to_date ?? todayISO());
+  const [remarks, setRemarks] = useState(existing?.remarks ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const valid = Boolean(fromDate && toDate && toDate >= fromDate);
+  const calc = useMemo(
+    () => (valid ? computeHolidayDeduction(slabs, fromDate, toDate) : null),
+    [valid, slabs, fromDate, toDate],
+  );
+
+  async function save() {
+    if (!valid) return toast.error("To Date must be on or after From Date");
+    if (!calc || calc.missingMonths.length > 0) {
+      return toast.error(missingSlabMessage((calc?.missingMonths[0] ?? fromDate)));
+    }
+    if (calc.amount <= 0) return toast.error("Deduction works out to ₹0 — check the fee slab");
+    setSaving(true);
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
+      const payload = {
+        amount: -calc.amount,
+        entry_date: fromDate,
+        from_date: fromDate,
+        to_date: toDate,
+        kind: "holiday",
+        remarks: remarks.trim() || null,
+      };
+      const label = `Holiday ${formatDMY(fromDate)} → ${formatDMY(toDate)} (${calc.days} days)`;
+      if (existing) {
+        const { error } = await supabase.from("ledger_adjustments").update(payload).eq("id", existing.id);
+        if (error) throw new Error(error.message);
+        const d = diffValues(
+          { amount: existing.amount, from_date: existing.from_date, to_date: existing.to_date, remarks: existing.remarks },
+          { amount: payload.amount, from_date: fromDate, to_date: toDate, remarks: payload.remarks },
+        );
+        await logAudit({ action: "update", entity: "holiday", entityId: existing.id, studentId, label, oldValues: d.old, newValues: d.new });
+        toast.success("Holiday deduction updated");
+      } else {
+        const { error } = await supabase.from("ledger_adjustments").insert({
+          student_id: studentId, created_by: userRes.user?.id ?? null, ...payload,
+        });
+        if (error) throw new Error(error.message);
+        await logAudit({ action: "create", entity: "holiday", studentId, label, newValues: payload });
+        toast.success(`Holiday credit of ${inr(calc.amount)} applied`);
+      }
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save holiday deduction");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{existing ? "Edit Holiday / Leave" : "Add Holiday / Leave"}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="From Date">
+              <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+            </Field>
+            <Field label="To Date">
+              <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+            </Field>
+          </div>
+          <Field label="Remarks (optional)">
+            <Input value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="e.g. Went home for Diwali" />
+          </Field>
+
+          <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+            {!valid ? (
+              <p className="text-destructive">To Date must be on or after From Date.</p>
+            ) : calc && calc.missingMonths.length > 0 ? (
+              <p className="text-destructive">{missingSlabMessage(calc.missingMonths[0])}</p>
+            ) : calc ? (
+              <>
+                {calc.segments.map((seg) => (
+                  <div key={seg.month} className="flex justify-between text-xs text-muted-foreground">
+                    <span>
+                      {formatMonth(seg.month)} — {seg.days} day{seg.days === 1 ? "" : "s"} ×{" "}
+                      {inr(seg.monthlyFee)}/{seg.daysInMonth}
+                    </span>
+                    <span>−{inr(seg.amount)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between font-semibold pt-1 border-t">
+                  <span>{calc.days} holiday day{calc.days === 1 ? "" : "s"}</span>
+                  <span className="text-success">−{inr(calc.amount)}</span>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving || !valid}>{saving ? "Saving…" : "Save Holiday Deduction"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
