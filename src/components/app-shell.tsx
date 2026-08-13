@@ -1,12 +1,14 @@
+import { useState } from "react";
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
 import {
   UtensilsCrossed, LayoutDashboard, Users, CalendarClock,
-  ClipboardList, BarChart3, Settings, ShieldCheck, LogOut, Receipt, ShoppingCart,
+  ClipboardList, BarChart3, Settings, ShieldCheck, LogOut, Receipt, ShoppingCart, Menu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -30,6 +32,11 @@ const NAV: NavItem[] = [
   { to: "/settings", label: "Settings", icon: Settings, show: (f) => f.isSuperAdmin },
 ];
 
+// Bottom tab bar on phones — the five most-used destinations.
+const BOTTOM_TABS = ["/dashboard", "/dues", "/students", "/pos", "/attendance"];
+
+const isActivePath = (pathname: string, to: string) =>
+  pathname === to || pathname.startsWith(to + "/");
 
 export function AppShell() {
   const { profile, roles, loading } = useCurrentUser();
@@ -37,6 +44,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const signOut = async () => {
     await qc.cancelQueries();
@@ -46,39 +54,43 @@ export function AppShell() {
   };
 
   const primaryRole = roles[0] ?? "no role";
+  const items = NAV.filter((n) => n.show(flags));
+  const tabs = items.filter((n) => BOTTOM_TABS.includes(n.to)).slice(0, 5);
+
+  const navLinks = (onNavigate?: () => void) =>
+    items.map((n) => {
+      const active = isActivePath(pathname, n.to);
+      return (
+        <Link
+          key={n.to}
+          to={n.to}
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-3 px-3 min-h-11 rounded-md text-sm transition-colors",
+            active
+              ? "bg-sidebar-primary text-sidebar-primary-foreground"
+              : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          )}
+        >
+          <n.icon className="h-4 w-4 shrink-0" />
+          {n.label}
+        </Link>
+      );
+    });
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-screen flex bg-background overflow-x-hidden">
       <aside className="w-64 hidden md:flex flex-col bg-sidebar border-r text-sidebar-foreground">
         <div className="p-4 border-b flex items-center gap-2">
-          <div className="h-9 w-9 rounded-lg bg-primary text-primary-foreground grid place-items-center">
+          <div className="h-9 w-9 rounded-lg bg-primary text-primary-foreground grid place-items-center shrink-0">
             <UtensilsCrossed className="h-5 w-5" />
           </div>
-          <div>
-            <div className="font-semibold leading-tight">Vrindavan Meals</div>
+          <div className="min-w-0">
+            <div className="font-semibold leading-tight truncate">Vrindavan Meals</div>
             <div className="text-xs text-muted-foreground">Canteen Portal</div>
           </div>
         </div>
-        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-          {NAV.filter((n) => n.show(flags)).map((n) => {
-            const active = pathname === n.to || pathname.startsWith(n.to + "/");
-            return (
-              <Link
-                key={n.to}
-                to={n.to}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                  active
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                    : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                )}
-              >
-                <n.icon className="h-4 w-4" />
-                {n.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">{navLinks()}</nav>
         <div className="p-3 border-t space-y-2">
           {profile?.name ? (
             <div className="text-xs font-medium truncate">{profile.name}</div>
@@ -92,13 +104,39 @@ export function AppShell() {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="md:hidden h-14 border-b bg-card flex items-center px-4 justify-between">
-          <div className="font-semibold">Vrindavan Meals</div>
-          <Button variant="ghost" size="sm" onClick={signOut}>
+        <header className="md:hidden h-14 border-b bg-card sticky top-0 z-30 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-2">
+          <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Open menu">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[17rem] p-0 bg-sidebar text-sidebar-foreground">
+              <div className="p-4 border-b flex items-center gap-2">
+                <div className="h-9 w-9 rounded-lg bg-primary text-primary-foreground grid place-items-center shrink-0">
+                  <UtensilsCrossed className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="font-semibold leading-tight truncate">Vrindavan Meals</div>
+                  <div className="text-xs text-muted-foreground">Canteen Portal</div>
+                </div>
+              </div>
+              <nav className="p-2 space-y-1 overflow-y-auto">{navLinks(() => setDrawerOpen(false))}</nav>
+              <div className="p-3 border-t space-y-2">
+                {profile?.name ? <div className="text-xs font-medium truncate">{profile.name}</div> : null}
+                <Badge variant="secondary" className="capitalize">{primaryRole.replace("_", " ")}</Badge>
+                <Button variant="outline" size="sm" className="w-full min-h-11" onClick={signOut}>
+                  <LogOut className="h-4 w-4 mr-2" />Sign out
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+          <div className="font-semibold truncate">Vrindavan Meals</div>
+          <Button variant="ghost" size="icon" className="h-11 w-11" onClick={signOut} aria-label="Sign out">
             <LogOut className="h-4 w-4" />
           </Button>
         </header>
-        <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+        <div className="flex-1 p-3 pb-24 sm:p-4 md:p-6 md:pb-6 overflow-x-hidden">
           {/* Only gate on the very first load. Background auth refreshes must never
               unmount <Outlet />, or in-progress form input would be lost. */}
           {loading && roles.length === 0 && !profile ? (
@@ -110,6 +148,27 @@ export function AppShell() {
           )}
         </div>
 
+        {tabs.length > 0 && (
+          <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t bg-card grid print:hidden"
+            style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
+            {tabs.map((n) => {
+              const active = isActivePath(pathname, n.to);
+              return (
+                <Link
+                  key={n.to}
+                  to={n.to}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-0.5 min-h-14 text-[11px] px-1",
+                    active ? "text-primary font-semibold" : "text-muted-foreground",
+                  )}
+                >
+                  <n.icon className="h-5 w-5" />
+                  <span className="truncate max-w-full">{n.label.split(" ")[0]}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        )}
       </main>
     </div>
   );
