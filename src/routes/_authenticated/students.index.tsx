@@ -89,11 +89,11 @@ function StudentList() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold">Students</h1>
-          <p className="text-muted-foreground">Manage student records across units.</p>
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold">Students</h1>
+          <p className="text-sm text-muted-foreground">Manage student records across units.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 w-full sm:flex sm:w-auto [&_button]:min-h-11 [&_a]:min-h-11">
           <Button variant="outline" onClick={() => setBulkHoliday(true)}>
             <CalendarOff className="h-4 w-4 mr-2" />
             Bulk Holiday / Leave
