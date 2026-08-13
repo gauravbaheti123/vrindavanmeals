@@ -610,80 +610,65 @@ function StudentDetail() {
             Refundable — not counted in Total Billed, Paid, Adjustments or Due.
           </p>
           {data.deposits.length > 0 && (
-            <div className="border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Mode</TableHead>
-                    <TableHead>Remarks</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right print:hidden">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            <>
+              <DesktopOnly>
+                <div className="border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Mode</TableHead>
+                        <TableHead>Remarks</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right print:hidden">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.deposits.map((d) => (
+                        <TableRow key={d.id}>
+                          <TableCell className="text-sm whitespace-nowrap">{fmtDate(d.entry_date)}</TableCell>
+                          <TableCell>
+                            <Badge variant={d.kind === "refunded" ? "secondary" : "outline"} className="capitalize">
+                              {d.kind === "refunded" ? "Refunded" : "Received"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm uppercase">{d.mode ?? "—"}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{d.remarks ?? "—"}</TableCell>
+                          <TableCell className={`text-right font-semibold whitespace-nowrap ${d.kind === "refunded" ? "text-destructive" : ""}`}>
+                            {d.kind === "refunded" ? "−" : "+"}{inr(Number(d.amount))}
+                          </TableCell>
+                          <TableCell className="text-right print:hidden">
+                            <div className="flex justify-end gap-1">{depActions(d)}</div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </DesktopOnly>
+              <MobileOnly>
+                <MobileCardList>
                   {data.deposits.map((d) => (
-                    <TableRow key={d.id}>
-                      <TableCell className="text-sm">{fmtDate(d.entry_date)}</TableCell>
-                      <TableCell>
-                        <Badge variant={d.kind === "refunded" ? "secondary" : "outline"} className="capitalize">
-                          {d.kind === "refunded" ? "Refunded" : "Received"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm uppercase">{d.mode ?? "—"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{d.remarks ?? "—"}</TableCell>
-                      <TableCell className={`text-right font-semibold ${d.kind === "refunded" ? "text-destructive" : ""}`}>
-                        {d.kind === "refunded" ? "−" : "+"}{inr(Number(d.amount))}
-                      </TableCell>
-                      <TableCell className="text-right print:hidden">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="icon" variant="ghost" className="h-7 w-7"
-                            onClick={() => setDepositModal({ kind: d.kind as "received" | "refunded", existing: d, held: depositHeld })}
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive">
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete this deposit entry?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  The held deposit balance will be recalculated. Billing and dues are unaffected.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={async () => {
-                                    const { error } = await supabase.from("security_deposits").delete().eq("id", d.id);
-                                    if (error) return toast.error(error.message);
-                                    await logAudit({
-                                      action: "delete", entity: "security_deposit", entityId: d.id, studentId: s.id,
-                                      label: `Deposit ${d.kind} ${inr(Number(d.amount))}`,
-                                      oldValues: { kind: d.kind, amount: d.amount, entry_date: d.entry_date, mode: d.mode, remarks: d.remarks },
-                                    });
-                                    toast.success("Deposit entry deleted");
-                                    refresh();
-                                  }}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <MobileCard
+                      key={d.id}
+                      title={d.kind === "refunded" ? "Refunded" : "Received"}
+                      subtitle={fmtDate(d.entry_date)}
+                      right={
+                        <span className={`font-semibold whitespace-nowrap ${d.kind === "refunded" ? "text-destructive" : ""}`}>
+                          {d.kind === "refunded" ? "−" : "+"}{inr(Number(d.amount))}
+                        </span>
+                      }
+                      meta={[
+                        { label: "Mode", value: <span className="uppercase">{d.mode ?? "—"}</span> },
+                        { label: "Remarks", value: d.remarks ?? "—" },
+                      ]}
+                      actions={<div className="flex gap-1 print:hidden">{depActions(d)}</div>}
+                    />
                   ))}
-                </TableBody>
-              </Table>
-            </div>
+                </MobileCardList>
+              </MobileOnly>
+            </>
           )}
         </CardContent>
       </Card>
