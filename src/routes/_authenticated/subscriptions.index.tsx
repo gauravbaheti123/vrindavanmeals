@@ -114,7 +114,7 @@ function SubscriptionList() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
