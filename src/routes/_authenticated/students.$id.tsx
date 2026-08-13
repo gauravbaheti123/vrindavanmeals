@@ -205,6 +205,152 @@ function StudentDetail() {
   const activeSub = data.subs[0];
   const effStatus = activeSub ? computeSubscriptionStatus(activeSub) : null;
 
+  const adjMeta = (a: Adjustment) => {
+    const isHoliday = a.kind === "holiday";
+    const hDays = isHoliday && a.from_date && a.to_date
+      ? Math.round((Date.parse(a.to_date) - Date.parse(a.from_date)) / 86400000) + 1
+      : 0;
+    const rangeLabel = isHoliday && a.from_date && a.to_date
+      ? `${formatDMY(a.from_date)} → ${formatDMY(a.to_date)} (${hDays} day${hDays === 1 ? "" : "s"})`
+      : null;
+    const detail = isHoliday
+      ? `${rangeLabel ?? ""}${a.remarks ? ` · ${a.remarks}` : ""}`
+      : (a.remarks ?? "—");
+    return { isHoliday, rangeLabel, detail };
+  };
+
+  const payActions = (p: Payment) => (
+    <>
+      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setPayModal({ mode: "edit", payment: p })}>
+        <Pencil className="h-3 w-3" />
+      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive">
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this payment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {inr(Number(p.amount))} · {p.mode} · {fmtDate(p.created_at)} will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const { error } = await supabase.from("payments").delete().eq("id", p.id);
+                if (error) return toast.error(error.message);
+                await logAudit({
+                  action: "delete", entity: "payment", entityId: p.id, studentId: s.id,
+                  label: `${inr(Number(p.amount))} · ${p.mode} · ${fmtDate(p.created_at)}`,
+                  oldValues: { amount: p.amount, mode: p.mode, date: p.created_at.slice(0, 10), status: p.status },
+                });
+                toast.success("Payment deleted");
+                refresh();
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+
+  const adjActions = (a: Adjustment) => {
+    const { isHoliday, rangeLabel } = adjMeta(a);
+    return (
+      <>
+        <Button
+          size="icon" variant="ghost" className="h-8 w-8"
+          onClick={() => (isHoliday ? setHolidayModal({ existing: a }) : setAdjModal({ existing: a }))}
+        >
+          <Pencil className="h-3 w-3" />
+        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive">
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{isHoliday ? "Delete this holiday deduction?" : "Delete this adjustment?"}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {inr(Math.abs(Number(a.amount)))} · {rangeLabel ?? a.remarks ?? "no remarks"} will be permanently removed from the ledger.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  const { error } = await supabase.from("ledger_adjustments").delete().eq("id", a.id);
+                  if (error) return toast.error(error.message);
+                  await logAudit({
+                    action: "delete", entity: isHoliday ? "holiday" : "adjustment", entityId: a.id, studentId: s.id,
+                    label: rangeLabel ?? a.remarks ?? "Ledger adjustment",
+                    oldValues: { amount: a.amount, entry_date: a.entry_date, remarks: a.remarks, from_date: a.from_date, to_date: a.to_date },
+                  });
+                  toast.success(isHoliday ? "Holiday deduction deleted" : "Adjustment deleted");
+                  refresh();
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  };
+
+  const depActions = (d: Deposit) => (
+    <>
+      <Button
+        size="icon" variant="ghost" className="h-8 w-8"
+        onClick={() => setDepositModal({ kind: d.kind as "received" | "refunded", existing: d, held: depositHeld })}
+      >
+        <Pencil className="h-3 w-3" />
+      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive">
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this deposit entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The held deposit balance will be recalculated. Billing and dues are unaffected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const { error } = await supabase.from("security_deposits").delete().eq("id", d.id);
+                if (error) return toast.error(error.message);
+                await logAudit({
+                  action: "delete", entity: "security_deposit", entityId: d.id, studentId: s.id,
+                  label: `Deposit ${d.kind} ${inr(Number(d.amount))}`,
+                  oldValues: { kind: d.kind, amount: d.amount, entry_date: d.entry_date, mode: d.mode, remarks: d.remarks },
+                });
+                toast.success("Deposit entry deleted");
+                refresh();
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+
   return (
     <div className="space-y-6 max-w-5xl print:max-w-none print:space-y-3">
       <div className="flex items-center justify-between print:hidden flex-wrap gap-2">
