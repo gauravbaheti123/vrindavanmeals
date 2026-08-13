@@ -208,6 +208,32 @@ function StudentList() {
         </Table>
       </Card>
 
+      {/* Mobile — stacked cards instead of a wide table */}
+      <MobileOnly>
+        {isLoading ? (
+          <MobileEmpty>Loading…</MobileEmpty>
+        ) : rows.length === 0 ? (
+          <MobileEmpty>No students match the filters.</MobileEmpty>
+        ) : (
+          <MobileCardList>
+            {rows.map((s) => (
+              <MobileCard
+                key={s.student_id}
+                title={s.full_name}
+                subtitle={`${s.roll_number || "—"}${s.unit_name ? ` · ${s.unit_name}` : ""}`}
+                right={<div className="space-y-1"><StatusBadge status={s.status} /><DueAmount status={s.status} due={s.due_amount} daysOverdue={s.days_overdue} /></div>}
+                meta={[{ label: "Mobile", value: s.mobile || "—" }, { label: "Unit", value: s.unit_name || "—" }]}
+                actions={
+                  <Button asChild size="sm" variant="outline" className="min-h-11 flex-1">
+                    <Link to="/students/$id" params={{ id: s.student_id }}>View / Ledger</Link>
+                  </Button>
+                }
+              />
+            ))}
+          </MobileCardList>
+        )}
+      </MobileOnly>
+
       {bulkHoliday && (
         <BulkHolidayModal
           students={rows.map((r) => ({
