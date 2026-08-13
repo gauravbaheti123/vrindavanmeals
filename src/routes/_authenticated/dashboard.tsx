@@ -193,21 +193,21 @@ function Dashboard() {
       {/* PRIMARY — Outstanding Dues (largest, top) */}
       <Link to="/dues" className="block">
         <Card className="border-l-8 border-l-destructive hover:shadow-lg transition-shadow bg-gradient-to-br from-destructive/5 to-transparent">
-          <CardContent className="pt-6 pb-6 flex items-center justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <div className="h-14 w-14 rounded-xl bg-destructive/10 grid place-items-center shrink-0">
-                <AlertTriangle className="h-7 w-7 text-destructive" />
+          <CardContent className="pt-5 pb-5 sm:pt-6 sm:pb-6 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+              <div className="h-11 w-11 sm:h-14 sm:w-14 rounded-xl bg-destructive/10 grid place-items-center shrink-0">
+                <AlertTriangle className="h-6 w-6 sm:h-7 sm:w-7 text-destructive" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Total Outstanding Dues</div>
-                <div className="text-5xl font-bold text-destructive leading-tight">{inr(agg?.outstanding.amount ?? 0)}</div>
+                <div className="text-3xl sm:text-5xl font-bold text-destructive leading-tight truncate">{inr(agg?.outstanding.amount ?? 0)}</div>
                 <div className="text-sm text-muted-foreground mt-1">
                   <b className="text-foreground">{agg?.outstanding.students ?? 0}</b> students overdue
                 </div>
               </div>
             </div>
-            <div className="text-sm text-primary flex items-center gap-1 font-medium">
-              View Details <ArrowRight className="h-4 w-4" />
+            <div className="text-sm text-primary flex items-center gap-1 font-medium shrink-0">
+              <span className="hidden sm:inline">View Details</span> <ArrowRight className="h-4 w-4" />
             </div>
           </CardContent>
         </Card>
