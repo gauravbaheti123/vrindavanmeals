@@ -153,24 +153,38 @@ function Dashboard() {
   useEffect(() => { if (agg) setLastUpdated(new Date()); }, [agg]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <RefreshCw className="h-3 w-3" />
+            <RefreshCw className="h-3 w-3 shrink-0" />
             Updated {lastUpdated.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
           </p>
         </div>
         <Select value={unitId} onValueChange={setUnitId}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="All units" /></SelectTrigger>
+          <SelectTrigger className="w-[140px] sm:w-[180px]"><SelectValue placeholder="All units" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Units</SelectItem>
             {units?.map((u) => (<SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>))}
           </SelectContent>
         </Select>
       </div>
+
+      {/* Quick actions — always above the fold */}
+      <div className="grid grid-cols-2 gap-3">
+        <Button variant="outline" className="min-h-12 justify-center" onClick={() => setSearchOpen(true)}>
+          <Search className="h-4 w-4 mr-2" />Search Student
+        </Button>
+        <Button className="min-h-12 justify-center" onClick={() => setPayOpen(true)}>
+          <IndianRupee className="h-4 w-4 mr-2" />Record Payment
+        </Button>
+      </div>
+
+      <StudentSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <QuickPaymentDialog open={payOpen} onOpenChange={setPayOpen} />
+
 
       {/* PRIMARY — Outstanding Dues (largest, top) */}
       <Link to="/dues" className="block">
