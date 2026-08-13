@@ -31,6 +31,10 @@ function StudentList() {
   const [q, setQ] = useState("");
   const [unit, setUnit] = useState<string>("all");
   const [filter, setFilter] = useState<LedgerFilterState>({ ...defaultLedgerFilter, sort: "name_asc" });
+  const [bulkHoliday, setBulkHoliday] = useState(false);
+  const queryClient = useQueryClient();
+
+
 
   const { data: units } = useQuery({
     queryKey: ["units"],
