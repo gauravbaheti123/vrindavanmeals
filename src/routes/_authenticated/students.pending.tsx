@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/dates";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { STALE } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -72,7 +73,7 @@ function Pending() {
                 <TableCell>{s.mobile}</TableCell>
                 <TableCell>{(s as unknown as { college_roll_number?: string | null }).college_roll_number || "—"}</TableCell>
                 <TableCell>{s.course || "—"}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{new Date(s.created_at).toLocaleDateString()}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{fmtDate(s.created_at)}</TableCell>
                 <TableCell className="text-right space-x-2">
                   <Button size="sm" onClick={() => approve(s.id)}><Check className="h-4 w-4 mr-1" />Approve</Button>
                   <Button size="sm" variant="outline" onClick={() => reject(s.id)}><X className="h-4 w-4 mr-1" />Reject</Button>

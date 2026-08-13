@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/dates";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
@@ -76,7 +77,7 @@ function SubscriptionList() {
     r.due_amount,
     r.days_overdue,
   ]);
-  const exportTitle = `Subscriptions — ${new Date().toLocaleDateString("en-IN")}`;
+  const exportTitle = `Subscriptions — ${fmtDate(new Date())}`;
 
   return (
     <div className="space-y-6">
