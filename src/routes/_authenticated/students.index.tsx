@@ -173,6 +173,26 @@ function StudentList() {
           </TableBody>
         </Table>
       </Card>
+
+      {bulkHoliday && (
+        <BulkHolidayModal
+          students={rows.map((r) => ({
+            student_id: r.student_id,
+            full_name: r.full_name,
+            roll_number: r.roll_number,
+            unit_name: r.unit_name,
+            status: r.status,
+          }))}
+          onClose={() => setBulkHoliday(false)}
+          onSaved={() => {
+            setBulkHoliday(false);
+            queryClient.invalidateQueries({ queryKey: ["students-ledger"] });
+            queryClient.invalidateQueries({ queryKey: ["dues"] });
+            queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+          }}
+        />
+      )}
     </div>
+
   );
 }
