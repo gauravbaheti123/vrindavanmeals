@@ -115,11 +115,11 @@ function DuesPage() {
     r.unit_name ?? "",
     r.total_billed,
     r.due_amount,
-    r.last_payment_date ? r.last_payment_date.slice(0, 10) : "",
+    fmtDate(r.last_payment_date, ""),
     r.days_overdue,
     r.status === "active" ? "Active" : "Inactive",
   ]);
-  const exportTitle = `Dues & Ledger — ${fmtDate()}`;
+  const exportTitle = `Dues & Ledger — ${fmtDate(new Date())}`;
 
 
   return (
