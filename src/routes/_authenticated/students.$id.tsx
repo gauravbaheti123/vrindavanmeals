@@ -296,8 +296,8 @@ function StudentDetail() {
             <Row k="Email" v={s.email} />
             <Row k="Parent Mobile" v={s.parent_mobile} />
             <Row k="Blood Group" v={s.blood_group} />
-            <Row k="Joining Date" v={(s as unknown as { joining_date?: string | null }).joining_date} />
-            <Row k="Exit Date" v={(s as unknown as { exit_date?: string | null }).exit_date} />
+            <Row k="Joining Date" v={fmtDate((s as unknown as { joining_date?: string | null }).joining_date, "")} />
+            <Row k="Exit Date" v={fmtDate((s as unknown as { exit_date?: string | null }).exit_date, "")} />
 
 
             {s.is_approved && !(s as unknown as { exit_date?: string | null }).exit_date && (
