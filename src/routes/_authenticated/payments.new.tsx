@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -165,7 +166,7 @@ function NewPayment() {
             </div>
             <div className="space-y-2">
               <Label>Payment Date</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DateInput value={date} onChange={setDate} />
             </div>
           </div>
           <div className="space-y-2">

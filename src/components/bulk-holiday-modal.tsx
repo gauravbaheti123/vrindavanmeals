@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { STALE } from "@/lib/query-cache";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -148,11 +149,11 @@ export function BulkHolidayModal({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">From Date</Label>
-              <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+              <DateInput value={fromDate} onChange={setFromDate} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">To Date</Label>
-              <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+              <DateInput value={toDate} onChange={setToDate} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Remarks (optional)</Label>

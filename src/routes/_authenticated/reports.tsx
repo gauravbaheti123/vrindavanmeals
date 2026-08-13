@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/dates";
 import { createFileRoute } from "@tanstack/react-router";
 import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
@@ -6,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { pageAll } from "@/lib/fetch-all";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -128,8 +130,8 @@ function ReportsPage() {
         </div>
 
         <Card className="p-3 flex flex-wrap gap-3 items-end">
-          <div><div className="text-xs mb-1">From</div><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-[150px]" /></div>
-          <div><div className="text-xs mb-1">To</div><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-[150px]" /></div>
+          <div><div className="text-xs mb-1">From</div><DateInput value={from} onChange={setFrom} className="w-[150px]" /></div>
+          <div><div className="text-xs mb-1">To</div><DateInput value={to} onChange={setTo} className="w-[150px]" /></div>
           <div>
             <div className="text-xs mb-1">Unit</div>
             <Select value={unit} onValueChange={setUnit}>
@@ -299,12 +301,12 @@ function StudentMaster({ unit }: { unit: string }) {
   const badge = (s: string) => ({ active: "bg-success text-success-foreground", grace: "bg-warning text-warning-foreground", expired: "bg-destructive text-destructive-foreground", pending: "bg-muted", none: "bg-muted" } as Record<string, string>)[s];
   const rows = filtered.map((s) => [
     s.roll_number ?? "—", s.full_name, s.hostel_room ?? "—", s.units?.name ?? "—",
-    new Date(s.created_at).toLocaleDateString("en-IN"),
+    fmtDate(s.created_at),
     <Badge key="st" className={!s.exit_date ? "bg-success text-success-foreground" : "bg-muted"}>{s.exit_date ? "Inactive" : "Active"}</Badge>,
     <Badge key="ss" className={badge(s.subStatus)}>{s.subStatus}</Badge>,
     s.mobile,
   ]);
-  const exportRows = filtered.map((s) => [s.roll_number ?? "", s.full_name, s.hostel_room ?? "", s.units?.name ?? "", new Date(s.created_at).toLocaleDateString("en-IN"), s.exit_date ? "Inactive" : "Active", s.subStatus, s.mobile ?? ""]);
+  const exportRows = filtered.map((s) => [s.roll_number ?? "", s.full_name, s.hostel_room ?? "", s.units?.name ?? "", fmtDate(s.created_at), s.exit_date ? "Inactive" : "Active", s.subStatus, s.mobile ?? ""]);
 
   return (
     <div className="space-y-3">
@@ -529,11 +531,11 @@ function CollectionReport({ from, to, unit }: { from: string; to: string; unit: 
   const cols = ["Date", "Mess No", "Student", "Amount", "Mode"];
   const rows = filtered.map((r) => {
     const x = r as { created_at: string; amount: number; mode: string; students?: { full_name: string; roll_number: string | null } };
-    return [new Date(x.created_at).toLocaleDateString("en-IN"), x.students?.roll_number ?? "—", x.students?.full_name ?? "", fmtINR(Number(x.amount)), <Badge key="m" variant="outline">{x.mode.toUpperCase()}</Badge>];
+    return [fmtDate(x.created_at), x.students?.roll_number ?? "—", x.students?.full_name ?? "", fmtINR(Number(x.amount)), <Badge key="m" variant="outline">{x.mode.toUpperCase()}</Badge>];
   });
   const exportRows = filtered.map((r) => {
     const x = r as { created_at: string; amount: number; mode: string; students?: { full_name: string; roll_number: string | null } };
-    return [new Date(x.created_at).toLocaleDateString("en-IN"), x.students?.roll_number ?? "", x.students?.full_name ?? "", Number(x.amount), x.mode];
+    return [fmtDate(x.created_at), x.students?.roll_number ?? "", x.students?.full_name ?? "", Number(x.amount), x.mode];
   });
   return (
     <div className="space-y-3">
@@ -615,7 +617,7 @@ function OutstandingReport({ unit }: { unit: string }) {
   const cols = ["Mess No", "Name", "Mobile", "Unit", "Last Payment", "Last Amount", "Amount Due"];
   const rows = (data ?? []).map((s) => [
     s.students?.roll_number ?? "—", s.students?.full_name ?? "", s.students?.mobile ?? "", s.units?.name ?? "—",
-    s.last ? new Date(s.last.date).toLocaleDateString("en-IN") : "Never", s.last ? fmtINR(s.last.amount) : "—",
+    s.last ? fmtDate(s.last.date) : "Never", s.last ? fmtINR(s.last.amount) : "—",
     fmtINR(Number(s.subscription_plans?.price ?? 0)),
   ]);
   const totalDue = (data ?? []).reduce((a, s) => a + Number(s.subscription_plans?.price ?? 0), 0);
@@ -1040,7 +1042,7 @@ function BulkLedgerSummary() {
       Math.round(r.paid),
       Math.round(r.opening_balance + r.adjustments),
       Math.round(r.due_amount),
-      r.last_payment_date ? new Date(r.last_payment_date).toLocaleDateString("en-IN") : "—",
+      r.last_payment_date ? fmtDate(r.last_payment_date) : "—",
     ]);
   const meta = () => ({
     title: "Student Ledger Summary",
@@ -1116,7 +1118,7 @@ function BulkLedgerSummary() {
                 <TableCell className="text-right text-success">{fmtINR(r.paid)}</TableCell>
                 <TableCell className="text-right">{fmtINR(r.opening_balance + r.adjustments)}</TableCell>
                 <TableCell className={cn("text-right font-semibold", r.due_amount > 0 ? "text-destructive" : "text-success")}>{fmtINR(r.due_amount)}</TableCell>
-                <TableCell>{r.last_payment_date ? new Date(r.last_payment_date).toLocaleDateString("en-IN") : "—"}</TableCell>
+                <TableCell>{r.last_payment_date ? fmtDate(r.last_payment_date) : "—"}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -1229,7 +1231,7 @@ function SingleStudentLedger() {
                   return (
                     <TableRow key={p.id}>
                       <TableCell>{i + 1}</TableCell>
-                      <TableCell>{new Date(p.created_at).toLocaleDateString("en-IN")}</TableCell>
+                      <TableCell>{fmtDate(p.created_at)}</TableCell>
                       <TableCell className={success ? "text-success font-medium" : "text-muted-foreground"}>{fmtINR(Number(p.amount))}</TableCell>
                       <TableCell><Badge variant="outline">{p.mode.toUpperCase()}</Badge></TableCell>
                       <TableCell>{p.status}</TableCell>

@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/dates";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { STALE, invalidateLedger } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { pageAll } from "@/lib/fetch-all";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -117,7 +119,7 @@ function DuesPage() {
     r.days_overdue,
     r.status === "active" ? "Active" : "Inactive",
   ]);
-  const exportTitle = `Dues & Ledger — ${new Date().toLocaleDateString("en-IN")}`;
+  const exportTitle = `Dues & Ledger — ${fmtDate()}`;
 
 
   return (
@@ -321,7 +323,7 @@ function RecordPaymentModal({ row, onClose, onSaved }: {
               </div>
               <div className="space-y-1">
                 <Label>Date</Label>
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <DateInput value={date} onChange={setDate} />
               </div>
             </div>
             <div className="space-y-1">
