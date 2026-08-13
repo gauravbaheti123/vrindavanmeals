@@ -98,21 +98,21 @@ function PaymentList() {
 
       <Card className="p-4 flex flex-wrap gap-3 items-center">
         <Select value={unit} onValueChange={setUnit}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Unit" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Unit" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Units</SelectItem>
             {units?.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={mode} onValueChange={setMode}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Mode" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Mode" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Modes</SelectItem>
             {MODES.map((m) => <SelectItem key={m} value={m} className="capitalize">{m}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="success">Success</SelectItem>
@@ -120,8 +120,8 @@ function PaymentList() {
             <SelectItem value="failed">Failed</SelectItem>
           </SelectContent>
         </Select>
-        <DateInput value={from} onChange={setFrom} className="w-[160px]" placeholder="From" />
-        <DateInput value={to} onChange={setTo} className="w-[160px]" placeholder="To" />
+        <DateInput value={from} onChange={setFrom} className="w-full sm:w-[160px]" placeholder="From" />
+        <DateInput value={to} onChange={setTo} className="w-full sm:w-[160px]" placeholder="To" />
       </Card>
 
       <Card className="hidden md:block overflow-x-auto">
