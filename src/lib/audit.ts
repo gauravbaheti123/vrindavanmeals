@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { writeAudit } from "./audit.functions";
 
 export type AuditAction = "create" | "update" | "delete";
 
@@ -45,18 +45,16 @@ export async function logAudit(entry: {
   newValues?: Values;
 }): Promise<void> {
   try {
-    const { data } = await supabase.auth.getUser();
-    const actorId = data.user?.id;
-    if (!actorId) return;
-    await supabase.from("audit_log").insert({
-      actor_id: actorId,
-      action: entry.action,
-      entity: entry.entity,
-      entity_id: entry.entityId ?? null,
-      student_id: entry.studentId ?? null,
-      label: entry.label ?? null,
-      old_values: (entry.oldValues ?? null) as never,
-      new_values: (entry.newValues ?? null) as never,
+    await writeAudit({
+      data: {
+        action: entry.action,
+        entity: entry.entity,
+        entity_id: entry.entityId ?? null,
+        student_id: entry.studentId ?? null,
+        label: entry.label ?? null,
+        old_values: entry.oldValues ?? null,
+        new_values: entry.newValues ?? null,
+      },
     });
   } catch {
     /* audit is best-effort */
