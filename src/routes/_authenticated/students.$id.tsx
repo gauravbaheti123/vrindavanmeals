@@ -333,8 +333,8 @@ function StudentDetail() {
                   return (
                     <li key={sub.id} className="flex items-center justify-between border-b pb-2 last:border-0">
                       <div>
-                        <div className="font-medium">{sub.start_date} → {sub.end_date}</div>
-                        <div className="text-xs text-muted-foreground">Grace till {sub.grace_end_date}</div>
+                        <div className="font-medium">{fmtDate(sub.start_date)} → {fmtDate(sub.end_date)}</div>
+                        <div className="text-xs text-muted-foreground">Grace till {fmtDate(sub.grace_end_date)}</div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant={eff === "expired" ? "destructive" : eff === "grace" ? "secondary" : "outline"} className="capitalize">{eff}</Badge>

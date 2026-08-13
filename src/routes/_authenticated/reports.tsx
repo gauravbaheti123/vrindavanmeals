@@ -353,14 +353,14 @@ function ActiveStudents({ unit }: { unit: string }) {
     const tone = daysLeft < 0 ? "text-destructive" : daysLeft <= 5 ? "text-warning" : "text-success";
     return [
       s.students?.roll_number ?? "—", s.students?.full_name ?? "", s.students?.hostel_room ?? "—", s.units?.name ?? "—",
-      s.subscription_plans?.name ?? "—", s.start_date, s.end_date,
+      s.subscription_plans?.name ?? "—", fmtDate(s.start_date), fmtDate(s.end_date),
       <span key="d" className={tone}>{daysLeft} days</span>,
       fmtINR(Number(s.subscription_plans?.price ?? 0)),
     ];
   });
   const exportRows = (data ?? []).map((s) => {
     const daysLeft = Math.ceil((new Date(s.end_date).getTime() - Date.now()) / 86400000);
-    return [s.students?.roll_number ?? "", s.students?.full_name ?? "", s.students?.hostel_room ?? "", s.units?.name ?? "", s.subscription_plans?.name ?? "", s.start_date, s.end_date, daysLeft, Number(s.subscription_plans?.price ?? 0)];
+    return [s.students?.roll_number ?? "", s.students?.full_name ?? "", s.students?.hostel_room ?? "", s.units?.name ?? "", s.subscription_plans?.name ?? "", fmtDate(s.start_date), fmtDate(s.end_date), daysLeft, Number(s.subscription_plans?.price ?? 0)];
   });
   return (
     <div className="space-y-3">
@@ -454,7 +454,7 @@ function ExpiringReport({ unit }: { unit: string }) {
   const cols = ["Mess No", "Name", "Mobile", "Unit", "End Date", "Grace End", "Days Left", "Amount Due"];
   const rows = (data ?? []).map((r) => {
     const daysLeft = Math.ceil((new Date(r.end_date).getTime() - Date.now()) / 86400000);
-    return [r.students?.roll_number ?? "—", r.students?.full_name ?? "", r.students?.mobile ?? "", r.units?.name ?? "—", r.end_date, r.grace_end_date, daysLeft, fmtINR(Number(r.subscription_plans?.price ?? 0))];
+    return [r.students?.roll_number ?? "—", r.students?.full_name ?? "", r.students?.mobile ?? "", r.units?.name ?? "—", fmtDate(r.end_date), fmtDate(r.grace_end_date), daysLeft, fmtINR(Number(r.subscription_plans?.price ?? 0))];
   });
   return (
     <div className="space-y-3">
@@ -824,7 +824,7 @@ function ManualLog({ from, to, unit }: { from: string; to: string; unit: string 
   const cols = ["Date", "Time", "Student", "Unit", "Meal", "Reason", "Override"];
   const rows = (data ?? []).map((r) => {
     const x = r as { scan_date: string; scan_time: string; meal_type: string; override_reason: string | null; is_override: boolean; students?: { full_name: string }; units?: { name: string } };
-    return [x.scan_date, new Date(x.scan_time).toLocaleTimeString("en-IN"), x.students?.full_name ?? "", x.units?.name ?? "—", x.meal_type, x.override_reason ?? "—", x.is_override ? "Yes" : "No"];
+    return [fmtDate(x.scan_date), new Date(x.scan_time).toLocaleTimeString("en-IN"), x.students?.full_name ?? "", x.units?.name ?? "—", x.meal_type, x.override_reason ?? "—", x.is_override ? "Yes" : "No"];
   });
   return (
     <div className="space-y-3">
@@ -891,7 +891,7 @@ function SubStatusSummary({ unit }: { unit: string }) {
   withStatus.forEach((s) => { counts[s.eff]++; });
   const pieData = Object.entries(counts).map(([k, v]) => ({ name: k, value: v }));
   const cols = ["Mess No", "Name", "Unit", "Status", "Start", "End", "Grace"];
-  const rows = withStatus.map((s) => [s.students?.roll_number ?? "—", s.students?.full_name ?? "", s.units?.name ?? "—", <Badge key="s" style={{ background: STATUS_COLORS[s.eff], color: "#fff" }}>{s.eff}</Badge>, s.start_date, s.end_date, s.grace_end_date]);
+  const rows = withStatus.map((s) => [s.students?.roll_number ?? "—", s.students?.full_name ?? "", s.units?.name ?? "—", <Badge key="s" style={{ background: STATUS_COLORS[s.eff], color: "#fff" }}>{s.eff}</Badge>, fmtDate(s.start_date), fmtDate(s.end_date), fmtDate(s.grace_end_date)]);
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-4 gap-3">
@@ -957,7 +957,7 @@ function RenewalsReport({ unit }: { unit: string }) {
     },
   });
   const cols = ["Mess No", "Name", "Mobile", "Unit", "End Date", "Amount"];
-  const rows = (data ?? []).map((r) => [r.students?.roll_number ?? "—", r.students?.full_name ?? "", r.students?.mobile ?? "", r.units?.name ?? "—", r.end_date, fmtINR(Number(r.subscription_plans?.price ?? 0))]);
+  const rows = (data ?? []).map((r) => [r.students?.roll_number ?? "—", r.students?.full_name ?? "", r.students?.mobile ?? "", r.units?.name ?? "—", fmtDate(r.end_date), fmtINR(Number(r.subscription_plans?.price ?? 0))]);
   return (
     <div className="space-y-3">
       <Card className="p-3 flex items-center justify-between flex-wrap gap-2">
@@ -1204,9 +1204,9 @@ function SingleStudentLedger() {
                 const active = dISO(new Date()) <= s.end_date && s.status !== "pending";
                 return (
                   <div key={s.id} className="flex items-center gap-3 text-sm border-l-2 pl-3" style={{ borderColor: active ? "hsl(var(--success))" : "hsl(var(--muted))" }}>
-                    <div className="w-28 text-muted-foreground">{s.start_date}</div>
+                    <div className="w-28 text-muted-foreground">{fmtDate(s.start_date)}</div>
                     <TrendingUp className="h-3 w-3 text-muted-foreground" />
-                    <div className="w-28">{s.end_date}</div>
+                    <div className="w-28">{fmtDate(s.end_date)}</div>
                     <Badge variant="outline">{s.subscription_plans?.name ?? "Plan"}</Badge>
                     <div className="text-muted-foreground">{fmtINR(Number(s.subscription_plans?.price ?? 0))}</div>
                     <Badge className={active ? "bg-success text-success-foreground ml-auto" : "bg-muted ml-auto"}>{active ? "Active" : s.status}</Badge>
