@@ -8,11 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, UserPlus, Clock, CalendarOff } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, DueAmount } from "@/components/due-status";
-import { applyLedgerFilter, defaultLedgerFilter, LedgerFilterControls, type LedgerFilterState } from "@/components/ledger-filters";
+import { applyLedgerFilter, defaultLedgerFilter, type LedgerFilterState } from "@/components/ledger-filters";
+import { ColumnHead, FilterOptions, useTableSort, sortRows, LEDGER_DATE_KEYS } from "@/components/table-head-controls";
 import { fetchLedgerRows } from "@/lib/dues";
 import { BulkHolidayModal } from "@/components/bulk-holiday-modal";
 import { useQueryClient } from "@tanstack/react-query";
@@ -31,6 +31,7 @@ function StudentList() {
   const [q, setQ] = useState("");
   const [unit, setUnit] = useState<string>("all");
   const [filter, setFilter] = useState<LedgerFilterState>({ ...defaultLedgerFilter, sort: "name_asc" });
+  const { sort, toggle } = useTableSort({ key: "full_name", dir: "asc" });
   const [bulkHoliday, setBulkHoliday] = useState(false);
   const queryClient = useQueryClient();
 
@@ -74,8 +75,8 @@ function StudentList() {
       ) return false;
       return true;
     });
-    return applyLedgerFilter(base, filter);
-  }, [ledger, unit, q, filter]);
+    return sortRows(applyLedgerFilter(base, filter), sort, LEDGER_DATE_KEYS);
+  }, [ledger, unit, q, filter, sort]);
 
   const { data: pendingCount } = useQuery({
     queryKey: ["students-pending-count"],
@@ -118,17 +119,6 @@ function StudentList() {
               <Input placeholder="Search by Mess No, name or mobile" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Unit</Label>
-            <Select value={unit} onValueChange={setUnit}>
-              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Units</SelectItem>
-                {units?.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <LedgerFilterControls value={filter} onChange={setFilter} />
         </CardContent>
       </Card>
 
@@ -136,12 +126,56 @@ function StudentList() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Mess No</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Mobile</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Due</TableHead>
+              <ColumnHead label="Mess No" sortKey="roll_number" sort={sort} onSort={toggle} />
+              <ColumnHead label="Name" sortKey="full_name" sort={sort} onSort={toggle} />
+              <ColumnHead label="Mobile" sortKey="mobile" sort={sort} onSort={toggle} />
+              <ColumnHead
+                label="Unit" sortKey="unit_name" sort={sort} onSort={toggle}
+                filter={{
+                  active: unit !== "all",
+                  onClear: () => setUnit("all"),
+                  children: (
+                    <FilterOptions
+                      value={unit}
+                      onSelect={setUnit}
+                      options={[{ value: "all", label: "All Units" }, ...(units ?? []).map((u) => ({ value: u.id, label: u.name }))]}
+                    />
+                  ),
+                }}
+              />
+              <ColumnHead
+                label="Status" sortKey="status" sort={sort} onSort={toggle}
+                filter={{
+                  active: filter.status !== "all",
+                  onClear: () => setFilter({ ...filter, status: "all" }),
+                  children: (
+                    <FilterOptions
+                      value={filter.status}
+                      onSelect={(v) => setFilter({ ...filter, status: v })}
+                      options={[{ value: "all", label: "All" }, { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
+                    />
+                  ),
+                }}
+              />
+              <ColumnHead
+                label="Due" sortKey="due_amount" sort={sort} onSort={toggle} align="right"
+                filter={{
+                  active: filter.dueRange !== "all",
+                  onClear: () => setFilter({ ...filter, dueRange: "all" }),
+                  children: (
+                    <FilterOptions
+                      value={filter.dueRange}
+                      onSelect={(v) => setFilter({ ...filter, dueRange: v })}
+                      options={[
+                        { value: "all", label: "Any amount" },
+                        { value: "zero", label: "₹0 (Paid up)" },
+                        { value: "low", label: "₹1 – ₹1,000" },
+                        { value: "high", label: "₹1,000+" },
+                      ]}
+                    />
+                  ),
+                }}
+              />
               <TableHead className="w-[100px]"></TableHead>
             </TableRow>
           </TableHeader>
