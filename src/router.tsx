@@ -9,7 +9,10 @@ export const getRouter = () => {
         // Cached screens render instantly on back-navigation and revalidate quietly.
         staleTime: 60_000,
         gcTime: 30 * 60_000,
-        refetchOnWindowFocus: false,
+        refetchOnWindowFocus: true,
+        // Site-wide auto refresh: every mounted screen re-pulls its data each minute.
+        refetchInterval: 60_000,
+        refetchIntervalInBackground: false,
         retry: 1,
       },
     },
