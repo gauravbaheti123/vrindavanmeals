@@ -41,9 +41,17 @@ export function registerServiceWorker() {
     return;
   }
 
-  window.addEventListener("load", () => {
-    void navigator.serviceWorker.register(SW_URL, { scope: "/" }).catch(() => {
-      /* installability is best-effort */
+  const register = () => {
+    void navigator.serviceWorker.register(SW_URL, { scope: "/" }).catch((error) => {
+      console.warn("Service worker registration failed", error);
     });
-  });
+  };
+
+  // Hydration usually happens after the window "load" event has already fired,
+  // so listening for it would never register. Register right away in that case.
+  if (document.readyState === "complete") {
+    register();
+  } else {
+    window.addEventListener("load", register, { once: true });
+  }
 }
