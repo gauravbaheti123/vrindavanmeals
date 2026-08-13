@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Download, Upload, AlertTriangle, CheckCircle2, XCircle, Loader2, FileText, FileSpreadsheet, Info, ChevronRight, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
-import { importPayments, importAttendance, importExcelWorkbook, logImportRun, diffMessNos } from "@/lib/imports.functions";
+import { importPayments, importAttendance, importExcelWorkbook, logImportRun, diffMessNos, importSecurityDeposits } from "@/lib/imports.functions";
 
 export const Route = createFileRoute("/_authenticated/import")({
   head: () => ({ meta: [{ title: "Import Data — Vrindavan Meals" }] }),
@@ -36,7 +36,15 @@ const TEMPLATES: Record<string, { headers: string[]; samples: string[][] }> = {
       ["9876543210", "Unit 1", "dinner", "15-01-2026", "20:30", "manual"],
     ],
   },
+  deposits: {
+    headers: ["mess_no", "deposit_amount", "date", "remarks"],
+    samples: [
+      ["VM-0001", "2000", "01-06-2026", "Refundable security deposit"],
+      ["VM-0002", "1500", "", ""],
+    ],
+  },
 };
+
 
 function ImportPage() {
   const { roles } = useCurrentUser();
@@ -56,14 +64,16 @@ function ImportPage() {
         <AlertDescription>This action cannot be undone. Please download a database backup before importing large datasets.</AlertDescription>
       </Alert>
       <Tabs defaultValue="excel">
-        <TabsList className="grid grid-cols-3 w-full max-w-xl">
+        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="excel">Excel Workbook</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
+          <TabsTrigger value="deposits">Security Deposit</TabsTrigger>
         </TabsList>
         <TabsContent value="excel"><ExcelWorkbookTab /></TabsContent>
         <TabsContent value="payments"><ImportTab kind="payments" fn={importPayments} /></TabsContent>
         <TabsContent value="attendance"><ImportTab kind="attendance" fn={importAttendance} /></TabsContent>
+        <TabsContent value="deposits"><ImportTab kind="deposits" fn={importSecurityDeposits} /></TabsContent>
       </Tabs>
       <ImportHistory />
     </div>

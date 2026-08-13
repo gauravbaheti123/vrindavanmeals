@@ -856,3 +856,68 @@ export const diffMessNos = createServerFn({ method: "POST" })
       missing: file.filter((m) => !present.has(m)),
     };
   });
+
+/**
+ * Security Deposit import — matched strictly by Mess No (no mobile fallback).
+ * Deposits are held-balance records and never touch billing / dues.
+ */
+export const importSecurityDeposits = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => RowsSchema.parse(raw))
+  .handler(async ({ data, context }): Promise<ImportResult> => {
+    await assertAdminOrManager(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const messNos = Array.from(
+      new Set(
+        data.rows
+          .map((r) => String(r.mess_no ?? "").trim().toUpperCase())
+          .filter(Boolean),
+      ),
+    );
+    const idByMess = new Map<string, string>();
+    for (let i = 0; i < messNos.length; i += 200) {
+      const { data: studs } = await supabaseAdmin
+        .from("students").select("id, roll_number").in("roll_number", messNos.slice(i, i + 200));
+      (studs ?? []).forEach((s) => s.roll_number && idByMess.set(s.roll_number.trim().toUpperCase(), s.id));
+    }
+
+    const errors: ImportResult["errorRows"] = [];
+    const toInsert: any[] = [];
+    const today = new Date().toISOString().slice(0, 10);
+
+    for (let idx = 0; idx < data.rows.length; idx++) {
+      const r = data.rows[idx];
+      const rowNum = idx + 2;
+      const mess = String(r.mess_no ?? "").trim().toUpperCase();
+      if (!mess) { errors.push({ row: rowNum, reason: "Mess No is required", data: r }); continue; }
+      const studentId = idByMess.get(mess);
+      if (!studentId) { errors.push({ row: rowNum, reason: `No student found with Mess No ${mess}`, data: r }); continue; }
+      const amount = Number(String(r.deposit_amount ?? "").toString().replace(/,/g, ""));
+      if (!amount || Number.isNaN(amount) || amount < 0) {
+        errors.push({ row: rowNum, reason: `Invalid deposit amount: ${r.deposit_amount}`, data: r });
+        continue;
+      }
+      const entryDate = parseDate(r.date) ?? today;
+      toInsert.push({
+        student_id: studentId,
+        kind: "received",
+        amount,
+        entry_date: entryDate,
+        remarks: String(r.remarks ?? "").trim() || null,
+        created_by: context.userId,
+      });
+    }
+
+    let imported = 0;
+    for (let i = 0; i < toInsert.length; i += 50) {
+      const batch = toInsert.slice(i, i + 50);
+      const { error } = await supabaseAdmin.from("security_deposits").insert(batch);
+      if (error) errors.push({ row: i + 2, reason: `Batch insert failed: ${error.message}`, data: null });
+      else imported += batch.length;
+    }
+
+    const result = { total: data.rows.length, imported, skipped: 0, errors: errors.length, errorRows: errors };
+    const log_id = await logImport(supabaseAdmin, context.userId, "security_deposits", data.file_name, result);
+    return { ok: true, ...result, log_id };
+  });

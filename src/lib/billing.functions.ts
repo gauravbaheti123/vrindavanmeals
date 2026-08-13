@@ -94,3 +94,27 @@ export const accrueMonthlyBilling = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { created: Number(data ?? 0) };
   });
+
+/**
+ * Recalculates billing for ONE student (used after a Joining/Exit Date edit).
+ * Regenerates only subscription/billing rows — payments, adjustments and
+ * security deposits are untouched.
+ */
+export const recalcStudentBilling = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { student_id: string }) => d)
+  .handler(async ({ data, context }): Promise<{ total: number }> => {
+    const { data: roles, error: rErr } = await context.supabase
+      .from("user_roles").select("role").eq("user_id", context.userId);
+    if (rErr) throw new Error("Permission check failed");
+    const list = (roles ?? []).map((r: any) => r.role);
+    if (!list.includes("super_admin") && !list.includes("manager")) {
+      throw new Error("Forbidden: Super Admin or Manager only");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: total, error } = await supabaseAdmin.rpc("rebuild_student_billing", {
+      p_student: data.student_id,
+    });
+    if (error) throw new Error(error.message);
+    return { total: Number(total ?? 0) };
+  });
