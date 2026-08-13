@@ -29,6 +29,7 @@ import { fetchFeeSlabs, feeForMonth, missingSlabMessage, computeHolidayDeduction
 import { generateNocPdf } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
 import { StudentPhoto, StudentPhotoEditor } from "@/components/student-photo";
+import { MobileOnly, DesktopOnly, MobileCard, MobileCardList, MobileEmpty } from "@/components/mobile-list";
 import { useServerFn } from "@tanstack/react-start";
 import { recalcStudentBilling } from "@/lib/billing.functions";
 import { Wallet } from "lucide-react";
