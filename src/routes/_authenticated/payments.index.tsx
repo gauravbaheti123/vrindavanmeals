@@ -1,4 +1,5 @@
 import { fmtDate } from "@/lib/dates";
+import { MobileOnly, MobileCard, MobileCardList, MobileEmpty } from "@/components/mobile-list";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
@@ -82,7 +83,7 @@ function PaymentList() {
         </Button>
       </div>
 
-      <Card>
+      <Card className="hidden md:block overflow-x-auto">
         <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Collected this month</CardTitle></CardHeader>
         <CardContent>
           <div className="text-3xl font-bold mb-3">{inr(summary.total)}</div>
@@ -123,7 +124,7 @@ function PaymentList() {
         <DateInput value={to} onChange={setTo} className="w-[160px]" placeholder="To" />
       </Card>
 
-      <Card>
+      <Card className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
