@@ -707,7 +707,7 @@ function StudentDetail() {
           <CardTitle className="text-base flex items-center gap-2">
             <Wallet className="h-4 w-4" />Security Deposit
           </CardTitle>
-          <div className="flex gap-2 print:hidden">
+          <div className="flex w-full flex-wrap gap-2 print:hidden sm:w-auto">
             <Button size="sm" variant="outline" onClick={() => setDepositModal({ kind: "received", existing: null, held: depositHeld })}>
               <Plus className="h-3 w-3 mr-1" />Add Deposit
             </Button>
