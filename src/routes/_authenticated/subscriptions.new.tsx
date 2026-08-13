@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -90,15 +91,15 @@ function NewSubscription() {
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label>Start / Join Date</Label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <DateInput value={startDate} onChange={setStartDate} />
             </div>
             <div className="space-y-2">
               <Label>End Date (EOM)</Label>
-              <Input type="date" value={slice.endDate} readOnly />
+              <DateInput value={slice.endDate} onChange={() => {}} disabled />
             </div>
             <div className="space-y-2">
               <Label>Grace End</Label>
-              <Input type="date" value={graceEnd} readOnly />
+              <DateInput value={graceEnd} onChange={() => {}} disabled />
             </div>
           </div>
           <div className="rounded-md border bg-muted/40 p-3 text-sm">

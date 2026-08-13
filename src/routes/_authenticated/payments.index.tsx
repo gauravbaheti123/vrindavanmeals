@@ -1,9 +1,11 @@
+import { fmtDate } from "@/lib/dates";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -117,8 +119,8 @@ function PaymentList() {
             <SelectItem value="failed">Failed</SelectItem>
           </SelectContent>
         </Select>
-        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-[160px]" placeholder="From" />
-        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-[160px]" placeholder="To" />
+        <DateInput value={from} onChange={setFrom} className="w-[160px]" placeholder="From" />
+        <DateInput value={to} onChange={setTo} className="w-[160px]" placeholder="To" />
       </Card>
 
       <Card>
@@ -156,9 +158,9 @@ function PaymentList() {
                   <TableCell className="font-medium">{row.students?.full_name ?? "—"}<div className="text-xs text-muted-foreground">{row.students?.units?.name ?? ""}</div></TableCell>
                   <TableCell>₹{Number(row.amount).toLocaleString("en-IN")}</TableCell>
                   <TableCell className="capitalize">{row.mode}</TableCell>
-                  <TableCell>{new Date(row.created_at).toLocaleDateString("en-IN")}</TableCell>
+                  <TableCell>{fmtDate(row.created_at)}</TableCell>
                   <TableCell>{row.profiles?.name || "—"}</TableCell>
-                  <TableCell className="text-xs">{row.subscriptions ? `${row.subscriptions.start_date} → ${row.subscriptions.end_date}` : "—"}</TableCell>
+                  <TableCell className="text-xs">{row.subscriptions ? `${fmtDate(row.subscriptions.start_date)} → ${fmtDate(row.subscriptions.end_date)}` : "—"}</TableCell>
                   <TableCell>
                     <Badge variant={row.status === "success" ? "default" : row.status === "failed" ? "destructive" : "secondary"} className="capitalize">{row.status}</Badge>
                   </TableCell>

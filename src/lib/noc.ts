@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/dates";
 import { jsPDF } from "jspdf";
 
 export type NocBranding = {
@@ -20,9 +21,7 @@ export type NocData = {
 };
 
 function formatDate(iso: string) {
-  return new Date(iso + "T00:00:00").toLocaleDateString("en-IN", {
-    day: "2-digit", month: "long", year: "numeric",
-  });
+  return fmtDate(iso);
 }
 
 function detectImageFormat(dataUrl: string): "PNG" | "JPEG" {

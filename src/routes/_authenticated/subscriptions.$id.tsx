@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/dates";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { STALE, invalidateLedger } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -147,7 +148,7 @@ function SubscriptionDetail() {
                   <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">No payments yet</TableCell></TableRow>
                 ) : payments?.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell>{new Date(p.created_at).toLocaleDateString("en-IN")}</TableCell>
+                    <TableCell>{fmtDate(p.created_at)}</TableCell>
                     <TableCell className="capitalize">{p.mode}</TableCell>
                     <TableCell>₹{Number(p.amount).toLocaleString("en-IN")}</TableCell>
                     <TableCell><Badge variant={p.status === "success" ? "default" : p.status === "failed" ? "destructive" : "secondary"} className="capitalize">{p.status}</Badge></TableCell>

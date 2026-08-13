@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/dates";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
@@ -69,14 +70,14 @@ function SubscriptionList() {
     r.roll_number ?? "",
     r.full_name,
     r.unit_name ?? "",
-    r.joining_date ?? "",
-    r.exit_date ?? "",
+    fmtDate(r.joining_date, ""),
+    fmtDate(r.exit_date, ""),
     r.status === "active" ? "Active" : "Inactive",
     r.total_billed,
     r.due_amount,
     r.days_overdue,
   ]);
-  const exportTitle = `Subscriptions — ${new Date().toLocaleDateString("en-IN")}`;
+  const exportTitle = `Subscriptions — ${fmtDate(new Date())}`;
 
   return (
     <div className="space-y-6">
@@ -154,7 +155,7 @@ function SubscriptionList() {
                   <Link to="/students/$id" params={{ id: r.student_id }} className="hover:underline">{r.full_name}</Link>
                 </TableCell>
                 <TableCell>{r.unit_name ?? "—"}</TableCell>
-                <TableCell className="text-sm">{r.joining_date ?? "—"}</TableCell>
+                <TableCell className="text-sm">{fmtDate(r.joining_date)}</TableCell>
                 <TableCell><StatusBadge status={r.status} /></TableCell>
                 <TableCell className="text-right text-sm">{inr(r.total_billed)}</TableCell>
                 <TableCell className="text-right">

@@ -1,3 +1,4 @@
+import { fmtDateTime } from "@/lib/dates";
 import { createFileRoute } from "@tanstack/react-router";
 import { STALE } from "@/lib/query-cache";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -224,7 +225,7 @@ function ImportHistory() {
                     <TableCell className="text-emerald-600">{l.imported_rows}</TableCell>
                     <TableCell className="text-amber-600">{l.skipped_rows}</TableCell>
                     <TableCell className="text-red-600">{errs.length || l.error_rows}</TableCell>
-                    <TableCell className="text-xs">{new Date(l.created_at).toLocaleString()}</TableCell>
+                    <TableCell className="text-xs">{fmtDateTime(l.created_at)}</TableCell>
                   </TableRow>,
                 ];
                 if (isOpen) {

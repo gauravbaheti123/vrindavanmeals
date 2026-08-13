@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/dates";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { STALE, invalidateLedger } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -271,7 +273,7 @@ function StudentDetail() {
           tone={summary.adjustments < 0 ? "success" : summary.adjustments > 0 ? "destructive" : "muted"}
         />
         <SummaryTile label={summary.advance > 0 ? "Advance" : "Total Due"} value={inr(summary.advance > 0 ? summary.advance : summary.due)} tone={summary.due > 0 ? "destructive" : "muted"} />
-        <SummaryTile label="Last Payment" value={summary.last ? new Date(summary.last.created_at).toLocaleDateString("en-IN") : "—"} />
+        <SummaryTile label="Last Payment" value={summary.last ? fmtDate(summary.last.created_at) : "—"} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -294,8 +296,8 @@ function StudentDetail() {
             <Row k="Email" v={s.email} />
             <Row k="Parent Mobile" v={s.parent_mobile} />
             <Row k="Blood Group" v={s.blood_group} />
-            <Row k="Joining Date" v={(s as unknown as { joining_date?: string | null }).joining_date} />
-            <Row k="Exit Date" v={(s as unknown as { exit_date?: string | null }).exit_date} />
+            <Row k="Joining Date" v={fmtDate((s as unknown as { joining_date?: string | null }).joining_date, "")} />
+            <Row k="Exit Date" v={fmtDate((s as unknown as { exit_date?: string | null }).exit_date, "")} />
 
 
             {s.is_approved && !(s as unknown as { exit_date?: string | null }).exit_date && (
@@ -331,8 +333,8 @@ function StudentDetail() {
                   return (
                     <li key={sub.id} className="flex items-center justify-between border-b pb-2 last:border-0">
                       <div>
-                        <div className="font-medium">{sub.start_date} → {sub.end_date}</div>
-                        <div className="text-xs text-muted-foreground">Grace till {sub.grace_end_date}</div>
+                        <div className="font-medium">{fmtDate(sub.start_date)} → {fmtDate(sub.end_date)}</div>
+                        <div className="text-xs text-muted-foreground">Grace till {fmtDate(sub.grace_end_date)}</div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant={eff === "expired" ? "destructive" : eff === "grace" ? "secondary" : "outline"} className="capitalize">{eff}</Badge>
@@ -423,7 +425,7 @@ function StudentDetail() {
             <TableBody>
               {summary.opening > 0 && (
                 <TableRow className="bg-muted/40">
-                  <TableCell className="text-sm">{summary.openingAsOf ? new Date(summary.openingAsOf).toLocaleDateString("en-IN") : "—"}</TableCell>
+                  <TableCell className="text-sm">{summary.openingAsOf ? fmtDate(summary.openingAsOf) : "—"}</TableCell>
                   <TableCell className="text-sm italic">Opening Balance</TableCell>
                   <TableCell><Badge variant="secondary">carry-forward</Badge></TableCell>
                   <TableCell className="text-xs text-muted-foreground">Imported</TableCell>
@@ -440,7 +442,7 @@ function StudentDetail() {
                   if (p.status === "success") running += Number(p.amount);
                   return (
                     <TableRow key={p.id}>
-                      <TableCell className="text-sm">{new Date(p.created_at).toLocaleDateString("en-IN")}</TableCell>
+                      <TableCell className="text-sm">{fmtDate(p.created_at)}</TableCell>
                       <TableCell className="capitalize text-sm">{p.mode}</TableCell>
                       <TableCell>
                         <Badge variant={p.status === "success" ? "outline" : "secondary"} className="capitalize">{p.status}</Badge>
@@ -463,7 +465,7 @@ function StudentDetail() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete this payment?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  {inr(Number(p.amount))} · {p.mode} · {new Date(p.created_at).toLocaleDateString("en-IN")} will be permanently removed.
+                                  {inr(Number(p.amount))} · {p.mode} · {fmtDate(p.created_at)} will be permanently removed.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -474,7 +476,7 @@ function StudentDetail() {
                                     if (error) return toast.error(error.message);
                                     await logAudit({
                                       action: "delete", entity: "payment", entityId: p.id, studentId: s.id,
-                                      label: `${inr(Number(p.amount))} · ${p.mode} · ${new Date(p.created_at).toLocaleDateString("en-IN")}`,
+                                      label: `${inr(Number(p.amount))} · ${p.mode} · ${fmtDate(p.created_at)}`,
                                       oldValues: { amount: p.amount, mode: p.mode, date: p.created_at.slice(0, 10), status: p.status },
                                     });
                                     toast.success("Payment deleted");
@@ -502,7 +504,7 @@ function StudentDetail() {
                   : null;
                 return (
                 <TableRow key={a.id} className={isHoliday ? "bg-success/5" : "bg-muted/20"}>
-                  <TableCell className="text-sm">{new Date(a.entry_date).toLocaleDateString("en-IN")}</TableCell>
+                  <TableCell className="text-sm">{fmtDate(a.entry_date)}</TableCell>
                   <TableCell className="text-sm italic">{isHoliday ? "Holiday Deduction" : "Adjustment"}</TableCell>
                   <TableCell>
                     {isHoliday
@@ -623,7 +625,7 @@ function StudentDetail() {
                 <TableBody>
                   {data.deposits.map((d) => (
                     <TableRow key={d.id}>
-                      <TableCell className="text-sm">{new Date(d.entry_date).toLocaleDateString("en-IN")}</TableCell>
+                      <TableCell className="text-sm">{fmtDate(d.entry_date)}</TableCell>
                       <TableCell>
                         <Badge variant={d.kind === "refunded" ? "secondary" : "outline"} className="capitalize">
                           {d.kind === "refunded" ? "Refunded" : "Received"}
@@ -928,8 +930,8 @@ function ProfileEditModal({
           <Field label="Blood Group"><Input value={form.blood_group} onChange={(e) => set("blood_group", e.target.value)} /></Field>
           <Field label="Email"><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} /></Field>
           <Field label="Parent Mobile"><Input value={form.parent_mobile} onChange={(e) => set("parent_mobile", e.target.value)} /></Field>
-          <Field label="Joining Date"><Input type="date" value={form.joining_date} onChange={(e) => set("joining_date", e.target.value)} /></Field>
-          <Field label="Exit Date"><Input type="date" value={form.exit_date} onChange={(e) => set("exit_date", e.target.value)} /></Field>
+          <Field label="Joining Date"><DateInput value={form.joining_date} onChange={(v) => set("joining_date", v)} /></Field>
+          <Field label="Exit Date"><DateInput value={form.exit_date} onChange={(v) => set("exit_date", v)} /></Field>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
@@ -1024,9 +1026,9 @@ function SubscriptionModal({
             </Select>
           </Field>
           <div className="grid grid-cols-3 gap-2">
-            <Field label="Start Date"><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></Field>
-            <Field label="End Date"><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></Field>
-            <Field label="Grace Until"><Input type="date" value={graceEnd} onChange={(e) => setGraceEnd(e.target.value)} /></Field>
+            <Field label="Start Date"><DateInput value={startDate} onChange={setStartDate} /></Field>
+            <Field label="End Date"><DateInput value={endDate} onChange={setEndDate} /></Field>
+            <Field label="Grace Until"><DateInput value={graceEnd} onChange={setGraceEnd} /></Field>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <Field label="Billed Amount (₹)">
@@ -1119,7 +1121,7 @@ function PaymentModal({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Amount (₹)"><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
-            <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+            <Field label="Date"><DateInput value={date} onChange={setDate} /></Field>
           </div>
           <Field label="Mode">
             <RadioGroup value={mode} onValueChange={(v) => setMode(v as PaymentMode)} className="grid grid-cols-4 gap-2">
@@ -1193,7 +1195,7 @@ function ActivateStudentModal({
             day 1–15 = full month, day 16–EOM = half month. Subscription runs till last day of that month.
           </p>
           <Field label="Join / Activation Date">
-            <Input type="date" value={joinDate} onChange={(e) => setJoinDate(e.target.value)} />
+            <DateInput value={joinDate} onChange={setJoinDate} />
           </Field>
           <div className="rounded-md border bg-muted/40 p-3 text-sm">
             <div className="flex justify-between"><span>Rule</span><span className="font-medium">{slice.isFullMonth ? "Full month (day ≤ 15)" : "Half month (day 16 – EOM)"}</span></div>
@@ -1274,7 +1276,7 @@ function DeactivateStudentModal({
             up to that portion of advance refundable. Exit day 16–EOM → liable full month → no refund.
           </p>
           <Field label="Deactivation Date">
-            <Input type="date" value={deactivateDate} onChange={(e) => setDeactivateDate(e.target.value)} />
+            <DateInput value={deactivateDate} onChange={setDeactivateDate} />
           </Field>
           <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
             <div className="flex justify-between"><span>Current Advance</span><span className="font-medium">{inr(advance)}</span></div>
@@ -1405,7 +1407,7 @@ function AdjustmentModal({
             <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500" />
           </Field>
           <Field label="Date">
-            <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
+            <DateInput value={entryDate} onChange={setEntryDate} />
           </Field>
           <Field label="Remarks (required)">
             <Input value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="e.g. Waiver for mess closure" />
@@ -1496,10 +1498,10 @@ function HolidayModal({
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <Field label="From Date">
-              <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+              <DateInput value={fromDate} onChange={setFromDate} />
             </Field>
             <Field label="To Date">
-              <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+              <DateInput value={toDate} onChange={setToDate} />
             </Field>
           </div>
           <Field label="Remarks (optional)">
@@ -1605,7 +1607,7 @@ function DepositModal({
             <p className="text-xs text-muted-foreground">Currently held: <b>{inr(held)}</b> — edit the amount for a partial refund.</p>
           )}
           <Field label="Amount *"><Input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
-          <Field label={isRefund ? "Date" : "Date Received"}><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+          <Field label={isRefund ? "Date" : "Date Received"}><DateInput value={date} onChange={setDate} /></Field>
           <Field label="Mode">
             <Select value={mode} onValueChange={(v) => setMode(v as PaymentMode)}>
               <SelectTrigger><SelectValue /></SelectTrigger>

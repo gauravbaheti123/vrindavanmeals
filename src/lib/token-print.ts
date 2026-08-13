@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/dates";
 // Client helpers for token printing + WhatsApp fallback
 import { supabase } from "@/integrations/supabase/client";
 
@@ -59,7 +60,7 @@ export async function sendTokenViaWhatsapp(token: TokenData) {
         token.student_name,
         token.meal_type,
         token.token_label,
-        new Date(token.scan_time).toLocaleDateString("en-IN"),
+        fmtDate(token.scan_time),
       ],
     },
   });

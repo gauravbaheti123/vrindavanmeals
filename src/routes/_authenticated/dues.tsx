@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/dates";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { STALE, invalidateLedger } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { pageAll } from "@/lib/fetch-all";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -113,11 +115,11 @@ function DuesPage() {
     r.unit_name ?? "",
     r.total_billed,
     r.due_amount,
-    r.last_payment_date ? r.last_payment_date.slice(0, 10) : "",
+    fmtDate(r.last_payment_date, ""),
     r.days_overdue,
     r.status === "active" ? "Active" : "Inactive",
   ]);
-  const exportTitle = `Dues & Ledger — ${new Date().toLocaleDateString("en-IN")}`;
+  const exportTitle = `Dues & Ledger — ${fmtDate(new Date())}`;
 
 
   return (
@@ -226,7 +228,7 @@ function DuesPage() {
                     <TableCell className="text-right">
                       <DueAmount status={r.status} due={r.due_amount} daysOverdue={r.days_overdue} />
                     </TableCell>
-                    <TableCell className="text-sm">{r.last_payment_date ? r.last_payment_date.slice(0, 10) : <span className="text-muted-foreground">Never</span>}</TableCell>
+                    <TableCell className="text-sm">{r.last_payment_date ? fmtDate(r.last_payment_date) : <span className="text-muted-foreground">Never</span>}</TableCell>
                     <TableCell className="text-right">
                       <span className={r.days_overdue > 30 ? "font-bold text-destructive" : r.days_overdue > 7 ? "font-semibold text-warning-foreground" : ""}>
                         {r.days_overdue}
@@ -321,7 +323,7 @@ function RecordPaymentModal({ row, onClose, onSaved }: {
               </div>
               <div className="space-y-1">
                 <Label>Date</Label>
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <DateInput value={date} onChange={setDate} />
               </div>
             </div>
             <div className="space-y-1">

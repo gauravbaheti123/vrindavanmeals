@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/dates";
 import { createFileRoute } from "@tanstack/react-router";
 import { STALE } from "@/lib/query-cache";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -158,7 +159,7 @@ function UsersTab() {
                   <TableCell>{u.roles.map((r) => <RoleBadge key={r} role={r} />)}</TableCell>
                   <TableCell>{unitName(u.unit_id)}</TableCell>
                   <TableCell>{u.is_active ? <Badge variant="default">Active</Badge> : <Badge variant="secondary">Inactive</Badge>}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{fmtDate(u.created_at)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" onClick={() => { setEditing(u); setDialogOpen(true); }}><Pencil className="h-4 w-4" /></Button>
                   </TableCell>

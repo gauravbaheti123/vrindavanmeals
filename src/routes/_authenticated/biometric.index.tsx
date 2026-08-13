@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/dates";
 import { createFileRoute } from "@tanstack/react-router";
 import { STALE } from "@/lib/query-cache";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -152,7 +153,7 @@ function BiometricMappingPage() {
                       <TableCell>{r.device_name ?? "—"}</TableCell>
                       <TableCell>{r.units?.name ?? "—"}</TableCell>
                       <TableCell>{r.students ? <span><span className="font-mono text-xs mr-1">{r.students.roll_number ?? "—"}</span>{r.students.full_name}</span> : <span className="text-muted-foreground">Unmapped</span>}</TableCell>
-                      <TableCell>{r.mapped_at ? new Date(r.mapped_at).toLocaleDateString("en-IN") : "—"}</TableCell>
+                      <TableCell>{r.mapped_at ? fmtDate(r.mapped_at) : "—"}</TableCell>
                       <TableCell>
                         {mapped
                           ? <Badge className="bg-success text-success-foreground">Mapped ✅</Badge>
