@@ -426,7 +426,7 @@ function StudentDetail() {
       <div className="grid md:grid-cols-2 gap-4">
         {/* Profile */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
             <CardTitle className="text-base">Profile</CardTitle>
             <Button size="sm" variant="ghost" className="print:hidden" onClick={() => setEditProfile(true)}>
               <Pencil className="h-3 w-3 mr-1" />Edit
@@ -464,7 +464,7 @@ function StudentDetail() {
 
         {/* Subscriptions */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
             <CardTitle className="text-base">Subscriptions</CardTitle>
             <Button size="sm" className="print:hidden" onClick={() => setNewSub(true)}>
               <Plus className="h-3 w-3 mr-1" />Add / Renew
@@ -703,7 +703,7 @@ function StudentDetail() {
 
       {/* Security Deposit — refundable, tracked separately from billing */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <Wallet className="h-4 w-4" />Security Deposit
           </CardTitle>
@@ -793,7 +793,7 @@ function StudentDetail() {
 
       {/* Biometric */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
           <CardTitle className="text-base">Biometric Mapping</CardTitle>
           {data.mapping && (
             <Button
