@@ -170,6 +170,41 @@ function PaymentList() {
           </TableBody>
         </Table>
       </Card>
+
+      <MobileOnly>
+        {isLoading ? (
+          <MobileEmpty>Loading…</MobileEmpty>
+        ) : (payments ?? []).length === 0 ? (
+          <MobileEmpty>No payments match the filters.</MobileEmpty>
+        ) : (
+          <MobileCardList>
+            {(payments ?? []).map((p) => {
+              const row = p as unknown as {
+                id: string; amount: number; mode: string; status: string; created_at: string;
+                students?: { full_name: string; units?: { name: string } };
+                profiles?: { name: string };
+              };
+              return (
+                <MobileCard
+                  key={row.id}
+                  title={row.students?.full_name ?? "—"}
+                  subtitle={`${fmtDate(row.created_at)}${row.students?.units?.name ? ` · ${row.students.units.name}` : ""}`}
+                  right={
+                    <div className="space-y-1">
+                      <div className="font-bold">₹{Number(row.amount).toLocaleString("en-IN")}</div>
+                      <Badge variant={row.status === "success" ? "default" : row.status === "failed" ? "destructive" : "secondary"} className="capitalize">{row.status}</Badge>
+                    </div>
+                  }
+                  meta={[
+                    { label: "Mode", value: <span className="capitalize">{row.mode}</span> },
+                    { label: "Recorded by", value: row.profiles?.name || "—" },
+                  ]}
+                />
+              );
+            })}
+          </MobileCardList>
+        )}
+      </MobileOnly>
     </div>
   );
 }
