@@ -9,11 +9,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, UserPlus, Clock } from "lucide-react";
+import { Plus, Search, UserPlus, Clock, CalendarOff } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, DueAmount } from "@/components/due-status";
 import { applyLedgerFilter, defaultLedgerFilter, LedgerFilterControls, type LedgerFilterState } from "@/components/ledger-filters";
 import { fetchLedgerRows } from "@/lib/dues";
+import { BulkHolidayModal } from "@/components/bulk-holiday-modal";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated/students/")({
   head: () => ({
