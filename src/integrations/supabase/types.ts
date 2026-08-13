@@ -721,6 +721,53 @@ export type Database = {
         }
         Relationships: []
       }
+      security_deposits: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          id: string
+          kind: string
+          mode: Database["public"]["Enums"]["payment_mode"] | null
+          remarks: string | null
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          kind: string
+          mode?: Database["public"]["Enums"]["payment_mode"] | null
+          remarks?: string | null
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          kind?: string
+          mode?: Database["public"]["Enums"]["payment_mode"] | null
+          remarks?: string | null
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_deposits_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           address: string | null
