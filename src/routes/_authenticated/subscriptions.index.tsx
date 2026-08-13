@@ -205,6 +205,34 @@ function SubscriptionList() {
           </TableBody>
         </Table>
       </Card>
+
+      <MobileOnly>
+        {isLoading ? (
+          <MobileEmpty>Loading…</MobileEmpty>
+        ) : rows.length === 0 ? (
+          <MobileEmpty>No students match the filters.</MobileEmpty>
+        ) : (
+          <MobileCardList>
+            {rows.map((r) => (
+              <MobileCard
+                key={r.student_id}
+                title={r.full_name}
+                subtitle={`${r.roll_number ?? "—"}${r.unit_name ? ` · ${r.unit_name}` : ""}`}
+                right={<div className="space-y-1"><StatusBadge status={r.status} /><DueAmount status={r.status} due={r.due_amount} daysOverdue={r.days_overdue} /></div>}
+                meta={[
+                  { label: "Joined", value: fmtDate(r.joining_date) },
+                  { label: "Total billed", value: inr(r.total_billed) },
+                ]}
+                actions={
+                  <Button asChild size="sm" variant="outline" className="min-h-11 flex-1">
+                    <Link to="/students/$id" params={{ id: r.student_id }}>View</Link>
+                  </Button>
+                }
+              />
+            ))}
+          </MobileCardList>
+        )}
+      </MobileOnly>
     </div>
   );
 }
