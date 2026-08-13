@@ -9,11 +9,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, UserPlus, Clock } from "lucide-react";
+import { Plus, Search, UserPlus, Clock, CalendarOff } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, DueAmount } from "@/components/due-status";
 import { applyLedgerFilter, defaultLedgerFilter, LedgerFilterControls, type LedgerFilterState } from "@/components/ledger-filters";
 import { fetchLedgerRows } from "@/lib/dues";
+import { BulkHolidayModal } from "@/components/bulk-holiday-modal";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated/students/")({
   head: () => ({
@@ -29,6 +31,10 @@ function StudentList() {
   const [q, setQ] = useState("");
   const [unit, setUnit] = useState<string>("all");
   const [filter, setFilter] = useState<LedgerFilterState>({ ...defaultLedgerFilter, sort: "name_asc" });
+  const [bulkHoliday, setBulkHoliday] = useState(false);
+  const queryClient = useQueryClient();
+
+
 
   const { data: units } = useQuery({
     queryKey: ["units"],
@@ -86,6 +92,10 @@ function StudentList() {
           <p className="text-muted-foreground">Manage student records across units.</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setBulkHoliday(true)}>
+            <CalendarOff className="h-4 w-4 mr-2" />
+            Bulk Holiday / Leave
+          </Button>
           <Button asChild variant="outline">
             <Link to="/students/pending">
               <Clock className="h-4 w-4 mr-2" />
@@ -163,6 +173,26 @@ function StudentList() {
           </TableBody>
         </Table>
       </Card>
+
+      {bulkHoliday && (
+        <BulkHolidayModal
+          students={rows.map((r) => ({
+            student_id: r.student_id,
+            full_name: r.full_name,
+            roll_number: r.roll_number,
+            unit_name: r.unit_name,
+            status: r.status,
+          }))}
+          onClose={() => setBulkHoliday(false)}
+          onSaved={() => {
+            setBulkHoliday(false);
+            queryClient.invalidateQueries({ queryKey: ["students-ledger"] });
+            queryClient.invalidateQueries({ queryKey: ["dues"] });
+            queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+          }}
+        />
+      )}
     </div>
+
   );
 }
