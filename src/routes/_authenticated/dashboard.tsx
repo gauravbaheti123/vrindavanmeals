@@ -34,6 +34,8 @@ const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 function Dashboard() {
   const [unitId, setUnitId] = useState<string>("all");
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
 
   const { data: units } = useQuery({
     queryKey: ["units-list"],
