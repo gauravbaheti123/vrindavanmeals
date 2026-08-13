@@ -184,7 +184,7 @@ function DuesPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hidden md:block">
         <CardHeader className="py-3"><CardTitle className="text-base">Outstanding — {filtered.length} students</CardTitle></CardHeader>
         <CardContent className="p-0">
           <div className="max-h-[600px] overflow-auto">
