@@ -36,7 +36,15 @@ const TEMPLATES: Record<string, { headers: string[]; samples: string[][] }> = {
       ["9876543210", "Unit 1", "dinner", "15-01-2026", "20:30", "manual"],
     ],
   },
+  deposits: {
+    headers: ["mess_no", "deposit_amount", "date", "remarks"],
+    samples: [
+      ["VM-0001", "2000", "01-06-2026", "Refundable security deposit"],
+      ["VM-0002", "1500", "", ""],
+    ],
+  },
 };
+
 
 function ImportPage() {
   const { roles } = useCurrentUser();
