@@ -230,14 +230,33 @@ function ExportBar({ onPdf, onExcel }: { onPdf: () => void; onExcel: () => void 
 
 function DataTable({ cols, rows, empty = "No data." }: { cols: string[]; rows: (string | number | React.ReactNode)[][]; empty?: string }) {
   return (
-    <Card><Table>
-      <TableHeader><TableRow>{cols.map((c) => <TableHead key={c}>{c}</TableHead>)}</TableRow></TableHeader>
-      <TableBody>
-        {rows.length === 0
-          ? <TableRow><TableCell colSpan={cols.length} className="text-center py-8 text-muted-foreground">{empty}</TableCell></TableRow>
-          : rows.map((r, i) => <TableRow key={i}>{r.map((c, j) => <TableCell key={j}>{c}</TableCell>)}</TableRow>)}
-      </TableBody>
-    </Table></Card>
+    <>
+      <Card className="hidden md:block"><Table>
+        <TableHeader><TableRow>{cols.map((c) => <TableHead key={c}>{c}</TableHead>)}</TableRow></TableHeader>
+        <TableBody>
+          {rows.length === 0
+            ? <TableRow><TableCell colSpan={cols.length} className="text-center py-8 text-muted-foreground">{empty}</TableCell></TableRow>
+            : rows.map((r, i) => <TableRow key={i}>{r.map((c, j) => <TableCell key={j}>{c}</TableCell>)}</TableRow>)}
+        </TableBody>
+      </Table></Card>
+
+      <MobileOnly>
+        {rows.length === 0 ? (
+          <MobileEmpty>{empty}</MobileEmpty>
+        ) : (
+          <MobileCardList>
+            {rows.map((r, i) => (
+              <MobileCard
+                key={i}
+                title={r[0]}
+                subtitle={cols[1] ? <>{cols[1]}: {r[1]}</> : undefined}
+                meta={cols.slice(2).map((c, j) => ({ label: c, value: r[j + 2] }))}
+              />
+            ))}
+          </MobileCardList>
+        )}
+      </MobileOnly>
+    </>
   );
 }
 
