@@ -8,8 +8,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users, CalendarClock, IndianRupee, AlertTriangle, Wallet,
-  Utensils, RefreshCw, ArrowRight,
+  Utensils, RefreshCw, ArrowRight, Search,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { StudentSearchDialog, QuickPaymentDialog } from "@/components/quick-actions";
 import { fetchLedgerRows } from "@/lib/dues";
 import { useDueThresholds } from "@/hooks/use-due-thresholds";
 
