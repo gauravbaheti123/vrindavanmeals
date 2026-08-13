@@ -1,4 +1,5 @@
 import { fmtDate } from "@/lib/dates";
+import { MobileOnly, MobileCard, MobileCardList, MobileEmpty } from "@/components/mobile-list";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
@@ -97,21 +98,21 @@ function PaymentList() {
 
       <Card className="p-4 flex flex-wrap gap-3 items-center">
         <Select value={unit} onValueChange={setUnit}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Unit" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Unit" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Units</SelectItem>
             {units?.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={mode} onValueChange={setMode}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Mode" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Mode" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Modes</SelectItem>
             {MODES.map((m) => <SelectItem key={m} value={m} className="capitalize">{m}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
             <SelectItem value="success">Success</SelectItem>
@@ -119,11 +120,11 @@ function PaymentList() {
             <SelectItem value="failed">Failed</SelectItem>
           </SelectContent>
         </Select>
-        <DateInput value={from} onChange={setFrom} className="w-[160px]" placeholder="From" />
-        <DateInput value={to} onChange={setTo} className="w-[160px]" placeholder="To" />
+        <DateInput value={from} onChange={setFrom} className="w-full sm:w-[160px]" placeholder="From" />
+        <DateInput value={to} onChange={setTo} className="w-full sm:w-[160px]" placeholder="To" />
       </Card>
 
-      <Card>
+      <Card className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -170,6 +171,41 @@ function PaymentList() {
           </TableBody>
         </Table>
       </Card>
+
+      <MobileOnly>
+        {isLoading ? (
+          <MobileEmpty>Loading…</MobileEmpty>
+        ) : (payments ?? []).length === 0 ? (
+          <MobileEmpty>No payments match the filters.</MobileEmpty>
+        ) : (
+          <MobileCardList>
+            {(payments ?? []).map((p) => {
+              const row = p as unknown as {
+                id: string; amount: number; mode: string; status: string; created_at: string;
+                students?: { full_name: string; units?: { name: string } };
+                profiles?: { name: string };
+              };
+              return (
+                <MobileCard
+                  key={row.id}
+                  title={row.students?.full_name ?? "—"}
+                  subtitle={`${fmtDate(row.created_at)}${row.students?.units?.name ? ` · ${row.students.units.name}` : ""}`}
+                  right={
+                    <div className="space-y-1">
+                      <div className="font-bold">₹{Number(row.amount).toLocaleString("en-IN")}</div>
+                      <Badge variant={row.status === "success" ? "default" : row.status === "failed" ? "destructive" : "secondary"} className="capitalize">{row.status}</Badge>
+                    </div>
+                  }
+                  meta={[
+                    { label: "Mode", value: <span className="capitalize">{row.mode}</span> },
+                    { label: "Recorded by", value: row.profiles?.name || "—" },
+                  ]}
+                />
+              );
+            })}
+          </MobileCardList>
+        )}
+      </MobileOnly>
     </div>
   );
 }

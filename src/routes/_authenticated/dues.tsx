@@ -18,6 +18,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AlertTriangle, Wallet, Users as UsersIcon, Search, IndianRupee, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge, DueAmount } from "@/components/due-status";
+import { MobileOnly, MobileCard, MobileCardList, MobileEmpty } from "@/components/mobile-list";
 import { applyLedgerFilter, defaultLedgerFilter, type LedgerFilterState } from "@/components/ledger-filters";
 import { ColumnHead, FilterOptions, useTableSort, sortRows, LEDGER_DATE_KEYS } from "@/components/table-head-controls";
 import { fetchDuesRows, fetchLedgerRows, type DuesRow } from "@/lib/dues";
@@ -184,7 +185,7 @@ function DuesPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hidden md:block">
         <CardHeader className="py-3"><CardTitle className="text-base">Outstanding — {filtered.length} students</CardTitle></CardHeader>
         <CardContent className="p-0">
           <div className="max-h-[600px] overflow-auto">
@@ -282,6 +283,42 @@ function DuesPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Mobile — stacked cards */}
+      <MobileOnly>
+        {isLoading ? (
+          <MobileEmpty>Loading…</MobileEmpty>
+        ) : !filtered.length ? (
+          <MobileEmpty>No dues 🎉</MobileEmpty>
+        ) : (
+          <MobileCardList>
+            {filtered.map((r) => (
+              <MobileCard
+                key={r.student_id}
+                title={<Link to="/students/$id" params={{ id: r.student_id }}>{r.full_name}</Link>}
+                subtitle={`${r.roll_number ?? "—"}${r.unit_name ? ` · ${r.unit_name}` : ""}`}
+                right={<div className="space-y-1"><StatusBadge status={r.status} /><DueAmount status={r.status} due={r.due_amount} daysOverdue={r.days_overdue} /></div>}
+                meta={[
+                  { label: "Mobile", value: r.mobile ?? "—" },
+                  { label: "Last payment", value: r.last_payment_date ? fmtDate(r.last_payment_date) : "Never" },
+                  { label: "Days overdue", value: r.days_overdue },
+                  { label: "Total billed", value: inr(r.total_billed) },
+                ]}
+                actions={
+                  <>
+                    <Button size="sm" className="min-h-11 flex-1" onClick={() => setPayFor(r)}>
+                      <IndianRupee className="h-4 w-4 mr-1" />Record Payment
+                    </Button>
+                    <Button asChild size="sm" variant="outline" className="min-h-11 flex-1">
+                      <Link to="/students/$id" params={{ id: r.student_id }}>View</Link>
+                    </Button>
+                  </>
+                }
+              />
+            ))}
+          </MobileCardList>
+        )}
+      </MobileOnly>
 
       <RecordPaymentModal
         row={payFor}

@@ -1,4 +1,5 @@
 import { fmtDate } from "@/lib/dates";
+import { MobileOnly, MobileCard, MobileCardList, MobileEmpty } from "@/components/mobile-list";
 import { createFileRoute } from "@tanstack/react-router";
 import { STALE } from "@/lib/query-cache";
 import { useQuery } from "@tanstack/react-query";
@@ -230,14 +231,33 @@ function ExportBar({ onPdf, onExcel }: { onPdf: () => void; onExcel: () => void 
 
 function DataTable({ cols, rows, empty = "No data." }: { cols: string[]; rows: (string | number | React.ReactNode)[][]; empty?: string }) {
   return (
-    <Card><Table>
-      <TableHeader><TableRow>{cols.map((c) => <TableHead key={c}>{c}</TableHead>)}</TableRow></TableHeader>
-      <TableBody>
-        {rows.length === 0
-          ? <TableRow><TableCell colSpan={cols.length} className="text-center py-8 text-muted-foreground">{empty}</TableCell></TableRow>
-          : rows.map((r, i) => <TableRow key={i}>{r.map((c, j) => <TableCell key={j}>{c}</TableCell>)}</TableRow>)}
-      </TableBody>
-    </Table></Card>
+    <>
+      <Card className="hidden md:block"><Table>
+        <TableHeader><TableRow>{cols.map((c) => <TableHead key={c}>{c}</TableHead>)}</TableRow></TableHeader>
+        <TableBody>
+          {rows.length === 0
+            ? <TableRow><TableCell colSpan={cols.length} className="text-center py-8 text-muted-foreground">{empty}</TableCell></TableRow>
+            : rows.map((r, i) => <TableRow key={i}>{r.map((c, j) => <TableCell key={j}>{c}</TableCell>)}</TableRow>)}
+        </TableBody>
+      </Table></Card>
+
+      <MobileOnly>
+        {rows.length === 0 ? (
+          <MobileEmpty>{empty}</MobileEmpty>
+        ) : (
+          <MobileCardList>
+            {rows.map((r, i) => (
+              <MobileCard
+                key={i}
+                title={r[0]}
+                subtitle={cols[1] ? <>{cols[1]}: {r[1]}</> : undefined}
+                meta={cols.slice(2).map((c, j) => ({ label: c, value: r[j + 2] }))}
+              />
+            ))}
+          </MobileCardList>
+        )}
+      </MobileOnly>
+    </>
   );
 }
 
@@ -1097,7 +1117,7 @@ function BulkLedgerSummary() {
         <KPI label="Total Due" value={fmtINR(totals.due)} icon={AlertCircle} tone="text-destructive" />
       </div>
 
-      <Card className="overflow-x-auto">
+      <Card className="overflow-x-auto hidden md:block">
         <Table>
           <TableHeader><TableRow>{COLS.map((c) => (
             <TableHead key={c} className={c.startsWith("Total") || c === "Adjustments" ? "text-right" : ""}>{c}</TableHead>
@@ -1124,6 +1144,36 @@ function BulkLedgerSummary() {
           </TableBody>
         </Table>
       </Card>
+
+      <MobileOnly>
+        {isLoading ? (
+          <MobileEmpty>Loading…</MobileEmpty>
+        ) : rows.length === 0 ? (
+          <MobileEmpty>No students match the filters.</MobileEmpty>
+        ) : (
+          <MobileCardList>
+            {rows.map((r) => (
+              <MobileCard
+                key={r.student_id}
+                title={r.full_name}
+                subtitle={`${r.roll_number ?? "—"}${r.unit_name ? ` · ${r.unit_name}` : ""}`}
+                right={
+                  <div className="space-y-1">
+                    <StatusBadge status={r.status} />
+                    <div className={cn("font-semibold", r.due_amount > 0 ? "text-destructive" : "text-success")}>{fmtINR(r.due_amount)}</div>
+                  </div>
+                }
+                meta={[
+                  { label: "Billed", value: fmtINR(r.total_billed) },
+                  { label: "Paid", value: fmtINR(r.paid) },
+                  { label: "Opening + Adj", value: fmtINR(r.opening_balance + r.adjustments) },
+                  { label: "Last payment", value: r.last_payment_date ? fmtDate(r.last_payment_date) : "—" },
+                ]}
+              />
+            ))}
+          </MobileCardList>
+        )}
+      </MobileOnly>
     </div>
   );
 }

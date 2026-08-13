@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Search, UserPlus, Clock, CalendarOff } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge, DueAmount } from "@/components/due-status";
+import { MobileOnly, MobileCard, MobileCardList, MobileEmpty } from "@/components/mobile-list";
 import { applyLedgerFilter, defaultLedgerFilter, type LedgerFilterState } from "@/components/ledger-filters";
 import { ColumnHead, FilterOptions, useTableSort, sortRows, LEDGER_DATE_KEYS } from "@/components/table-head-controls";
 import { fetchLedgerRows } from "@/lib/dues";
@@ -88,11 +89,11 @@ function StudentList() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold">Students</h1>
-          <p className="text-muted-foreground">Manage student records across units.</p>
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold">Students</h1>
+          <p className="text-sm text-muted-foreground">Manage student records across units.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 w-full sm:flex sm:w-auto [&_button]:min-h-11 [&_a]:min-h-11">
           <Button variant="outline" onClick={() => setBulkHoliday(true)}>
             <CalendarOff className="h-4 w-4 mr-2" />
             Bulk Holiday / Leave
@@ -122,7 +123,7 @@ function StudentList() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -207,6 +208,32 @@ function StudentList() {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Mobile — stacked cards instead of a wide table */}
+      <MobileOnly>
+        {isLoading ? (
+          <MobileEmpty>Loading…</MobileEmpty>
+        ) : rows.length === 0 ? (
+          <MobileEmpty>No students match the filters.</MobileEmpty>
+        ) : (
+          <MobileCardList>
+            {rows.map((s) => (
+              <MobileCard
+                key={s.student_id}
+                title={s.full_name}
+                subtitle={`${s.roll_number || "—"}${s.unit_name ? ` · ${s.unit_name}` : ""}`}
+                right={<div className="space-y-1"><StatusBadge status={s.status} /><DueAmount status={s.status} due={s.due_amount} daysOverdue={s.days_overdue} /></div>}
+                meta={[{ label: "Mobile", value: s.mobile || "—" }, { label: "Unit", value: s.unit_name || "—" }]}
+                actions={
+                  <Button asChild size="sm" variant="outline" className="min-h-11 flex-1">
+                    <Link to="/students/$id" params={{ id: s.student_id }}>View / Ledger</Link>
+                  </Button>
+                }
+              />
+            ))}
+          </MobileCardList>
+        )}
+      </MobileOnly>
 
       {bulkHoliday && (
         <BulkHolidayModal

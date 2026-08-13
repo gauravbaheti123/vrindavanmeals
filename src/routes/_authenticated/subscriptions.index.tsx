@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, CalendarClock, Download, FileText } from "lucide-react";
 import { StatusBadge, DueAmount, inr } from "@/components/due-status";
+import { MobileOnly, MobileCard, MobileCardList, MobileEmpty } from "@/components/mobile-list";
 import { applyLedgerFilter, defaultLedgerFilter, type LedgerFilterState } from "@/components/ledger-filters";
 import { ColumnHead, FilterOptions, useTableSort, sortRows, LEDGER_DATE_KEYS } from "@/components/table-head-controls";
 import { fetchLedgerRows } from "@/lib/dues";
@@ -114,7 +115,7 @@ function SubscriptionList() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -205,6 +206,34 @@ function SubscriptionList() {
           </TableBody>
         </Table>
       </Card>
+
+      <MobileOnly>
+        {isLoading ? (
+          <MobileEmpty>Loading…</MobileEmpty>
+        ) : rows.length === 0 ? (
+          <MobileEmpty>No students match the filters.</MobileEmpty>
+        ) : (
+          <MobileCardList>
+            {rows.map((r) => (
+              <MobileCard
+                key={r.student_id}
+                title={r.full_name}
+                subtitle={`${r.roll_number ?? "—"}${r.unit_name ? ` · ${r.unit_name}` : ""}`}
+                right={<div className="space-y-1"><StatusBadge status={r.status} /><DueAmount status={r.status} due={r.due_amount} daysOverdue={r.days_overdue} /></div>}
+                meta={[
+                  { label: "Joined", value: fmtDate(r.joining_date) },
+                  { label: "Total billed", value: inr(r.total_billed) },
+                ]}
+                actions={
+                  <Button asChild size="sm" variant="outline" className="min-h-11 flex-1">
+                    <Link to="/students/$id" params={{ id: r.student_id }}>View</Link>
+                  </Button>
+                }
+              />
+            ))}
+          </MobileCardList>
+        )}
+      </MobileOnly>
     </div>
   );
 }

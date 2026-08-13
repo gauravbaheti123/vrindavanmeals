@@ -8,8 +8,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users, CalendarClock, IndianRupee, AlertTriangle, Wallet,
-  Utensils, RefreshCw, ArrowRight,
+  Utensils, RefreshCw, ArrowRight, Search,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { StudentSearchDialog, QuickPaymentDialog } from "@/components/quick-actions";
 import { fetchLedgerRows } from "@/lib/dues";
 import { useDueThresholds } from "@/hooks/use-due-thresholds";
 
@@ -32,6 +34,8 @@ const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 function Dashboard() {
   const [unitId, setUnitId] = useState<string>("all");
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
 
   const { data: units } = useQuery({
     queryKey: ["units-list"],
@@ -153,18 +157,18 @@ function Dashboard() {
   useEffect(() => { if (agg) setLastUpdated(new Date()); }, [agg]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <RefreshCw className="h-3 w-3" />
+            <RefreshCw className="h-3 w-3 shrink-0" />
             Updated {lastUpdated.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
           </p>
         </div>
         <Select value={unitId} onValueChange={setUnitId}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="All units" /></SelectTrigger>
+          <SelectTrigger className="w-[140px] sm:w-[180px]"><SelectValue placeholder="All units" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Units</SelectItem>
             {units?.map((u) => (<SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>))}
@@ -172,24 +176,38 @@ function Dashboard() {
         </Select>
       </div>
 
+      {/* Quick actions — always above the fold */}
+      <div className="grid grid-cols-2 gap-3">
+        <Button variant="outline" className="min-h-12 justify-center" onClick={() => setSearchOpen(true)}>
+          <Search className="h-4 w-4 mr-2" />Search Student
+        </Button>
+        <Button className="min-h-12 justify-center" onClick={() => setPayOpen(true)}>
+          <IndianRupee className="h-4 w-4 mr-2" />Record Payment
+        </Button>
+      </div>
+
+      <StudentSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <QuickPaymentDialog open={payOpen} onOpenChange={setPayOpen} />
+
+
       {/* PRIMARY — Outstanding Dues (largest, top) */}
       <Link to="/dues" className="block">
         <Card className="border-l-8 border-l-destructive hover:shadow-lg transition-shadow bg-gradient-to-br from-destructive/5 to-transparent">
-          <CardContent className="pt-6 pb-6 flex items-center justify-between gap-4">
-            <div className="flex items-start gap-4">
-              <div className="h-14 w-14 rounded-xl bg-destructive/10 grid place-items-center shrink-0">
-                <AlertTriangle className="h-7 w-7 text-destructive" />
+          <CardContent className="pt-5 pb-5 sm:pt-6 sm:pb-6 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+              <div className="h-11 w-11 sm:h-14 sm:w-14 rounded-xl bg-destructive/10 grid place-items-center shrink-0">
+                <AlertTriangle className="h-6 w-6 sm:h-7 sm:w-7 text-destructive" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Total Outstanding Dues</div>
-                <div className="text-5xl font-bold text-destructive leading-tight">{inr(agg?.outstanding.amount ?? 0)}</div>
+                <div className="text-3xl sm:text-5xl font-bold text-destructive leading-tight truncate">{inr(agg?.outstanding.amount ?? 0)}</div>
                 <div className="text-sm text-muted-foreground mt-1">
                   <b className="text-foreground">{agg?.outstanding.students ?? 0}</b> students overdue
                 </div>
               </div>
             </div>
-            <div className="text-sm text-primary flex items-center gap-1 font-medium">
-              View Details <ArrowRight className="h-4 w-4" />
+            <div className="text-sm text-primary flex items-center gap-1 font-medium shrink-0">
+              <span className="hidden sm:inline">View Details</span> <ArrowRight className="h-4 w-4" />
             </div>
           </CardContent>
         </Card>
