@@ -228,7 +228,7 @@ function DuesPage() {
                     <TableCell className="text-right">
                       <DueAmount status={r.status} due={r.due_amount} daysOverdue={r.days_overdue} />
                     </TableCell>
-                    <TableCell className="text-sm">{r.last_payment_date ? r.last_payment_date.slice(0, 10) : <span className="text-muted-foreground">Never</span>}</TableCell>
+                    <TableCell className="text-sm">{r.last_payment_date ? fmtDate(r.last_payment_date) : <span className="text-muted-foreground">Never</span>}</TableCell>
                     <TableCell className="text-right">
                       <span className={r.days_overdue > 30 ? "font-bold text-destructive" : r.days_overdue > 7 ? "font-semibold text-warning-foreground" : ""}>
                         {r.days_overdue}

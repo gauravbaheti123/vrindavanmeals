@@ -155,7 +155,7 @@ function SubscriptionList() {
                   <Link to="/students/$id" params={{ id: r.student_id }} className="hover:underline">{r.full_name}</Link>
                 </TableCell>
                 <TableCell>{r.unit_name ?? "—"}</TableCell>
-                <TableCell className="text-sm">{r.joining_date ?? "—"}</TableCell>
+                <TableCell className="text-sm">{fmtDate(r.joining_date)}</TableCell>
                 <TableCell><StatusBadge status={r.status} /></TableCell>
                 <TableCell className="text-right text-sm">{inr(r.total_billed)}</TableCell>
                 <TableCell className="text-right">

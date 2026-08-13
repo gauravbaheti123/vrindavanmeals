@@ -160,7 +160,7 @@ function PaymentList() {
                   <TableCell className="capitalize">{row.mode}</TableCell>
                   <TableCell>{fmtDate(row.created_at)}</TableCell>
                   <TableCell>{row.profiles?.name || "—"}</TableCell>
-                  <TableCell className="text-xs">{row.subscriptions ? `${row.subscriptions.start_date} → ${row.subscriptions.end_date}` : "—"}</TableCell>
+                  <TableCell className="text-xs">{row.subscriptions ? `${fmtDate(row.subscriptions.start_date)} → ${fmtDate(row.subscriptions.end_date)}` : "—"}</TableCell>
                   <TableCell>
                     <Badge variant={row.status === "success" ? "default" : row.status === "failed" ? "destructive" : "secondary"} className="capitalize">{row.status}</Badge>
                   </TableCell>
