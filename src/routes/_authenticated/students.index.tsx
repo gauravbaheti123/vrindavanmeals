@@ -92,6 +92,10 @@ function StudentList() {
           <p className="text-muted-foreground">Manage student records across units.</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setBulkHoliday(true)}>
+            <CalendarOff className="h-4 w-4 mr-2" />
+            Bulk Holiday / Leave
+          </Button>
           <Button asChild variant="outline">
             <Link to="/students/pending">
               <Clock className="h-4 w-4 mr-2" />
