@@ -29,6 +29,7 @@ import { fetchFeeSlabs, feeForMonth, missingSlabMessage, computeHolidayDeduction
 import { generateNocPdf } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
 import { StudentPhoto, StudentPhotoEditor } from "@/components/student-photo";
+import { MobileOnly, DesktopOnly, MobileCard, MobileCardList, MobileEmpty } from "@/components/mobile-list";
 import { useServerFn } from "@tanstack/react-start";
 import { recalcStudentBilling } from "@/lib/billing.functions";
 import { Wallet } from "lucide-react";
@@ -205,6 +206,152 @@ function StudentDetail() {
   const activeSub = data.subs[0];
   const effStatus = activeSub ? computeSubscriptionStatus(activeSub) : null;
 
+  const adjMeta = (a: Adjustment) => {
+    const isHoliday = a.kind === "holiday";
+    const hDays = isHoliday && a.from_date && a.to_date
+      ? Math.round((Date.parse(a.to_date) - Date.parse(a.from_date)) / 86400000) + 1
+      : 0;
+    const rangeLabel = isHoliday && a.from_date && a.to_date
+      ? `${formatDMY(a.from_date)} → ${formatDMY(a.to_date)} (${hDays} day${hDays === 1 ? "" : "s"})`
+      : null;
+    const detail = isHoliday
+      ? `${rangeLabel ?? ""}${a.remarks ? ` · ${a.remarks}` : ""}`
+      : (a.remarks ?? "—");
+    return { isHoliday, rangeLabel, detail };
+  };
+
+  const payActions = (p: Payment) => (
+    <>
+      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setPayModal({ mode: "edit", payment: p })}>
+        <Pencil className="h-3 w-3" />
+      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive">
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this payment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {inr(Number(p.amount))} · {p.mode} · {fmtDate(p.created_at)} will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const { error } = await supabase.from("payments").delete().eq("id", p.id);
+                if (error) return toast.error(error.message);
+                await logAudit({
+                  action: "delete", entity: "payment", entityId: p.id, studentId: s.id,
+                  label: `${inr(Number(p.amount))} · ${p.mode} · ${fmtDate(p.created_at)}`,
+                  oldValues: { amount: p.amount, mode: p.mode, date: p.created_at.slice(0, 10), status: p.status },
+                });
+                toast.success("Payment deleted");
+                refresh();
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+
+  const adjActions = (a: Adjustment) => {
+    const { isHoliday, rangeLabel } = adjMeta(a);
+    return (
+      <>
+        <Button
+          size="icon" variant="ghost" className="h-8 w-8"
+          onClick={() => (isHoliday ? setHolidayModal({ existing: a }) : setAdjModal({ existing: a }))}
+        >
+          <Pencil className="h-3 w-3" />
+        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive">
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{isHoliday ? "Delete this holiday deduction?" : "Delete this adjustment?"}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {inr(Math.abs(Number(a.amount)))} · {rangeLabel ?? a.remarks ?? "no remarks"} will be permanently removed from the ledger.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  const { error } = await supabase.from("ledger_adjustments").delete().eq("id", a.id);
+                  if (error) return toast.error(error.message);
+                  await logAudit({
+                    action: "delete", entity: isHoliday ? "holiday" : "adjustment", entityId: a.id, studentId: s.id,
+                    label: rangeLabel ?? a.remarks ?? "Ledger adjustment",
+                    oldValues: { amount: a.amount, entry_date: a.entry_date, remarks: a.remarks, from_date: a.from_date, to_date: a.to_date },
+                  });
+                  toast.success(isHoliday ? "Holiday deduction deleted" : "Adjustment deleted");
+                  refresh();
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  };
+
+  const depActions = (d: Deposit) => (
+    <>
+      <Button
+        size="icon" variant="ghost" className="h-8 w-8"
+        onClick={() => setDepositModal({ kind: d.kind as "received" | "refunded", existing: d, held: depositHeld })}
+      >
+        <Pencil className="h-3 w-3" />
+      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive">
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this deposit entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The held deposit balance will be recalculated. Billing and dues are unaffected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const { error } = await supabase.from("security_deposits").delete().eq("id", d.id);
+                if (error) return toast.error(error.message);
+                await logAudit({
+                  action: "delete", entity: "security_deposit", entityId: d.id, studentId: s.id,
+                  label: `Deposit ${d.kind} ${inr(Number(d.amount))}`,
+                  oldValues: { kind: d.kind, amount: d.amount, entry_date: d.entry_date, mode: d.mode, remarks: d.remarks },
+                });
+                toast.success("Deposit entry deleted");
+                refresh();
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+
   return (
     <div className="space-y-6 max-w-5xl print:max-w-none print:space-y-3">
       <div className="flex items-center justify-between print:hidden flex-wrap gap-2">
@@ -279,7 +426,7 @@ function StudentDetail() {
       <div className="grid md:grid-cols-2 gap-4">
         {/* Profile */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
             <CardTitle className="text-base">Profile</CardTitle>
             <Button size="sm" variant="ghost" className="print:hidden" onClick={() => setEditProfile(true)}>
               <Pencil className="h-3 w-3 mr-1" />Edit
@@ -317,7 +464,7 @@ function StudentDetail() {
 
         {/* Subscriptions */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
             <CardTitle className="text-base">Subscriptions</CardTitle>
             <Button size="sm" className="print:hidden" onClick={() => setNewSub(true)}>
               <Plus className="h-3 w-3 mr-1" />Add / Renew
@@ -394,183 +541,154 @@ function StudentDetail() {
 
       {/* Payment Ledger */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardHeader className="flex flex-col items-start gap-2 pb-2 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base">Payment Ledger</CardTitle>
-          <div className="flex gap-2 print:hidden">
-            <Button size="sm" variant="outline" onClick={() => setAdjModal({ existing: null })}>
+          <div className="grid w-full grid-cols-1 gap-2 print:hidden sm:flex sm:w-auto sm:flex-wrap">
+            <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => setAdjModal({ existing: null })}>
               <Scale className="h-3 w-3 mr-1" />Add Adjustment
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setHolidayModal({ existing: null })}>
+            <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => setHolidayModal({ existing: null })}>
               <CalendarDays className="h-3 w-3 mr-1" />Add Holiday / Leave
             </Button>
-            <Button size="sm" onClick={() => setPayModal({ mode: "new" })}>
+            <Button size="sm" className="w-full sm:w-auto" onClick={() => setPayModal({ mode: "new" })}>
               <IndianRupee className="h-3 w-3 mr-1" />Record Payment
             </Button>
           </div>
         </CardHeader>
 
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Mode</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Reference</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Running Paid</TableHead>
-                <TableHead className="text-right print:hidden">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {summary.opening > 0 && (
-                <TableRow className="bg-muted/40">
-                  <TableCell className="text-sm">{summary.openingAsOf ? fmtDate(summary.openingAsOf) : "—"}</TableCell>
-                  <TableCell className="text-sm italic">Opening Balance</TableCell>
-                  <TableCell><Badge variant="secondary">carry-forward</Badge></TableCell>
-                  <TableCell className="text-xs text-muted-foreground">Imported</TableCell>
-                  <TableCell className="text-right font-semibold">{inr(summary.opening)}</TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
-                  <TableCell className="print:hidden" />
+          <DesktopOnly>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Mode</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Running Paid</TableHead>
+                  <TableHead className="text-right print:hidden">Actions</TableHead>
                 </TableRow>
+              </TableHeader>
+              <TableBody>
+                {summary.opening > 0 && (
+                  <TableRow className="bg-muted/40">
+                    <TableCell className="text-sm whitespace-nowrap">{summary.openingAsOf ? fmtDate(summary.openingAsOf) : "—"}</TableCell>
+                    <TableCell className="text-sm italic">Opening Balance</TableCell>
+                    <TableCell><Badge variant="secondary">carry-forward</Badge></TableCell>
+                    <TableCell className="text-xs text-muted-foreground">Imported</TableCell>
+                    <TableCell className="text-right font-semibold whitespace-nowrap">{inr(summary.opening)}</TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                    <TableCell className="print:hidden" />
+                  </TableRow>
+                )}
+                {data.pays.length === 0 && summary.opening <= 0 ? (
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No payments yet.</TableCell></TableRow>
+                ) : (() => {
+                  let running = 0;
+                  return data.pays.map((p) => {
+                    if (p.status === "success") running += Number(p.amount);
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell className="text-sm whitespace-nowrap">{fmtDate(p.created_at)}</TableCell>
+                        <TableCell className="capitalize text-sm">{p.mode}</TableCell>
+                        <TableCell>
+                          <Badge variant={p.status === "success" ? "outline" : "secondary"} className="capitalize">{p.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground font-mono">{p.razorpay_payment_id ?? "—"}</TableCell>
+                        <TableCell className="text-right font-semibold whitespace-nowrap">{inr(Number(p.amount))}</TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground whitespace-nowrap">{inr(running)}</TableCell>
+                        <TableCell className="text-right print:hidden">
+                          <div className="flex justify-end gap-1">{payActions(p)}</div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  });
+                })()}
+                {data.adjs.map((a) => {
+                  const meta = adjMeta(a);
+                  return (
+                    <TableRow key={a.id} className={meta.isHoliday ? "bg-success/5" : "bg-muted/20"}>
+                      <TableCell className="text-sm whitespace-nowrap">{fmtDate(a.entry_date)}</TableCell>
+                      <TableCell className="text-sm italic">{meta.isHoliday ? "Holiday Deduction" : "Adjustment"}</TableCell>
+                      <TableCell>
+                        {meta.isHoliday
+                          ? <Badge className="bg-success text-success-foreground">Holiday</Badge>
+                          : <Badge variant="secondary">{Number(a.amount) < 0 ? "Credit" : "Charge"}</Badge>}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{meta.detail}</TableCell>
+                      <TableCell className={`text-right font-semibold whitespace-nowrap ${Number(a.amount) < 0 ? "text-success" : ""}`}>
+                        {Number(a.amount) < 0 ? "−" : "+"}{inr(Math.abs(Number(a.amount)))}
+                      </TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                      <TableCell className="text-right print:hidden">
+                        <div className="flex justify-end gap-1">{adjActions(a)}</div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </DesktopOnly>
+
+          <MobileOnly className="p-3">
+            <MobileCardList>
+              {summary.opening > 0 && (
+                <MobileCard
+                  title="Opening Balance"
+                  subtitle={summary.openingAsOf ? fmtDate(summary.openingAsOf) : "—"}
+                  right={<span className="font-semibold whitespace-nowrap">{inr(summary.opening)}</span>}
+                  meta={[{ label: "Source", value: "Imported carry-forward" }]}
+                />
               )}
-              {data.pays.length === 0 && summary.opening <= 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No payments yet.</TableCell></TableRow>
-              ) : (() => {
+              {data.pays.length === 0 && summary.opening <= 0 && data.adjs.length === 0 ? (
+                <MobileEmpty>No payments yet.</MobileEmpty>
+              ) : null}
+              {(() => {
                 let running = 0;
                 return data.pays.map((p) => {
                   if (p.status === "success") running += Number(p.amount);
                   return (
-                    <TableRow key={p.id}>
-                      <TableCell className="text-sm">{fmtDate(p.created_at)}</TableCell>
-                      <TableCell className="capitalize text-sm">{p.mode}</TableCell>
-                      <TableCell>
-                        <Badge variant={p.status === "success" ? "outline" : "secondary"} className="capitalize">{p.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-mono">{p.razorpay_payment_id ?? "—"}</TableCell>
-                      <TableCell className="text-right font-semibold">{inr(Number(p.amount))}</TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">{inr(running)}</TableCell>
-                      <TableCell className="text-right print:hidden">
-                        <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setPayModal({ mode: "edit", payment: p })}>
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive">
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete this payment?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  {inr(Number(p.amount))} · {p.mode} · {fmtDate(p.created_at)} will be permanently removed.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={async () => {
-                                    const { error } = await supabase.from("payments").delete().eq("id", p.id);
-                                    if (error) return toast.error(error.message);
-                                    await logAudit({
-                                      action: "delete", entity: "payment", entityId: p.id, studentId: s.id,
-                                      label: `${inr(Number(p.amount))} · ${p.mode} · ${fmtDate(p.created_at)}`,
-                                      oldValues: { amount: p.amount, mode: p.mode, date: p.created_at.slice(0, 10), status: p.status },
-                                    });
-                                    toast.success("Payment deleted");
-                                    refresh();
-                                  }}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                    <MobileCard
+                      key={p.id}
+                      title={fmtDate(p.created_at)}
+                      subtitle={<span className="capitalize">{p.mode}</span>}
+                      right={
+                        <div className="space-y-1">
+                          <div className="font-semibold whitespace-nowrap">{inr(Number(p.amount))}</div>
+                          <Badge variant={p.status === "success" ? "outline" : "secondary"} className="capitalize">{p.status}</Badge>
                         </div>
-                      </TableCell>
-                    </TableRow>
+                      }
+                      meta={[
+                        { label: "Reference", value: <span className="font-mono break-all">{p.razorpay_payment_id ?? "—"}</span> },
+                        { label: "Running Paid", value: inr(running) },
+                      ]}
+                      actions={<div className="flex gap-1 print:hidden">{payActions(p)}</div>}
+                    />
                   );
                 });
               })()}
               {data.adjs.map((a) => {
-                const isHoliday = a.kind === "holiday";
-                const hDays = isHoliday && a.from_date && a.to_date
-                  ? Math.round((Date.parse(a.to_date) - Date.parse(a.from_date)) / 86400000) + 1
-                  : 0;
-                const rangeLabel = isHoliday && a.from_date && a.to_date
-                  ? `${formatDMY(a.from_date)} → ${formatDMY(a.to_date)} (${hDays} day${hDays === 1 ? "" : "s"})`
-                  : null;
+                const m = adjMeta(a);
                 return (
-                <TableRow key={a.id} className={isHoliday ? "bg-success/5" : "bg-muted/20"}>
-                  <TableCell className="text-sm">{fmtDate(a.entry_date)}</TableCell>
-                  <TableCell className="text-sm italic">{isHoliday ? "Holiday Deduction" : "Adjustment"}</TableCell>
-                  <TableCell>
-                    {isHoliday
-                      ? <Badge className="bg-success text-success-foreground">Holiday</Badge>
-                      : <Badge variant="secondary">{Number(a.amount) < 0 ? "Credit" : "Charge"}</Badge>}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {isHoliday
-                      ? <span>{rangeLabel}{a.remarks ? ` · ${a.remarks}` : ""}</span>
-                      : (a.remarks ?? "—")}
-                  </TableCell>
-                  <TableCell className={`text-right font-semibold ${Number(a.amount) < 0 ? "text-success" : ""}`}>
-                    {Number(a.amount) < 0 ? "−" : "+"}{inr(Math.abs(Number(a.amount)))}
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
-                  <TableCell className="text-right print:hidden">
-                    <div className="flex justify-end gap-1">
-                    <Button
-                      size="icon" variant="ghost" className="h-7 w-7"
-                      onClick={() => (isHoliday ? setHolidayModal({ existing: a }) : setAdjModal({ existing: a }))}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <AlertDialog>
-
-                      <AlertDialogTrigger asChild>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive">
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>{isHoliday ? "Delete this holiday deduction?" : "Delete this adjustment?"}</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {inr(Math.abs(Number(a.amount)))} · {rangeLabel ?? a.remarks ?? "no remarks"} will be permanently removed from the ledger.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={async () => {
-                              const { error } = await supabase.from("ledger_adjustments").delete().eq("id", a.id);
-                              if (error) return toast.error(error.message);
-                              await logAudit({
-                                action: "delete", entity: isHoliday ? "holiday" : "adjustment", entityId: a.id, studentId: s.id,
-                                label: rangeLabel ?? a.remarks ?? "Ledger adjustment",
-                                oldValues: { amount: a.amount, entry_date: a.entry_date, remarks: a.remarks, from_date: a.from_date, to_date: a.to_date },
-                              });
-                              toast.success(isHoliday ? "Holiday deduction deleted" : "Adjustment deleted");
-                              refresh();
-                            }}
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                    </div>
-                  </TableCell>
-
-                </TableRow>
+                  <MobileCard
+                    key={a.id}
+                    title={m.isHoliday ? "Holiday Deduction" : "Adjustment"}
+                    subtitle={fmtDate(a.entry_date)}
+                    right={
+                      <span className={`font-semibold whitespace-nowrap ${Number(a.amount) < 0 ? "text-success" : ""}`}>
+                        {Number(a.amount) < 0 ? "−" : "+"}{inr(Math.abs(Number(a.amount)))}
+                      </span>
+                    }
+                    meta={[{ label: "Details", value: m.detail }]}
+                    actions={<div className="flex gap-1 print:hidden">{adjActions(a)}</div>}
+                  />
                 );
               })}
-            </TableBody>
-          </Table>
-          <div className="flex flex-wrap gap-6 border-t px-4 py-3 text-sm">
+            </MobileCardList>
+          </MobileOnly>
+
+          <div className="flex flex-wrap gap-x-6 gap-y-1 border-t px-4 py-3 text-sm">
             <span>Total Billed: <b>{inr(summary.billed)}</b></span>
             <span>Total Paid: <b>{inr(summary.paid)}</b></span>
             {summary.adjustments !== 0 && (
@@ -585,11 +703,11 @@ function StudentDetail() {
 
       {/* Security Deposit — refundable, tracked separately from billing */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <Wallet className="h-4 w-4" />Security Deposit
           </CardTitle>
-          <div className="flex gap-2 print:hidden">
+          <div className="flex w-full flex-wrap gap-2 print:hidden sm:w-auto">
             <Button size="sm" variant="outline" onClick={() => setDepositModal({ kind: "received", existing: null, held: depositHeld })}>
               <Plus className="h-3 w-3 mr-1" />Add Deposit
             </Button>
@@ -610,87 +728,72 @@ function StudentDetail() {
             Refundable — not counted in Total Billed, Paid, Adjustments or Due.
           </p>
           {data.deposits.length > 0 && (
-            <div className="border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Mode</TableHead>
-                    <TableHead>Remarks</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right print:hidden">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            <>
+              <DesktopOnly>
+                <div className="border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Mode</TableHead>
+                        <TableHead>Remarks</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right print:hidden">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.deposits.map((d) => (
+                        <TableRow key={d.id}>
+                          <TableCell className="text-sm whitespace-nowrap">{fmtDate(d.entry_date)}</TableCell>
+                          <TableCell>
+                            <Badge variant={d.kind === "refunded" ? "secondary" : "outline"} className="capitalize">
+                              {d.kind === "refunded" ? "Refunded" : "Received"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm uppercase">{d.mode ?? "—"}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{d.remarks ?? "—"}</TableCell>
+                          <TableCell className={`text-right font-semibold whitespace-nowrap ${d.kind === "refunded" ? "text-destructive" : ""}`}>
+                            {d.kind === "refunded" ? "−" : "+"}{inr(Number(d.amount))}
+                          </TableCell>
+                          <TableCell className="text-right print:hidden">
+                            <div className="flex justify-end gap-1">{depActions(d)}</div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </DesktopOnly>
+              <MobileOnly>
+                <MobileCardList>
                   {data.deposits.map((d) => (
-                    <TableRow key={d.id}>
-                      <TableCell className="text-sm">{fmtDate(d.entry_date)}</TableCell>
-                      <TableCell>
-                        <Badge variant={d.kind === "refunded" ? "secondary" : "outline"} className="capitalize">
-                          {d.kind === "refunded" ? "Refunded" : "Received"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm uppercase">{d.mode ?? "—"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{d.remarks ?? "—"}</TableCell>
-                      <TableCell className={`text-right font-semibold ${d.kind === "refunded" ? "text-destructive" : ""}`}>
-                        {d.kind === "refunded" ? "−" : "+"}{inr(Number(d.amount))}
-                      </TableCell>
-                      <TableCell className="text-right print:hidden">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="icon" variant="ghost" className="h-7 w-7"
-                            onClick={() => setDepositModal({ kind: d.kind as "received" | "refunded", existing: d, held: depositHeld })}
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive">
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete this deposit entry?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  The held deposit balance will be recalculated. Billing and dues are unaffected.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={async () => {
-                                    const { error } = await supabase.from("security_deposits").delete().eq("id", d.id);
-                                    if (error) return toast.error(error.message);
-                                    await logAudit({
-                                      action: "delete", entity: "security_deposit", entityId: d.id, studentId: s.id,
-                                      label: `Deposit ${d.kind} ${inr(Number(d.amount))}`,
-                                      oldValues: { kind: d.kind, amount: d.amount, entry_date: d.entry_date, mode: d.mode, remarks: d.remarks },
-                                    });
-                                    toast.success("Deposit entry deleted");
-                                    refresh();
-                                  }}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <MobileCard
+                      key={d.id}
+                      title={d.kind === "refunded" ? "Refunded" : "Received"}
+                      subtitle={fmtDate(d.entry_date)}
+                      right={
+                        <span className={`font-semibold whitespace-nowrap ${d.kind === "refunded" ? "text-destructive" : ""}`}>
+                          {d.kind === "refunded" ? "−" : "+"}{inr(Number(d.amount))}
+                        </span>
+                      }
+                      meta={[
+                        { label: "Mode", value: <span className="uppercase">{d.mode ?? "—"}</span> },
+                        { label: "Remarks", value: d.remarks ?? "—" },
+                      ]}
+                      actions={<div className="flex gap-1 print:hidden">{depActions(d)}</div>}
+                    />
                   ))}
-                </TableBody>
-              </Table>
-            </div>
+                </MobileCardList>
+              </MobileOnly>
+            </>
           )}
         </CardContent>
       </Card>
 
       {/* Biometric */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
           <CardTitle className="text-base">Biometric Mapping</CardTitle>
           {data.mapping && (
             <Button
