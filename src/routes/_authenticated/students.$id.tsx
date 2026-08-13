@@ -27,6 +27,9 @@ import { fetchFeeSlabs, feeForMonth, missingSlabMessage, computeHolidayDeduction
 import { generateNocPdf } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
 import { StudentPhoto, StudentPhotoEditor } from "@/components/student-photo";
+import { useServerFn } from "@tanstack/react-start";
+import { recalcStudentBilling } from "@/lib/billing.functions";
+import { Wallet } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/students/$id")({
   head: () => ({ meta: [{ title: "Student — Vrindavan Meals" }] }),
@@ -52,6 +55,8 @@ type Adjustment = {
 };
 
 
+type Deposit = Database["public"]["Tables"]["security_deposits"]["Row"];
+
 const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 const todayISO = () => new Date().toISOString().slice(0, 10);
 /** "2026-05-17" → "May 2026" */
@@ -67,7 +72,7 @@ function StudentDetail() {
     queryKey: ["student-detail", id],
     staleTime: STALE.LIST,
     queryFn: async () => {
-      const [student, subs, pays, mapping, plans, units, adjs] = await Promise.all([
+      const [student, subs, pays, mapping, plans, units, adjs, deposits] = await Promise.all([
         supabase.from("students").select("*, units(name)").eq("id", id).maybeSingle(),
         supabase.from("subscriptions").select("*").eq("student_id", id).order("start_date", { ascending: false }),
         supabase.from("payments").select("*").eq("student_id", id).order("created_at", { ascending: true }),
@@ -75,6 +80,7 @@ function StudentDetail() {
         supabase.from("subscription_plans").select("*").eq("is_active", true).order("created_at"),
         supabase.from("units").select("id, name").eq("is_active", true).order("name"),
         supabase.from("ledger_adjustments").select("*").eq("student_id", id).order("entry_date", { ascending: true }),
+        supabase.from("security_deposits").select("*").eq("student_id", id).order("entry_date", { ascending: true }),
       ]);
       return {
         student: student.data as Student | null,
@@ -84,6 +90,7 @@ function StudentDetail() {
         plans: plans.data ?? [],
         units: units.data ?? [],
         adjs: (adjs.data ?? []) as unknown as Adjustment[],
+        deposits: (deposits.data ?? []) as Deposit[],
       };
     },
   });
@@ -96,6 +103,7 @@ function StudentDetail() {
   const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment } | null>(null);
   const [adjModal, setAdjModal] = useState<{ existing: Adjustment | null } | null>(null);
   const [holidayModal, setHolidayModal] = useState<{ existing: Adjustment | null } | null>(null);
+  const [depositModal, setDepositModal] = useState<{ kind: "received" | "refunded"; existing: Deposit | null; held: number } | null>(null);
 
   const [activateOpen, setActivateOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
@@ -133,6 +141,15 @@ function StudentDetail() {
     };
   }, [data]);
 
+
+  // Security deposit is a held refundable balance — never part of billing / dues.
+  const depositHeld = useMemo(() => {
+    if (!data) return 0;
+    return data.deposits.reduce(
+      (sum, d) => sum + (d.kind === "refunded" ? -Number(d.amount) : Number(d.amount)),
+      0,
+    );
+  }, [data]);
 
   async function handleIssueNoc() {
     if (!data) return;
@@ -564,6 +581,111 @@ function StudentDetail() {
       </Card>
 
 
+      {/* Security Deposit — refundable, tracked separately from billing */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Wallet className="h-4 w-4" />Security Deposit
+          </CardTitle>
+          <div className="flex gap-2 print:hidden">
+            <Button size="sm" variant="outline" onClick={() => setDepositModal({ kind: "received", existing: null, held: depositHeld })}>
+              <Plus className="h-3 w-3 mr-1" />Add Deposit
+            </Button>
+            <Button
+              size="sm" variant="outline" disabled={depositHeld <= 0}
+              onClick={() => setDepositModal({ kind: "refunded", existing: null, held: depositHeld })}
+            >
+              <IndianRupee className="h-3 w-3 mr-1" />Refund Deposit
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm text-muted-foreground">Security Deposit Held:</span>
+            <span className="text-2xl font-bold">{inr(depositHeld)}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Refundable — not counted in Total Billed, Paid, Adjustments or Due.
+          </p>
+          {data.deposits.length > 0 && (
+            <div className="border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Mode</TableHead>
+                    <TableHead>Remarks</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right print:hidden">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.deposits.map((d) => (
+                    <TableRow key={d.id}>
+                      <TableCell className="text-sm">{new Date(d.entry_date).toLocaleDateString("en-IN")}</TableCell>
+                      <TableCell>
+                        <Badge variant={d.kind === "refunded" ? "secondary" : "outline"} className="capitalize">
+                          {d.kind === "refunded" ? "Refunded" : "Received"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm uppercase">{d.mode ?? "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{d.remarks ?? "—"}</TableCell>
+                      <TableCell className={`text-right font-semibold ${d.kind === "refunded" ? "text-destructive" : ""}`}>
+                        {d.kind === "refunded" ? "−" : "+"}{inr(Number(d.amount))}
+                      </TableCell>
+                      <TableCell className="text-right print:hidden">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="icon" variant="ghost" className="h-7 w-7"
+                            onClick={() => setDepositModal({ kind: d.kind as "received" | "refunded", existing: d, held: depositHeld })}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete this deposit entry?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  The held deposit balance will be recalculated. Billing and dues are unaffected.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={async () => {
+                                    const { error } = await supabase.from("security_deposits").delete().eq("id", d.id);
+                                    if (error) return toast.error(error.message);
+                                    await logAudit({
+                                      action: "delete", entity: "security_deposit", entityId: d.id, studentId: s.id,
+                                      label: `Deposit ${d.kind} ${inr(Number(d.amount))}`,
+                                      oldValues: { kind: d.kind, amount: d.amount, entry_date: d.entry_date, mode: d.mode, remarks: d.remarks },
+                                    });
+                                    toast.success("Deposit entry deleted");
+                                    refresh();
+                                  }}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Biometric */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -656,6 +778,16 @@ function StudentDetail() {
           onSaved={() => { setAdjModal(null); refresh(); }}
         />
       )}
+      {depositModal && (
+        <DepositModal
+          studentId={s.id}
+          kind={depositModal.kind}
+          held={depositModal.held}
+          existing={depositModal.existing}
+          onClose={() => setDepositModal(null)}
+          onSaved={() => { setDepositModal(null); refresh(); }}
+        />
+      )}
       {holidayModal && (
         <HolidayModal
           studentId={s.id}
@@ -708,9 +840,11 @@ function ProfileEditModal({
     parent_mobile: student.parent_mobile ?? "",
     blood_group: student.blood_group ?? "",
     joining_date: (student as unknown as { joining_date?: string | null }).joining_date ?? "",
+    exit_date: (student as unknown as { exit_date?: string | null }).exit_date ?? "",
     unit_id: student.unit_id ?? "",
   });
   const [saving, setSaving] = useState(false);
+  const recalc = useServerFn(recalcStudentBilling);
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   async function save() {
@@ -740,11 +874,33 @@ function ProfileEditModal({
       parent_mobile: form.parent_mobile || null,
       blood_group: form.blood_group || null,
       joining_date: form.joining_date || null,
+      exit_date: form.exit_date || null,
       unit_id: form.unit_id || null,
     }).eq("id", student.id);
+    if (error) { setSaving(false); return toast.error(error.message); }
+
+    // Joining / Exit date drives the billing calendar — recalculate this student only.
+    const oldJoin = (student as unknown as { joining_date?: string | null }).joining_date ?? "";
+    const oldExit = (student as unknown as { exit_date?: string | null }).exit_date ?? "";
+    const datesChanged = oldJoin !== (form.joining_date || "") || oldExit !== (form.exit_date || "");
+    if (datesChanged) {
+      try {
+        const res = await recalc({ data: { student_id: student.id } });
+        await logAudit({
+          action: "update", entity: "billing", entityId: student.id, studentId: student.id,
+          label: `Billing recalculated due to date change: ${oldJoin || "—"} → ${form.joining_date || "—"}` +
+            (oldExit !== (form.exit_date || "") ? ` (exit ${oldExit || "—"} → ${form.exit_date || "—"})` : ""),
+          oldValues: { joining_date: oldJoin || null, exit_date: oldExit || null },
+          newValues: { joining_date: form.joining_date || null, exit_date: form.exit_date || null, total_billed: res.total },
+        });
+        toast.success(`Profile updated — billing recalculated (${inr(res.total)})`);
+      } catch (e: any) {
+        toast.error(`Profile saved, but billing recalculation failed: ${e?.message ?? e}`);
+      }
+    } else {
+      toast.success("Profile updated");
+    }
     setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Profile updated");
     onSaved();
   }
 
@@ -773,6 +929,7 @@ function ProfileEditModal({
           <Field label="Email"><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} /></Field>
           <Field label="Parent Mobile"><Input value={form.parent_mobile} onChange={(e) => set("parent_mobile", e.target.value)} /></Field>
           <Field label="Joining Date"><Input type="date" value={form.joining_date} onChange={(e) => set("joining_date", e.target.value)} /></Field>
+          <Field label="Exit Date"><Input type="date" value={form.exit_date} onChange={(e) => set("exit_date", e.target.value)} /></Field>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
@@ -1377,6 +1534,94 @@ function HolidayModal({
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={save} disabled={saving || !valid}>{saving ? "Saving…" : "Save Holiday Deduction"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+/* ---------------- Security Deposit Modal ---------------- */
+
+const DEPOSIT_MODES: PaymentMode[] = ["cash", "upi", "card", "rtgs", "bank_transfer"];
+
+function DepositModal({
+  studentId, kind, held, existing, onClose, onSaved,
+}: {
+  studentId: string; kind: "received" | "refunded"; held: number;
+  existing: Deposit | null; onClose: () => void; onSaved: () => void;
+}) {
+  const isRefund = kind === "refunded";
+  const [amount, setAmount] = useState(
+    existing ? String(existing.amount) : isRefund ? String(Math.max(0, held)) : "",
+  );
+  const [date, setDate] = useState(existing?.entry_date ?? todayISO());
+  const [mode, setMode] = useState<PaymentMode>((existing?.mode as PaymentMode) ?? "cash");
+  const [remarks, setRemarks] = useState(existing?.remarks ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const amt = Number(amount);
+    if (!amt || Number.isNaN(amt) || amt <= 0) return toast.error("Enter a valid amount");
+    setSaving(true);
+    const payload = { amount: amt, entry_date: date, mode, remarks: remarks.trim() || null };
+    if (existing) {
+      const { error } = await supabase.from("security_deposits").update(payload).eq("id", existing.id);
+      setSaving(false);
+      if (error) return toast.error(error.message);
+      const d = diffValues(
+        { amount: existing.amount, entry_date: existing.entry_date, mode: existing.mode, remarks: existing.remarks },
+        payload,
+      );
+      await logAudit({
+        action: "update", entity: "security_deposit", entityId: existing.id, studentId,
+        label: `Deposit ${existing.kind} ${inr(amt)}`, oldValues: d.old, newValues: d.new,
+      });
+      toast.success("Deposit entry updated");
+    } else {
+      const { data: auth } = await supabase.auth.getUser();
+      const { data: row, error } = await supabase.from("security_deposits").insert({
+        student_id: studentId, kind, created_by: auth.user?.id ?? null, ...payload,
+      }).select("id").maybeSingle();
+      setSaving(false);
+      if (error) return toast.error(error.message);
+      await logAudit({
+        action: "create", entity: "security_deposit", entityId: row?.id ?? null, studentId,
+        label: `Deposit ${kind} ${inr(amt)}`, newValues: { kind, ...payload },
+      });
+      toast.success(isRefund ? "Deposit refund recorded" : "Security deposit recorded");
+    }
+    onSaved();
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{existing ? "Edit Deposit Entry" : isRefund ? "Refund Security Deposit" : "Add Security Deposit"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          {isRefund && !existing && (
+            <p className="text-xs text-muted-foreground">Currently held: <b>{inr(held)}</b> — edit the amount for a partial refund.</p>
+          )}
+          <Field label="Amount *"><Input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
+          <Field label={isRefund ? "Date" : "Date Received"}><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+          <Field label="Mode">
+            <Select value={mode} onValueChange={(v) => setMode(v as PaymentMode)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {DEPOSIT_MODES.map((m) => <SelectItem key={m} value={m} className="uppercase">{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Remarks"><Input value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Optional" /></Field>
+          <p className="text-xs text-muted-foreground">
+            Security deposit is refundable and is never included in billing, payments or dues.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
