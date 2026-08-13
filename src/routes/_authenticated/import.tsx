@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Download, Upload, AlertTriangle, CheckCircle2, XCircle, Loader2, FileText, FileSpreadsheet, Info, ChevronRight, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
-import { importPayments, importAttendance, importExcelWorkbook, logImportRun, diffMessNos } from "@/lib/imports.functions";
+import { importPayments, importAttendance, importExcelWorkbook, logImportRun, diffMessNos, importSecurityDeposits } from "@/lib/imports.functions";
 
 export const Route = createFileRoute("/_authenticated/import")({
   head: () => ({ meta: [{ title: "Import Data — Vrindavan Meals" }] }),
@@ -64,14 +64,16 @@ function ImportPage() {
         <AlertDescription>This action cannot be undone. Please download a database backup before importing large datasets.</AlertDescription>
       </Alert>
       <Tabs defaultValue="excel">
-        <TabsList className="grid grid-cols-3 w-full max-w-xl">
+        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="excel">Excel Workbook</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
+          <TabsTrigger value="deposits">Security Deposit</TabsTrigger>
         </TabsList>
         <TabsContent value="excel"><ExcelWorkbookTab /></TabsContent>
         <TabsContent value="payments"><ImportTab kind="payments" fn={importPayments} /></TabsContent>
         <TabsContent value="attendance"><ImportTab kind="attendance" fn={importAttendance} /></TabsContent>
+        <TabsContent value="deposits"><ImportTab kind="deposits" fn={importSecurityDeposits} /></TabsContent>
       </Tabs>
       <ImportHistory />
     </div>
