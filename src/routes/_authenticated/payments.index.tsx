@@ -83,7 +83,7 @@ function PaymentList() {
         </Button>
       </div>
 
-      <Card className="hidden md:block overflow-x-auto">
+      <Card>
         <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Collected this month</CardTitle></CardHeader>
         <CardContent>
           <div className="text-3xl font-bold mb-3">{inr(summary.total)}</div>
