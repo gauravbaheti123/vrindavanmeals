@@ -8,11 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, CalendarClock, Download, FileText } from "lucide-react";
 import { StatusBadge, DueAmount, inr } from "@/components/due-status";
-import { applyLedgerFilter, defaultLedgerFilter, LedgerFilterControls, type LedgerFilterState } from "@/components/ledger-filters";
+import { applyLedgerFilter, defaultLedgerFilter, type LedgerFilterState } from "@/components/ledger-filters";
+import { ColumnHead, FilterOptions, useTableSort, sortRows, LEDGER_DATE_KEYS } from "@/components/table-head-controls";
 import { fetchLedgerRows } from "@/lib/dues";
 import { exportPdf, exportExcel } from "@/lib/report-export";
 
@@ -30,6 +30,7 @@ function SubscriptionList() {
   const [q, setQ] = useState("");
   const [unit, setUnit] = useState("all");
   const [filter, setFilter] = useState<LedgerFilterState>(defaultLedgerFilter);
+  const { sort, toggle } = useTableSort({ key: "due_amount", dir: "desc" });
 
   const { data: units } = useQuery({
     queryKey: ["units"],
@@ -62,8 +63,8 @@ function SubscriptionList() {
       if (s && !(r.full_name.toLowerCase().includes(s) || (r.roll_number ?? "").toLowerCase().includes(s))) return false;
       return true;
     });
-    return applyLedgerFilter(base, filter);
-  }, [ledger, unit, q, filter]);
+    return sortRows(applyLedgerFilter(base, filter), sort, LEDGER_DATE_KEYS);
+  }, [ledger, unit, q, filter, sort]);
 
   const exportColumns = ["Mess No", "Student", "Unit", "Joined", "Exit", "Status", "Total Billed", "Due", "Days Overdue"];
   const exportRows = rows.map((r) => [
@@ -110,17 +111,6 @@ function SubscriptionList() {
               <Input placeholder="Name or Mess No" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Unit</Label>
-            <Select value={unit} onValueChange={setUnit}>
-              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Units</SelectItem>
-                {units?.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <LedgerFilterControls value={filter} onChange={setFilter} />
         </CardContent>
       </Card>
 
@@ -128,13 +118,57 @@ function SubscriptionList() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Mess No</TableHead>
-              <TableHead>Student</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Joined</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Total Billed</TableHead>
-              <TableHead className="text-right">Due</TableHead>
+              <ColumnHead label="Mess No" sortKey="roll_number" sort={sort} onSort={toggle} />
+              <ColumnHead label="Student" sortKey="full_name" sort={sort} onSort={toggle} />
+              <ColumnHead
+                label="Unit" sortKey="unit_name" sort={sort} onSort={toggle}
+                filter={{
+                  active: unit !== "all",
+                  onClear: () => setUnit("all"),
+                  children: (
+                    <FilterOptions
+                      value={unit}
+                      onSelect={setUnit}
+                      options={[{ value: "all", label: "All Units" }, ...(units ?? []).map((u) => ({ value: u.id, label: u.name }))]}
+                    />
+                  ),
+                }}
+              />
+              <ColumnHead label="Joined" sortKey="joining_date" sort={sort} onSort={toggle} />
+              <ColumnHead
+                label="Status" sortKey="status" sort={sort} onSort={toggle}
+                filter={{
+                  active: filter.status !== "all",
+                  onClear: () => setFilter({ ...filter, status: "all" }),
+                  children: (
+                    <FilterOptions
+                      value={filter.status}
+                      onSelect={(v) => setFilter({ ...filter, status: v })}
+                      options={[{ value: "all", label: "All" }, { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
+                    />
+                  ),
+                }}
+              />
+              <ColumnHead label="Total Billed" sortKey="total_billed" sort={sort} onSort={toggle} align="right" />
+              <ColumnHead
+                label="Due" sortKey="due_amount" sort={sort} onSort={toggle} align="right"
+                filter={{
+                  active: filter.dueRange !== "all",
+                  onClear: () => setFilter({ ...filter, dueRange: "all" }),
+                  children: (
+                    <FilterOptions
+                      value={filter.dueRange}
+                      onSelect={(v) => setFilter({ ...filter, dueRange: v })}
+                      options={[
+                        { value: "all", label: "Any amount" },
+                        { value: "zero", label: "₹0 (Paid up)" },
+                        { value: "low", label: "₹1 – ₹1,000" },
+                        { value: "high", label: "₹1,000+" },
+                      ]}
+                    />
+                  ),
+                }}
+              />
               <TableHead className="w-[80px]"></TableHead>
             </TableRow>
           </TableHeader>

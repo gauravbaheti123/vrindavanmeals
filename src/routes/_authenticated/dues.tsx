@@ -12,14 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AlertTriangle, Wallet, Users as UsersIcon, Search, IndianRupee, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge, DueAmount } from "@/components/due-status";
-import { applyLedgerFilter, defaultLedgerFilter, LedgerFilterControls, type LedgerFilterState } from "@/components/ledger-filters";
+import { applyLedgerFilter, defaultLedgerFilter, type LedgerFilterState } from "@/components/ledger-filters";
+import { ColumnHead, FilterOptions, useTableSort, sortRows, LEDGER_DATE_KEYS } from "@/components/table-head-controls";
 import { fetchDuesRows, fetchLedgerRows, type DuesRow } from "@/lib/dues";
 import { exportPdf, exportExcel } from "@/lib/report-export";
 
@@ -44,6 +44,7 @@ function DuesPage() {
   const [includeSettled, setIncludeSettled] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<LedgerFilterState>(defaultLedgerFilter);
+  const { sort, toggle } = useTableSort({ key: "due_amount", dir: "desc" });
   const [payFor, setPayFor] = useState<Row | null>(null);
 
   const { data: units } = useQuery({
@@ -102,8 +103,8 @@ function DuesPage() {
       if (q && !(r.full_name.toLowerCase().includes(q) || (r.roll_number ?? "").toLowerCase().includes(q))) return false;
       return true;
     });
-    return applyLedgerFilter(base, filter);
-  }, [data, search, unitId, overdueOnly, filter]);
+    return sortRows(applyLedgerFilter(base, filter), sort, LEDGER_DATE_KEYS);
+  }, [data, search, unitId, overdueOnly, filter, sort]);
 
   const totalOutstanding = filtered.reduce((s, r) => s + Math.max(0, r.due_amount), 0);
 
@@ -171,17 +172,6 @@ function DuesPage() {
               <Input className="pl-8" placeholder="Name or Mess No" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Unit</Label>
-            <Select value={unitId} onValueChange={setUnitId}>
-              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Units</SelectItem>
-                {units?.map((u) => (<SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>))}
-              </SelectContent>
-            </Select>
-          </div>
-          <LedgerFilterControls value={filter} onChange={setFilter} />
           <div className="flex items-center gap-2">
             <Switch id="overdue" checked={overdueOnly} onCheckedChange={setOverdueOnly} />
             <Label htmlFor="overdue" className="text-sm">Overdue only</Label>
@@ -201,14 +191,58 @@ function DuesPage() {
             <Table>
               <TableHeader className="sticky top-0 bg-card">
                 <TableRow>
-                  <TableHead>Mess No</TableHead>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Mobile</TableHead>
-                  <TableHead>Unit</TableHead>
-                  <TableHead className="text-right">Due</TableHead>
-                  <TableHead>Last Payment</TableHead>
-                  <TableHead className="text-right">Days Overdue</TableHead>
-                  <TableHead>Status</TableHead>
+              <ColumnHead label="Mess No" sortKey="roll_number" sort={sort} onSort={toggle} />
+              <ColumnHead label="Student" sortKey="full_name" sort={sort} onSort={toggle} />
+              <ColumnHead label="Mobile" sortKey="mobile" sort={sort} onSort={toggle} />
+              <ColumnHead
+                label="Unit" sortKey="unit_name" sort={sort} onSort={toggle}
+                filter={{
+                  active: unitId !== "all",
+                  onClear: () => setUnitId("all"),
+                  children: (
+                    <FilterOptions
+                      value={unitId}
+                      onSelect={setUnitId}
+                      options={[{ value: "all", label: "All Units" }, ...(units ?? []).map((u) => ({ value: u.id, label: u.name }))]}
+                    />
+                  ),
+                }}
+              />
+              <ColumnHead
+                label="Due" sortKey="due_amount" sort={sort} onSort={toggle} align="right"
+                filter={{
+                  active: filter.dueRange !== "all",
+                  onClear: () => setFilter({ ...filter, dueRange: "all" }),
+                  children: (
+                    <FilterOptions
+                      value={filter.dueRange}
+                      onSelect={(v) => setFilter({ ...filter, dueRange: v })}
+                      options={[
+                        { value: "all", label: "Any amount" },
+                        { value: "zero", label: "₹0 (Paid up)" },
+                        { value: "low", label: "₹1 – ₹1,000" },
+                        { value: "high", label: "₹1,000+" },
+                      ]}
+                    />
+                  ),
+                }}
+              />
+              <ColumnHead label="Last Payment" sortKey="last_payment_date" sort={sort} onSort={toggle} />
+              <ColumnHead label="Days Overdue" sortKey="days_overdue" sort={sort} onSort={toggle} align="right" />
+              <ColumnHead
+                label="Status" sortKey="status" sort={sort} onSort={toggle}
+                filter={{
+                  active: filter.status !== "all",
+                  onClear: () => setFilter({ ...filter, status: "all" }),
+                  children: (
+                    <FilterOptions
+                      value={filter.status}
+                      onSelect={(v) => setFilter({ ...filter, status: v })}
+                      options={[{ value: "all", label: "All" }, { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
+                    />
+                  ),
+                }}
+              />
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
