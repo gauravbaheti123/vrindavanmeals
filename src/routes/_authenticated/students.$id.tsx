@@ -873,14 +873,10 @@ function StudentDetail() {
           depositHeld={depositHeld}
           plan={data.plans[0]}
           slabs={feeSlabs ?? []}
-          onRecordPayment={() => {
-            setDeactivateOpen(false);
-            setPayModal({ mode: "new", defaultAmount: summary.due });
-          }}
-          onRefundDeposit={() => {
-            setDeactivateOpen(false);
-            setDepositModal({ kind: "refunded", existing: null, held: depositHeld });
-          }}
+          onRecordPayment={() => setPayModal({ mode: "new", defaultAmount: summary.due })}
+          onAddAdjustment={() => setAdjModal({ existing: null })}
+          onRefundDeposit={() => setDepositModal({ kind: "refunded", existing: null, held: depositHeld })}
+
           onClose={() => setDeactivateOpen(false)}
           onSaved={() => { setDeactivateOpen(false); refresh(); }}
         />
