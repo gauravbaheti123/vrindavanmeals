@@ -103,7 +103,7 @@ function StudentDetail() {
   const [editProfile, setEditProfile] = useState(false);
   const [editSub, setEditSub] = useState<Subscription | null>(null);
   const [newSub, setNewSub] = useState(false);
-  const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment } | null>(null);
+  const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment; defaultAmount?: number } | null>(null);
   const [adjModal, setAdjModal] = useState<{ existing: Adjustment | null } | null>(null);
   const [holidayModal, setHolidayModal] = useState<{ existing: Adjustment | null } | null>(null);
   const [depositModal, setDepositModal] = useState<{ kind: "received" | "refunded"; existing: Deposit | null; held: number } | null>(null);
@@ -850,7 +850,7 @@ function StudentDetail() {
         <PaymentModal
           studentId={s.id}
           subId={activeSub?.id ?? null}
-          defaultAmount={Number(data.plans[0]?.price ?? 3000)}
+          defaultAmount={payModal.defaultAmount ?? Number(data.plans[0]?.price ?? 3000)}
           existing={payModal.mode === "edit" ? payModal.payment : undefined}
           onClose={() => setPayModal(null)}
           onSaved={() => { setPayModal(null); refresh(); }}
@@ -869,8 +869,18 @@ function StudentDetail() {
         <DeactivateStudentModal
           student={s}
           advance={summary.advance}
+          due={summary.due}
+          depositHeld={depositHeld}
           plan={data.plans[0]}
           slabs={feeSlabs ?? []}
+          onRecordPayment={() => {
+            setDeactivateOpen(false);
+            setPayModal({ mode: "new", defaultAmount: summary.due });
+          }}
+          onRefundDeposit={() => {
+            setDeactivateOpen(false);
+            setDepositModal({ kind: "refunded", existing: null, held: depositHeld });
+          }}
           onClose={() => setDeactivateOpen(false)}
           onSaved={() => { setDeactivateOpen(false); refresh(); }}
         />
@@ -1318,12 +1328,16 @@ function ActivateStudentModal({
 /* ---------------- Deactivate Student Modal ---------------- */
 
 function DeactivateStudentModal({
-  student, advance, plan, slabs, onClose, onSaved,
+  student, advance, due, depositHeld, plan, slabs, onRecordPayment, onRefundDeposit, onClose, onSaved,
 }: {
   student: Student;
   advance: number;
+  due: number;
+  depositHeld: number;
   plan: Database["public"]["Tables"]["subscription_plans"]["Row"] | undefined;
   slabs: FeeSlab[];
+  onRecordPayment: () => void;
+  onRefundDeposit: () => void;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -1381,6 +1395,41 @@ function DeactivateStudentModal({
           <Field label="Deactivation Date">
             <DateInput value={deactivateDate} onChange={setDeactivateDate} />
           </Field>
+
+          {(due > 0 || depositHeld > 0) && (
+            <div className="rounded-md border border-warning/50 bg-warning/10 p-3 text-sm space-y-2">
+              <div className="font-medium">Settlement Summary</div>
+              {due > 0 && (
+                <div className="flex justify-between">
+                  <span>Total Due</span>
+                  <span className="font-bold text-destructive">{inr(due)}</span>
+                </div>
+              )}
+              {depositHeld > 0 && (
+                <div className="flex justify-between">
+                  <span>Security Deposit Held</span>
+                  <span className="font-bold">{inr(depositHeld)}</span>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Deactivating does not clear these automatically. Settle payment or refund the deposit first if this
+                student's account should be closed out cleanly.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {due > 0 && (
+                  <Button type="button" size="sm" variant="outline" onClick={onRecordPayment}>
+                    Record Final Payment
+                  </Button>
+                )}
+                {depositHeld > 0 && (
+                  <Button type="button" size="sm" variant="outline" onClick={onRefundDeposit}>
+                    Refund Deposit
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
             <div className="flex justify-between"><span>Current Advance</span><span className="font-medium">{inr(advance)}</span></div>
             <div className="flex justify-between"><span>Refundable</span><span className="font-bold text-success">{inr(refundable)}</span></div>
