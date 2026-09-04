@@ -1328,12 +1328,16 @@ function ActivateStudentModal({
 /* ---------------- Deactivate Student Modal ---------------- */
 
 function DeactivateStudentModal({
-  student, advance, plan, slabs, onClose, onSaved,
+  student, advance, due, depositHeld, plan, slabs, onRecordPayment, onRefundDeposit, onClose, onSaved,
 }: {
   student: Student;
   advance: number;
+  due: number;
+  depositHeld: number;
   plan: Database["public"]["Tables"]["subscription_plans"]["Row"] | undefined;
   slabs: FeeSlab[];
+  onRecordPayment: () => void;
+  onRefundDeposit: () => void;
   onClose: () => void;
   onSaved: () => void;
 }) {
