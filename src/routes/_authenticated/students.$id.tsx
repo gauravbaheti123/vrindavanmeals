@@ -103,7 +103,7 @@ function StudentDetail() {
   const [editProfile, setEditProfile] = useState(false);
   const [editSub, setEditSub] = useState<Subscription | null>(null);
   const [newSub, setNewSub] = useState(false);
-  const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment } | null>(null);
+  const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment; defaultAmount?: number } | null>(null);
   const [adjModal, setAdjModal] = useState<{ existing: Adjustment | null } | null>(null);
   const [holidayModal, setHolidayModal] = useState<{ existing: Adjustment | null } | null>(null);
   const [depositModal, setDepositModal] = useState<{ kind: "received" | "refunded"; existing: Deposit | null; held: number } | null>(null);
@@ -850,7 +850,7 @@ function StudentDetail() {
         <PaymentModal
           studentId={s.id}
           subId={activeSub?.id ?? null}
-          defaultAmount={Number(data.plans[0]?.price ?? 3000)}
+          defaultAmount={payModal.defaultAmount ?? Number(data.plans[0]?.price ?? 3000)}
           existing={payModal.mode === "edit" ? payModal.payment : undefined}
           onClose={() => setPayModal(null)}
           onSaved={() => { setPayModal(null); refresh(); }}
