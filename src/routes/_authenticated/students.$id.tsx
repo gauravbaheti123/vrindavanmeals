@@ -1477,9 +1477,10 @@ function DeactivateStudentModal({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={saving || (refundable > 0 && action === "none")}>
-            {saving ? "Saving…" : "Confirm Deactivation"}
+          <Button onClick={save} disabled={saving || due > 0 || (refundable > 0 && action === "none")}>
+            {saving ? "Saving…" : due > 0 ? "Settle Due to Deactivate" : "Confirm Deactivation"}
           </Button>
+
         </DialogFooter>
       </DialogContent>
     </Dialog>
