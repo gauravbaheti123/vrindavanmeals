@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/due-status";
 import { fetchLedgerRows } from "@/lib/dues";
 import { applyLedgerFilter, defaultLedgerFilter, LedgerFilterControls, type LedgerFilterState } from "@/components/ledger-filters";
+import { usePagination, PaginationBar } from "@/components/table-pagination";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis,
   Tooltip, ResponsiveContainer, Legend, CartesianGrid,
