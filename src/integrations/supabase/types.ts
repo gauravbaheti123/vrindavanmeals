@@ -65,6 +65,13 @@ export type Database = {
             foreignKeyName: "attendance_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
+            referencedRelation: "student_ledger_summary"
+            referencedColumns: ["student_id"]
+          },
+          {
+            foreignKeyName: "attendance_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
             referencedRelation: "students"
             referencedColumns: ["id"]
           },
@@ -119,6 +126,13 @@ export type Database = {
             foreignKeyName: "audit_log_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
+            referencedRelation: "student_ledger_summary"
+            referencedColumns: ["student_id"]
+          },
+          {
+            foreignKeyName: "audit_log_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
             referencedRelation: "students"
             referencedColumns: ["id"]
           },
@@ -150,6 +164,13 @@ export type Database = {
           student_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "billing_backfill_log_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "student_ledger_summary"
+            referencedColumns: ["student_id"]
+          },
           {
             foreignKeyName: "billing_backfill_log_student_id_fkey"
             columns: ["student_id"]
@@ -194,6 +215,13 @@ export type Database = {
           unit_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "biometric_mappings_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "student_ledger_summary"
+            referencedColumns: ["student_id"]
+          },
           {
             foreignKeyName: "biometric_mappings_student_id_fkey"
             columns: ["student_id"]
@@ -324,6 +352,13 @@ export type Database = {
             foreignKeyName: "ledger_adjustments_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
+            referencedRelation: "student_ledger_summary"
+            referencedColumns: ["student_id"]
+          },
+          {
+            foreignKeyName: "ledger_adjustments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
             referencedRelation: "students"
             referencedColumns: ["id"]
           },
@@ -397,6 +432,13 @@ export type Database = {
             foreignKeyName: "notifications_log_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
+            referencedRelation: "student_ledger_summary"
+            referencedColumns: ["student_id"]
+          },
+          {
+            foreignKeyName: "notifications_log_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
             referencedRelation: "students"
             referencedColumns: ["id"]
           },
@@ -440,6 +482,13 @@ export type Database = {
           subscription_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "payments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "student_ledger_summary"
+            referencedColumns: ["student_id"]
+          },
           {
             foreignKeyName: "payments_student_id_fkey"
             columns: ["student_id"]
@@ -763,6 +812,13 @@ export type Database = {
             foreignKeyName: "security_deposits_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
+            referencedRelation: "student_ledger_summary"
+            referencedColumns: ["student_id"]
+          },
+          {
+            foreignKeyName: "security_deposits_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
             referencedRelation: "students"
             referencedColumns: ["id"]
           },
@@ -936,6 +992,13 @@ export type Database = {
             foreignKeyName: "subscriptions_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
+            referencedRelation: "student_ledger_summary"
+            referencedColumns: ["student_id"]
+          },
+          {
+            foreignKeyName: "subscriptions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
             referencedRelation: "students"
             referencedColumns: ["id"]
           },
@@ -1080,7 +1143,39 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      student_ledger_summary: {
+        Row: {
+          college_roll_number: string | null
+          exit_date: string | null
+          first_start_date: string | null
+          full_name: string | null
+          joining_date: string | null
+          last_payment_date: string | null
+          mobile: string | null
+          opening_balance: number | null
+          opening_balance_as_of: string | null
+          roll_number: string | null
+          security_deposit_held: number | null
+          status: string | null
+          student_id: string | null
+          sub_id: string | null
+          total_adjustments: number | null
+          total_billed: number | null
+          total_due: number | null
+          total_paid: number | null
+          unit_id: string | null
+          unit_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accrue_monthly_billing: { Args: never; Returns: number }
