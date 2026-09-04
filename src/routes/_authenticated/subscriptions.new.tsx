@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { StudentPicker, type StudentOption } from "@/components/student-picker";
 import { toast } from "sonner";
 import { computeActivationBilling, addDaysISO } from "@/lib/billing";
+import { fetchFeeSlabs, feeForMonth, missingSlabMessage } from "@/lib/fees";
 
 export const Route = createFileRoute("/_authenticated/subscriptions/new")({
   head: () => ({ meta: [{ title: "Assign Subscription — Vrindavan Meals" }] }),
@@ -45,14 +46,19 @@ function NewSubscription() {
     queryFn: async () => (await supabase.from("units").select("name").eq("id", student!.unit_id!).maybeSingle()).data?.name ?? "—",
   });
 
+  const { data: feeSlabs } = useQuery({ queryKey: ["fee-settings"], staleTime: STALE.MASTER, queryFn: fetchFeeSlabs });
+
   const graceDays = Number(settings?.grace_period_days ?? 5);
-  const monthlyPrice = Number(plan?.price ?? 3000);
+  // Monthly fee comes from Fee Settings — the same source the billing engine uses.
+  const slabFee = feeForMonth(feeSlabs ?? [], startDate);
+  const monthlyPrice = Number(slabFee ?? 0);
   const slice = useMemo(() => computeActivationBilling(startDate, monthlyPrice), [startDate, monthlyPrice]);
   const graceEnd = useMemo(() => addDaysISO(slice.endDate, graceDays), [slice.endDate, graceDays]);
 
   async function save() {
     if (!student) { toast.error("Please select a student"); return; }
     if (!plan) { toast.error("No active plan configured"); return; }
+    if (slabFee === null) { toast.error(missingSlabMessage(startDate)); return; }
     if (!student.unit_id) { toast.error("Student has no unit assigned"); return; }
     setSaving(true);
     const { data, error } = await supabase.from("subscriptions").insert({
@@ -105,7 +111,7 @@ function NewSubscription() {
           <div className="rounded-md border bg-muted/40 p-3 text-sm">
             <div className="font-semibold">Billing Preview</div>
             <div className="text-muted-foreground">
-              {slice.isFullMonth ? "Full month (day ≤ 15)" : "Half month (day 16 – end of month)"} · Plan {plan?.name ?? ""} · ₹{monthlyPrice.toLocaleString("en-IN")}/mo
+              {slice.isFullMonth ? "Full month (day ≤ 15)" : "Half month (day 16 – end of month)"} · Plan {plan?.name ?? ""} · ₹{monthlyPrice.toLocaleString("en-IN")}/mo (Fee Settings)
             </div>
             <div className="text-lg font-bold pt-1">Amount to bill: ₹{slice.amount.toLocaleString("en-IN")}</div>
           </div>

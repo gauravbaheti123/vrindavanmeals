@@ -1144,7 +1144,9 @@ function BulkLedgerSummary() {
                 <TableCell><StatusBadge status={r.status} /></TableCell>
                 <TableCell className="text-right">{fmtINR(r.total_billed)}</TableCell>
                 <TableCell className="text-right text-success">{fmtINR(r.paid)}</TableCell>
-                <TableCell className="text-right">{fmtINR(r.opening_balance + r.adjustments)}</TableCell>
+                <TableCell className={`text-right ${r.opening_balance + r.adjustments < 0 ? "text-destructive" : r.opening_balance + r.adjustments > 0 ? "text-success" : ""}`}>
+                  {(r.opening_balance + r.adjustments) < 0 ? "−" : (r.opening_balance + r.adjustments) > 0 ? "+" : ""}{fmtINR(Math.abs(r.opening_balance + r.adjustments))}
+                </TableCell>
                 <TableCell className={cn("text-right font-semibold", r.due_amount > 0 ? "text-destructive" : "text-success")}>{fmtINR(r.due_amount)}</TableCell>
                 <TableCell>{r.last_payment_date ? fmtDate(r.last_payment_date) : "—"}</TableCell>
               </TableRow>
@@ -1174,7 +1176,11 @@ function BulkLedgerSummary() {
                 meta={[
                   { label: "Billed", value: fmtINR(r.total_billed) },
                   { label: "Paid", value: fmtINR(r.paid) },
-                  { label: "Opening + Adj", value: fmtINR(r.opening_balance + r.adjustments) },
+                  { label: "Opening + Adj", value: (
+                    <span className={(r.opening_balance + r.adjustments) < 0 ? "text-destructive" : (r.opening_balance + r.adjustments) > 0 ? "text-success" : ""}>
+                      {(r.opening_balance + r.adjustments) < 0 ? "−" : (r.opening_balance + r.adjustments) > 0 ? "+" : ""}{fmtINR(Math.abs(r.opening_balance + r.adjustments))}
+                    </span>
+                  ) },
                   { label: "Last payment", value: r.last_payment_date ? fmtDate(r.last_payment_date) : "—" },
                 ]}
               />
