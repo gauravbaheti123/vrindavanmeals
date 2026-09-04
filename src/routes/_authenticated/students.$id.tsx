@@ -1394,7 +1394,7 @@ function DeactivateStudentModal({
           </Field>
 
           {(due > 0 || depositHeld > 0) && (
-            <div className="rounded-md border border-warning/50 bg-warning/10 p-3 text-sm space-y-2">
+            <div className={`rounded-md border p-3 text-sm space-y-2 ${due > 0 ? "border-destructive/50 bg-destructive/10" : "border-warning/50 bg-warning/10"}`}>
               <div className="font-medium">Settlement Summary</div>
               {due > 0 && (
                 <div className="flex justify-between">
@@ -1408,15 +1408,25 @@ function DeactivateStudentModal({
                   <span className="font-bold">{inr(depositHeld)}</span>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground">
-                Deactivating does not clear these automatically. Settle payment or refund the deposit first if this
-                student's account should be closed out cleanly.
-              </p>
+              {due > 0 ? (
+                <p className="text-xs font-medium text-destructive">
+                  This student has {inr(due)} outstanding due. Settle the balance to ₹0 before deactivating.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Security deposit does not block deactivation — refund it separately whenever it is handed back.
+                </p>
+              )}
               <div className="flex flex-wrap gap-2 pt-1">
                 {due > 0 && (
-                  <Button type="button" size="sm" variant="outline" onClick={onRecordPayment}>
-                    Record Final Payment
-                  </Button>
+                  <>
+                    <Button type="button" size="sm" variant="outline" onClick={onRecordPayment}>
+                      Record Final Payment
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={onAddAdjustment}>
+                      Add Adjustment
+                    </Button>
+                  </>
                 )}
                 {depositHeld > 0 && (
                   <Button type="button" size="sm" variant="outline" onClick={onRefundDeposit}>
@@ -1426,6 +1436,7 @@ function DeactivateStudentModal({
               </div>
             </div>
           )}
+
 
           <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
             <div className="flex justify-between"><span>Current Advance</span><span className="font-medium">{inr(advance)}</span></div>
