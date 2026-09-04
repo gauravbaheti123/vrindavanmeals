@@ -34,22 +34,21 @@ function PosMastersPage() {
   const flags = roleFlags(roles);
 
   const qc = useQueryClient();
-  const db = supabase as unknown as { from: (t: string) => ReturnType<typeof supabase.from> };
 
   const { data: cats = [] } = useQuery({
     queryKey: ["settings-pos-cats"],
     staleTime: STALE.MASTER,
-    queryFn: async () => ((await db.from("pos_categories").select("*").order("sort_order")).data ?? []) as unknown as PosCategory[],
+    queryFn: async () => ((await supabase.from("pos_categories").select("*").order("sort_order")).data ?? []) as unknown as PosCategory[],
   });
   const { data: items = [] } = useQuery({
     queryKey: ["settings-pos-items"],
     staleTime: STALE.MASTER,
-    queryFn: async () => ((await db.from("pos_items").select("*").order("name")).data ?? []) as unknown as PosItem[],
+    queryFn: async () => ((await supabase.from("pos_items").select("*").order("name")).data ?? []) as unknown as PosItem[],
   });
   const { data: modes = [] } = useQuery({
     queryKey: ["settings-pos-modes"],
     staleTime: STALE.MASTER,
-    queryFn: async () => ((await db.from("pos_payment_modes").select("*").order("sort_order")).data ?? []) as unknown as PosPayMode[],
+    queryFn: async () => ((await supabase.from("pos_payment_modes").select("*").order("sort_order")).data ?? []) as unknown as PosPayMode[],
   });
   const { data: settings } = useQuery({
     queryKey: ["system-settings"],
@@ -104,30 +103,30 @@ function PosMastersPage() {
   // ---------- Categories ----------
   async function addCat() {
     if (!newCat.trim()) return;
-    const { error } = await db.from("pos_categories").insert({ name: newCat.trim(), sort_order: cats.length + 1 });
+    const { error } = await supabase.from("pos_categories").insert({ name: newCat.trim(), sort_order: cats.length + 1 });
     if (error) return toast.error(error.message);
     setNewCat(""); toast.success("Category added"); invalidateAll();
   }
   async function toggleCat(c: PosCategory) {
-    const { error } = await db.from("pos_categories").update({ is_active: !c.is_active }).eq("id", c.id);
+    const { error } = await supabase.from("pos_categories").update({ is_active: !c.is_active }).eq("id", c.id);
     if (error) return toast.error(error.message);
     invalidateAll();
   }
   async function saveCatName(c: PosCategory) {
     const name = editCatName.trim();
     if (!name) return toast.error("Name required");
-    const { error } = await db.from("pos_categories").update({ name }).eq("id", c.id);
+    const { error } = await supabase.from("pos_categories").update({ name }).eq("id", c.id);
     if (error) return toast.error(error.message);
     setEditCatId(null); toast.success("Category updated"); invalidateAll();
   }
   async function deleteCat(id: string) {
     // Block if any item references this category (past sales would rely on those items)
-    const { count } = await db.from("pos_items").select("id", { count: "exact", head: true }).eq("category_id", id);
+    const { count } = await supabase.from("pos_items").select("id", { count: "exact", head: true }).eq("category_id", id);
     if ((count ?? 0) > 0) {
       toast.error("Is category ke items pehle se maujood hain, delete nahi kar sakte — Deactivate karo.");
       return;
     }
-    const { error } = await db.from("pos_categories").delete().eq("id", id);
+    const { error } = await supabase.from("pos_categories").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Category deleted"); invalidateAll();
   }
@@ -135,7 +134,7 @@ function PosMastersPage() {
   // ---------- Items ----------
   async function addItem() {
     if (!newItem.name.trim() || !newItem.price) return toast.error("Name and price required");
-    const { error } = await db.from("pos_items").insert({
+    const { error } = await supabase.from("pos_items").insert({
       name: newItem.name.trim(),
       category_id: newItem.category_id || null,
       price: Number(newItem.price),
@@ -145,7 +144,7 @@ function PosMastersPage() {
     toast.success("Item added"); invalidateAll();
   }
   async function toggleItem(i: PosItem) {
-    const { error } = await db.from("pos_items").update({ is_active: !i.is_active }).eq("id", i.id);
+    const { error } = await supabase.from("pos_items").update({ is_active: !i.is_active }).eq("id", i.id);
     if (error) return toast.error(error.message);
     invalidateAll();
   }
@@ -155,19 +154,19 @@ function PosMastersPage() {
     const price = Number(editItem.price);
     if (!name) return toast.error("Name required");
     if (!Number.isFinite(price) || price < 0) return toast.error("Valid price required");
-    const { error } = await db.from("pos_items").update({
+    const { error } = await supabase.from("pos_items").update({
       name, category_id: editItem.category_id || null, price,
     }).eq("id", editItem.id);
     if (error) return toast.error(error.message);
     setEditItem(null); toast.success("Item updated"); invalidateAll();
   }
   async function deleteItem(id: string) {
-    const { count } = await db.from("pos_sale_items").select("id", { count: "exact", head: true }).eq("item_id", id);
+    const { count } = await supabase.from("pos_sale_items").select("id", { count: "exact", head: true }).eq("item_id", id);
     if ((count ?? 0) > 0) {
       toast.error("Ye item pehle se sales mein use ho chuka hai, delete nahi kar sakte — Deactivate karo.");
       return;
     }
-    const { error } = await db.from("pos_items").delete().eq("id", id);
+    const { error } = await supabase.from("pos_items").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Item deleted"); invalidateAll();
   }
@@ -175,29 +174,29 @@ function PosMastersPage() {
   // ---------- Payment Modes ----------
   async function addMode() {
     if (!newMode.trim()) return;
-    const { error } = await db.from("pos_payment_modes").insert({ label: newMode.trim(), sort_order: modes.length + 1 });
+    const { error } = await supabase.from("pos_payment_modes").insert({ label: newMode.trim(), sort_order: modes.length + 1 });
     if (error) return toast.error(error.message);
     setNewMode(""); toast.success("Payment mode added"); invalidateAll();
   }
   async function toggleMode(m: PosPayMode) {
-    const { error } = await db.from("pos_payment_modes").update({ is_active: !m.is_active }).eq("id", m.id);
+    const { error } = await supabase.from("pos_payment_modes").update({ is_active: !m.is_active }).eq("id", m.id);
     if (error) return toast.error(error.message);
     invalidateAll();
   }
   async function saveModeLabel(m: PosPayMode) {
     const label = editModeLabel.trim();
     if (!label) return toast.error("Label required");
-    const { error } = await db.from("pos_payment_modes").update({ label }).eq("id", m.id);
+    const { error } = await supabase.from("pos_payment_modes").update({ label }).eq("id", m.id);
     if (error) return toast.error(error.message);
     setEditModeId(null); toast.success("Payment mode updated"); invalidateAll();
   }
   async function deleteMode(m: PosPayMode) {
-    const { count } = await db.from("pos_sales").select("id", { count: "exact", head: true }).eq("payment_mode", m.label);
+    const { count } = await supabase.from("pos_sales").select("id", { count: "exact", head: true }).eq("payment_mode", m.label);
     if ((count ?? 0) > 0) {
       toast.error("Ye payment mode pehle se sales mein use ho chuka hai, delete nahi kar sakte — Deactivate karo.");
       return;
     }
-    const { error } = await db.from("pos_payment_modes").delete().eq("id", m.id);
+    const { error } = await supabase.from("pos_payment_modes").delete().eq("id", m.id);
     if (error) return toast.error(error.message);
     toast.success("Payment mode deleted"); invalidateAll();
   }
