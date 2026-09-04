@@ -869,8 +869,18 @@ function StudentDetail() {
         <DeactivateStudentModal
           student={s}
           advance={summary.advance}
+          due={summary.due}
+          depositHeld={depositHeld}
           plan={data.plans[0]}
           slabs={feeSlabs ?? []}
+          onRecordPayment={() => {
+            setDeactivateOpen(false);
+            setPayModal({ mode: "new", defaultAmount: summary.due });
+          }}
+          onRefundDeposit={() => {
+            setDeactivateOpen(false);
+            setDepositModal({ kind: "refunded", existing: null, held: depositHeld });
+          }}
           onClose={() => setDeactivateOpen(false)}
           onSaved={() => { setDeactivateOpen(false); refresh(); }}
         />
