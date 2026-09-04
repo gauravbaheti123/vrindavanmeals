@@ -1198,6 +1198,7 @@ export type Database = {
       }
       rebuild_billing_reset: { Args: never; Returns: number }
       rebuild_student_billing: { Args: { p_student: string }; Returns: number }
+      student_total_due: { Args: { p_student: string }; Returns: number }
     }
     Enums: {
       app_role: "super_admin" | "manager" | "counter_staff" | "accountant"
