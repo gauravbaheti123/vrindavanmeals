@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/due-status";
 import { fetchLedgerRows } from "@/lib/dues";
 import { applyLedgerFilter, defaultLedgerFilter, LedgerFilterControls, type LedgerFilterState } from "@/components/ledger-filters";
+import { usePagination, PaginationBar } from "@/components/table-pagination";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis,
   Tooltip, ResponsiveContainer, Legend, CartesianGrid,
@@ -230,6 +231,7 @@ function ExportBar({ onPdf, onExcel }: { onPdf: () => void; onExcel: () => void 
 }
 
 function DataTable({ cols, rows, empty = "No data." }: { cols: string[]; rows: (string | number | React.ReactNode)[][]; empty?: string }) {
+  const pg = usePagination(rows);
   return (
     <>
       <Card className="hidden md:block"><Table>
@@ -237,7 +239,7 @@ function DataTable({ cols, rows, empty = "No data." }: { cols: string[]; rows: (
         <TableBody>
           {rows.length === 0
             ? <TableRow><TableCell colSpan={cols.length} className="text-center py-8 text-muted-foreground">{empty}</TableCell></TableRow>
-            : rows.map((r, i) => <TableRow key={i}>{r.map((c, j) => <TableCell key={j}>{c}</TableCell>)}</TableRow>)}
+            : pg.pageRows.map((r, i) => <TableRow key={i}>{r.map((c, j) => <TableCell key={j}>{c}</TableCell>)}</TableRow>)}
         </TableBody>
       </Table></Card>
 
@@ -246,7 +248,7 @@ function DataTable({ cols, rows, empty = "No data." }: { cols: string[]; rows: (
           <MobileEmpty>{empty}</MobileEmpty>
         ) : (
           <MobileCardList>
-            {rows.map((r, i) => (
+            {pg.pageRows.map((r, i) => (
               <MobileCard
                 key={i}
                 title={r[0]}
@@ -257,9 +259,12 @@ function DataTable({ cols, rows, empty = "No data." }: { cols: string[]; rows: (
           </MobileCardList>
         )}
       </MobileOnly>
+
+      <PaginationBar {...pg} />
     </>
   );
 }
+
 
 function KPI({ label, value, icon: Icon, tone = "" }: { label: string; value: React.ReactNode; icon?: React.ComponentType<{ className?: string }>; tone?: string }) {
   return (
@@ -1077,6 +1082,9 @@ function BulkLedgerSummary() {
     adj: a.adj + r.opening_balance + r.adjustments, due: a.due + r.due_amount,
   }), { billed: 0, paid: 0, adj: 0, due: 0 }), [rows]);
 
+  const pg = usePagination(rows);
+
+
   return (
     <div className="space-y-3">
       <Card className="p-4 flex flex-wrap items-end gap-3">
@@ -1127,7 +1135,7 @@ function BulkLedgerSummary() {
               <TableRow><TableCell colSpan={COLS.length} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
             ) : rows.length === 0 ? (
               <TableRow><TableCell colSpan={COLS.length} className="text-center py-8 text-muted-foreground">No students match the filters.</TableCell></TableRow>
-            ) : rows.map((r) => (
+            ) : pg.pageRows.map((r) => (
               <TableRow key={r.student_id}>
                 <TableCell className="font-mono text-xs">{r.roll_number ?? "—"}</TableCell>
                 <TableCell className="font-medium">{r.full_name}</TableCell>
@@ -1152,7 +1160,7 @@ function BulkLedgerSummary() {
           <MobileEmpty>No students match the filters.</MobileEmpty>
         ) : (
           <MobileCardList>
-            {rows.map((r) => (
+            {pg.pageRows.map((r) => (
               <MobileCard
                 key={r.student_id}
                 title={r.full_name}
@@ -1174,6 +1182,8 @@ function BulkLedgerSummary() {
           </MobileCardList>
         )}
       </MobileOnly>
+
+      <PaginationBar {...pg} />
     </div>
   );
 }
