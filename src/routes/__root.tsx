@@ -10,6 +10,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import { Toaster } from "../components/ui/sonner";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { registerServiceWorker } from "../lib/register-sw";
 
@@ -147,6 +148,14 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      {/* Global success/error feedback for every save, delete and edit action. */}
+      <Toaster
+        position="top-center"
+        richColors
+        closeButton
+        duration={5000}
+        toastOptions={{ classNames: { toast: "group toast shadow-lg" } }}
+      />
     </QueryClientProvider>
   );
 }

@@ -52,6 +52,8 @@ export function StudentPhotoEditor({
       if (path && !path.startsWith("http")) await removeStudentPhoto(path);
       toast.success("Photo removed");
       onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? `Failed to remove photo: ${e.message}` : "Could not remove photo");
     } finally {
       setBusy(false);
     }
