@@ -230,6 +230,7 @@ function ExportBar({ onPdf, onExcel }: { onPdf: () => void; onExcel: () => void 
 }
 
 function DataTable({ cols, rows, empty = "No data." }: { cols: string[]; rows: (string | number | React.ReactNode)[][]; empty?: string }) {
+  const pg = usePagination(rows);
   return (
     <>
       <Card className="hidden md:block"><Table>
@@ -237,7 +238,7 @@ function DataTable({ cols, rows, empty = "No data." }: { cols: string[]; rows: (
         <TableBody>
           {rows.length === 0
             ? <TableRow><TableCell colSpan={cols.length} className="text-center py-8 text-muted-foreground">{empty}</TableCell></TableRow>
-            : rows.map((r, i) => <TableRow key={i}>{r.map((c, j) => <TableCell key={j}>{c}</TableCell>)}</TableRow>)}
+            : pg.pageRows.map((r, i) => <TableRow key={i}>{r.map((c, j) => <TableCell key={j}>{c}</TableCell>)}</TableRow>)}
         </TableBody>
       </Table></Card>
 
@@ -246,7 +247,7 @@ function DataTable({ cols, rows, empty = "No data." }: { cols: string[]; rows: (
           <MobileEmpty>{empty}</MobileEmpty>
         ) : (
           <MobileCardList>
-            {rows.map((r, i) => (
+            {pg.pageRows.map((r, i) => (
               <MobileCard
                 key={i}
                 title={r[0]}
@@ -257,9 +258,12 @@ function DataTable({ cols, rows, empty = "No data." }: { cols: string[]; rows: (
           </MobileCardList>
         )}
       </MobileOnly>
+
+      <PaginationBar {...pg} />
     </>
   );
 }
+
 
 function KPI({ label, value, icon: Icon, tone = "" }: { label: string; value: React.ReactNode; icon?: React.ComponentType<{ className?: string }>; tone?: string }) {
   return (
