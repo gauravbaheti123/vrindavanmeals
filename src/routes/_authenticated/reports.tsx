@@ -1082,6 +1082,9 @@ function BulkLedgerSummary() {
     adj: a.adj + r.opening_balance + r.adjustments, due: a.due + r.due_amount,
   }), { billed: 0, paid: 0, adj: 0, due: 0 }), [rows]);
 
+  const pg = usePagination(rows);
+
+
   return (
     <div className="space-y-3">
       <Card className="p-4 flex flex-wrap items-end gap-3">
