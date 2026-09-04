@@ -1665,11 +1665,30 @@ function DepositModal({
   const [remarks, setRemarks] = useState(existing?.remarks ?? "");
   const [saving, setSaving] = useState(false);
 
+  // Held balance excluding the entry being edited, so validation is always
+  // "does this entry fit within what is actually held?".
+  const heldExcludingThis =
+    held - (existing ? (existing.kind === "refunded" ? -Number(existing.amount) : Number(existing.amount)) : 0);
+
   async function save() {
     const amt = Number(amount);
     if (!amt || Number.isNaN(amt) || amt <= 0) return toast.error("Enter a valid amount");
+
+    const entryKind = existing ? existing.kind : kind;
+    if (entryKind === "refunded" && amt > heldExcludingThis + 1e-6) {
+      return toast.error(
+        `Refund amount (${inr(amt)}) exceeds the held deposit (${inr(Math.max(0, heldExcludingThis))}) — cannot refund more than what was received.`,
+      );
+    }
+    if (entryKind === "received" && heldExcludingThis + amt < -1e-6) {
+      return toast.error(
+        `Reducing this deposit to ${inr(amt)} would make the held balance negative — refunds already recorded total more than that.`,
+      );
+    }
+
     setSaving(true);
     const payload = { amount: amt, entry_date: date, mode, remarks: remarks.trim() || null };
+
     if (existing) {
       const { error } = await supabase.from("security_deposits").update(payload).eq("id", existing.id);
       setSaving(false);
