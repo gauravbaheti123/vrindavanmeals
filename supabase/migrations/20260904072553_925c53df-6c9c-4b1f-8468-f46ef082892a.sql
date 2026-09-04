@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.enforce_deposit_non_negative() FROM PUBLIC, anon, authenticated;
