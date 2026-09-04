@@ -1350,6 +1350,10 @@ function DeactivateStudentModal({
 
 
   async function save() {
+    if (due > 0) {
+      toast.error(`This student has ${inr(due)} outstanding due. Settle the balance to ₹0 before deactivating.`);
+      return;
+    }
     setSaving(true);
     try {
       if (action === "refund" && refundable > 0) {
