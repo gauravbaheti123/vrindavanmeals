@@ -1182,6 +1182,8 @@ function BulkLedgerSummary() {
           </MobileCardList>
         )}
       </MobileOnly>
+
+      <PaginationBar {...pg} />
     </div>
   );
 }
