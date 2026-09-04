@@ -1157,7 +1157,7 @@ function BulkLedgerSummary() {
           <MobileEmpty>No students match the filters.</MobileEmpty>
         ) : (
           <MobileCardList>
-            {rows.map((r) => (
+            {pg.pageRows.map((r) => (
               <MobileCard
                 key={r.student_id}
                 title={r.full_name}
