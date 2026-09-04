@@ -1701,7 +1701,7 @@ function HolidayModal({
                 ))}
                 <div className="flex justify-between font-semibold pt-1 border-t">
                   <span>{calc.days} holiday day{calc.days === 1 ? "" : "s"}</span>
-                  <span className="text-success">−{inr(calc.amount)}</span>
+                  <span className="text-destructive">−{inr(calc.amount)}</span>
                 </div>
               </>
             ) : null}

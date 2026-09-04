@@ -180,7 +180,7 @@ export function BulkHolidayModal({
                   <span>
                     {calc.days} day{calc.days === 1 ? "" : "s"} × {selectedCount} student{selectedCount === 1 ? "" : "s"}
                   </span>
-                  <span className="text-success">−{inr(totalCredit)}</span>
+                  <span className="text-destructive">−{inr(totalCredit)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   This will apply a Holiday Deduction of {inr(calc.amount)} each to {selectedCount} student
