@@ -417,7 +417,7 @@ function StudentDetail() {
         <SummaryTile
           label="Adjustments"
           value={(summary.adjustments < 0 ? "−" : summary.adjustments > 0 ? "+" : "") + inr(Math.abs(summary.adjustments))}
-          tone={summary.adjustments < 0 ? "success" : summary.adjustments > 0 ? "destructive" : "muted"}
+          tone={summary.adjustments < 0 ? "destructive" : summary.adjustments > 0 ? "success" : "muted"}
         />
         <SummaryTile label={summary.advance > 0 ? "Advance" : "Total Due"} value={inr(summary.advance > 0 ? summary.advance : summary.due)} tone={summary.due > 0 ? "destructive" : "muted"} />
         <SummaryTile label="Last Payment" value={summary.last ? fmtDate(summary.last.created_at) : "—"} />
@@ -614,10 +614,10 @@ function StudentDetail() {
                       <TableCell>
                         {meta.isHoliday
                           ? <Badge className="bg-success text-success-foreground">Holiday</Badge>
-                          : <Badge variant="secondary">{Number(a.amount) < 0 ? "Credit" : "Charge"}</Badge>}
+                          : <Badge variant="secondary">{Number(a.amount) < 0 ? "Reduced Due" : "Added Charge"}</Badge>}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{meta.detail}</TableCell>
-                      <TableCell className={`text-right font-semibold whitespace-nowrap ${Number(a.amount) < 0 ? "text-success" : ""}`}>
+                      <TableCell className={`text-right font-semibold whitespace-nowrap ${Number(a.amount) < 0 ? "text-destructive" : "text-success"}`}>
                         {Number(a.amount) < 0 ? "−" : "+"}{inr(Math.abs(Number(a.amount)))}
                       </TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
@@ -676,7 +676,7 @@ function StudentDetail() {
                     title={m.isHoliday ? "Holiday Deduction" : "Adjustment"}
                     subtitle={fmtDate(a.entry_date)}
                     right={
-                      <span className={`font-semibold whitespace-nowrap ${Number(a.amount) < 0 ? "text-success" : ""}`}>
+                      <span className={`font-semibold whitespace-nowrap ${Number(a.amount) < 0 ? "text-destructive" : "text-success"}`}>
                         {Number(a.amount) < 0 ? "−" : "+"}{inr(Math.abs(Number(a.amount)))}
                       </span>
                     }
@@ -692,7 +692,7 @@ function StudentDetail() {
             <span>Total Billed: <b>{inr(summary.billed)}</b></span>
             <span>Total Paid: <b>{inr(summary.paid)}</b></span>
             {summary.adjustments !== 0 && (
-              <span>Adjustments: <b className={summary.adjustments < 0 ? "text-success" : ""}>{summary.adjustments < 0 ? "−" : "+"}{inr(Math.abs(summary.adjustments))}</b></span>
+              <span>Adjustments: <b className={summary.adjustments < 0 ? "text-destructive" : "text-success"}>{summary.adjustments < 0 ? "−" : "+"}{inr(Math.abs(summary.adjustments))}</b></span>
             )}
             <span>Total Due: <b className={summary.due > 0 ? "text-destructive" : ""}>{inr(summary.due)}</b></span>
             {summary.advance > 0 && <span>Advance: <b className="text-success">{inr(summary.advance)}</b></span>}
@@ -1542,7 +1542,7 @@ function AdjustmentModal({
           action: "create", entity: "adjustment", studentId, label: remarks.trim(),
           newValues: { amount: signed, entry_date: entryDate, remarks: remarks.trim() },
         });
-        toast.success(`${kind === "credit" ? "Credit" : "Charge"} of ${inr(abs)} added to ledger`);
+        toast.success(`${kind === "credit" ? "Reduce Due" : "Increase Due"} adjustment of ${inr(abs)} added to ledger`);
       }
       onSaved();
     } catch (e) {
@@ -1561,10 +1561,10 @@ function AdjustmentModal({
           <Field label="Type">
             <RadioGroup value={kind} onValueChange={(v) => setKind(v as typeof kind)} className="grid grid-cols-2 gap-2">
               <label className={`flex items-center gap-2 border rounded-md px-3 py-2 cursor-pointer text-sm ${kind === "credit" ? "border-primary bg-primary/5" : ""}`}>
-                <RadioGroupItem value="credit" />Credit (reduces due)
+                <RadioGroupItem value="credit" />Reduce Due
               </label>
               <label className={`flex items-center gap-2 border rounded-md px-3 py-2 cursor-pointer text-sm ${kind === "charge" ? "border-primary bg-primary/5" : ""}`}>
-                <RadioGroupItem value="charge" />Charge (increases due)
+                <RadioGroupItem value="charge" />Increase Due
               </label>
             </RadioGroup>
           </Field>
