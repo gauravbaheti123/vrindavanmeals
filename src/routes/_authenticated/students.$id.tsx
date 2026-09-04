@@ -841,6 +841,7 @@ function StudentDetail() {
           studentId={s.id}
           unitId={s.unit_id}
           plans={data.plans}
+          slabs={feeSlabs ?? []}
           existing={editSub}
           onClose={() => { setNewSub(false); setEditSub(null); }}
           onSaved={() => { setNewSub(false); setEditSub(null); refresh(); }}
@@ -1058,10 +1059,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 /* ---------------- Subscription Modal ---------------- */
 
 function SubscriptionModal({
-  studentId, unitId, plans, existing, onClose, onSaved,
+  studentId, unitId, plans, slabs, existing, onClose, onSaved,
 }: {
   studentId: string; unitId: string | null;
   plans: Database["public"]["Tables"]["subscription_plans"]["Row"][];
+  slabs: FeeSlab[];
   existing: Subscription | null; onClose: () => void; onSaved: () => void;
 }) {
   const [planId, setPlanId] = useState(existing?.plan_id ?? plans[0]?.id ?? "");
@@ -1074,8 +1076,9 @@ function SubscriptionModal({
   );
   const [saving, setSaving] = useState(false);
 
-  const plan = plans.find((p) => p.id === planId);
-  const monthlyPrice = Number(plan?.price ?? 3000);
+  // Monthly fee always comes from Fee Settings (single source of truth), never the legacy plan price.
+  const slabFee = feeForMonth(slabs, startDate);
+  const monthlyPrice = Number(slabFee ?? 0);
   const slice = useMemo(() => computeActivationBilling(startDate, monthlyPrice), [startDate, monthlyPrice]);
 
   // Auto-fill end/grace/amount from 15th-pivot rule (new only)
@@ -1088,6 +1091,7 @@ function SubscriptionModal({
 
   async function save() {
     if (!planId || !startDate || !endDate || !graceEnd) return toast.error("All fields required");
+    if (!existing && slabFee === null) return toast.error(missingSlabMessage(startDate));
     const amt = billedAmount === "" ? monthlyPrice : Number(billedAmount);
     if (Number.isNaN(amt) || amt < 0) return toast.error("Invalid billed amount");
     setSaving(true);
@@ -1130,7 +1134,7 @@ function SubscriptionModal({
             <Select value={planId} onValueChange={setPlanId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {plans.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} — {inr(Number(p.price))} / {p.duration_days}d</SelectItem>)}
+                {plans.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </Field>
@@ -1155,9 +1159,15 @@ function SubscriptionModal({
             </Field>
           </div>
           {!existing && (
-            <div className="rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
-              15th-pivot: {slice.isFullMonth ? "Full month" : "Half month"} · Ends {slice.endDate} · Auto ₹{slice.amount.toLocaleString("en-IN")}
-            </div>
+            slabFee === null ? (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
+                {missingSlabMessage(startDate)}
+              </div>
+            ) : (
+              <div className="rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
+                15th-pivot: {slice.isFullMonth ? "Full month" : "Half month"} · Ends {fmtDate(slice.endDate)} · Monthly fee {inr(monthlyPrice)} · Auto {inr(slice.amount)}
+              </div>
+            )
           )}
         </div>
         <DialogFooter>
