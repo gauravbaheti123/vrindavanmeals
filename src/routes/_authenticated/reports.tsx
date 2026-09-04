@@ -1132,7 +1132,7 @@ function BulkLedgerSummary() {
               <TableRow><TableCell colSpan={COLS.length} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
             ) : rows.length === 0 ? (
               <TableRow><TableCell colSpan={COLS.length} className="text-center py-8 text-muted-foreground">No students match the filters.</TableCell></TableRow>
-            ) : rows.map((r) => (
+            ) : pg.pageRows.map((r) => (
               <TableRow key={r.student_id}>
                 <TableCell className="font-mono text-xs">{r.roll_number ?? "—"}</TableCell>
                 <TableCell className="font-medium">{r.full_name}</TableCell>
