@@ -1395,6 +1395,41 @@ function DeactivateStudentModal({
           <Field label="Deactivation Date">
             <DateInput value={deactivateDate} onChange={setDeactivateDate} />
           </Field>
+
+          {(due > 0 || depositHeld > 0) && (
+            <div className="rounded-md border border-warning/50 bg-warning/10 p-3 text-sm space-y-2">
+              <div className="font-medium">Settlement Summary</div>
+              {due > 0 && (
+                <div className="flex justify-between">
+                  <span>Total Due</span>
+                  <span className="font-bold text-destructive">{inr(due)}</span>
+                </div>
+              )}
+              {depositHeld > 0 && (
+                <div className="flex justify-between">
+                  <span>Security Deposit Held</span>
+                  <span className="font-bold">{inr(depositHeld)}</span>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Deactivating does not clear these automatically. Settle payment or refund the deposit first if this
+                student's account should be closed out cleanly.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {due > 0 && (
+                  <Button type="button" size="sm" variant="outline" onClick={onRecordPayment}>
+                    Record Final Payment
+                  </Button>
+                )}
+                {depositHeld > 0 && (
+                  <Button type="button" size="sm" variant="outline" onClick={onRefundDeposit}>
+                    Refund Deposit
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
             <div className="flex justify-between"><span>Current Advance</span><span className="font-medium">{inr(advance)}</span></div>
             <div className="flex justify-between"><span>Refundable</span><span className="font-bold text-success">{inr(refundable)}</span></div>
