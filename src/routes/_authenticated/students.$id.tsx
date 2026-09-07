@@ -571,19 +571,22 @@ function StudentDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {summary.opening > 0 && (
+                {summary.opening !== 0 && (
                   <TableRow className="bg-muted/40">
                     <TableCell className="text-sm whitespace-nowrap">{summary.openingAsOf ? fmtDate(summary.openingAsOf) : "—"}</TableCell>
                     <TableCell className="text-sm italic">Opening Balance</TableCell>
                     <TableCell><Badge variant="secondary">carry-forward</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">Imported</TableCell>
-                    <TableCell className="text-right font-semibold whitespace-nowrap">{inr(summary.opening)}</TableCell>
+                    <TableCell className={`text-right font-semibold whitespace-nowrap ${summary.opening < 0 ? "text-destructive" : "text-success"}`}>
+                      {summary.opening < 0 ? "−" : "+"}{inr(Math.abs(summary.opening))}
+                    </TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
                     <TableCell className="print:hidden" />
                   </TableRow>
                 )}
-                {data.pays.length === 0 && summary.opening <= 0 ? (
+                {data.pays.length === 0 && summary.opening === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No payments yet.</TableCell></TableRow>
+
                 ) : (() => {
                   let running = 0;
                   return data.pays.map((p) => {
@@ -633,15 +636,20 @@ function StudentDetail() {
 
           <MobileOnly className="p-3">
             <MobileCardList>
-              {summary.opening > 0 && (
+              {summary.opening !== 0 && (
                 <MobileCard
                   title="Opening Balance"
                   subtitle={summary.openingAsOf ? fmtDate(summary.openingAsOf) : "—"}
-                  right={<span className="font-semibold whitespace-nowrap">{inr(summary.opening)}</span>}
+                  right={
+                    <span className={`font-semibold whitespace-nowrap ${summary.opening < 0 ? "text-destructive" : "text-success"}`}>
+                      {summary.opening < 0 ? "−" : "+"}{inr(Math.abs(summary.opening))}
+                    </span>
+                  }
                   meta={[{ label: "Source", value: "Imported carry-forward" }]}
                 />
               )}
-              {data.pays.length === 0 && summary.opening <= 0 && data.adjs.length === 0 ? (
+              {data.pays.length === 0 && summary.opening === 0 && data.adjs.length === 0 ? (
+
                 <MobileEmpty>No payments yet.</MobileEmpty>
               ) : null}
               {(() => {
