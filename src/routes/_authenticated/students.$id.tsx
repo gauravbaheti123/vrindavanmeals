@@ -106,6 +106,7 @@ function StudentDetail() {
   const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment; defaultAmount?: number } | null>(null);
   const [adjModal, setAdjModal] = useState<{ existing: Adjustment | null } | null>(null);
   const [holidayModal, setHolidayModal] = useState<{ existing: Adjustment | null } | null>(null);
+  const [openingModal, setOpeningModal] = useState(false);
   const [depositModal, setDepositModal] = useState<{ kind: "received" | "refunded"; existing: Deposit | null; held: number } | null>(null);
 
   const [activateOpen, setActivateOpen] = useState(false);
@@ -307,6 +308,50 @@ function StudentDetail() {
       </>
     );
   };
+
+  const openingActions = (
+    <>
+      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setOpeningModal(true)}>
+        <Pencil className="h-3 w-3" />
+      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive">
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete the opening balance?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {inr(Math.abs(summary.opening))} carried forward will be removed from this student's ledger.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const { error } = await supabase
+                  .from("students")
+                  .update({ opening_balance: 0, opening_balance_as_of: null })
+                  .eq("id", s.id);
+                if (error) return toast.error(error.message);
+                await logAudit({
+                  action: "delete", entity: "opening_balance", entityId: s.id, studentId: s.id,
+                  label: `Opening balance ${inr(summary.opening)}`,
+                  oldValues: { opening_balance: summary.opening, opening_balance_as_of: summary.openingAsOf },
+                });
+                toast.success("Opening balance deleted");
+                refresh();
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 
   const depActions = (d: Deposit) => (
     <>
@@ -572,7 +617,7 @@ function StudentDetail() {
               </TableHeader>
               <TableBody>
                 {summary.opening !== 0 && (
-                  <TableRow className="bg-muted/40">
+                  <TableRow>
                     <TableCell className="text-sm whitespace-nowrap">{summary.openingAsOf ? fmtDate(summary.openingAsOf) : "—"}</TableCell>
                     <TableCell className="text-sm italic">Opening Balance</TableCell>
                     <TableCell><Badge variant="secondary">carry-forward</Badge></TableCell>
@@ -581,7 +626,9 @@ function StudentDetail() {
                       {summary.opening < 0 ? "−" : "+"}{inr(Math.abs(summary.opening))}
                     </TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
-                    <TableCell className="print:hidden" />
+                    <TableCell className="text-right print:hidden">
+                      <div className="flex justify-end gap-1">{openingActions}</div>
+                    </TableCell>
                   </TableRow>
                 )}
                 {data.pays.length === 0 && summary.opening === 0 ? (
@@ -646,6 +693,7 @@ function StudentDetail() {
                     </span>
                   }
                   meta={[{ label: "Source", value: "Imported carry-forward" }]}
+                  actions={<div className="flex gap-1 print:hidden">{openingActions}</div>}
                 />
               )}
               {data.pays.length === 0 && summary.opening === 0 && data.adjs.length === 0 ? (
@@ -896,6 +944,15 @@ function StudentDetail() {
           existing={adjModal.existing}
           onClose={() => setAdjModal(null)}
           onSaved={() => { setAdjModal(null); refresh(); }}
+        />
+      )}
+      {openingModal && (
+        <OpeningBalanceModal
+          studentId={s.id}
+          amount={summary.opening}
+          asOf={summary.openingAsOf}
+          onClose={() => setOpeningModal(false)}
+          onSaved={() => { setOpeningModal(false); refresh(); }}
         />
       )}
       {depositModal && (
@@ -1503,6 +1560,85 @@ function DeactivateStudentModal({
             {saving ? "Saving…" : due > 0 ? "Settle Due to Deactivate" : "Confirm Deactivation"}
           </Button>
 
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ---------------- Opening Balance Modal ---------------- */
+
+function OpeningBalanceModal({
+  studentId, amount, asOf, onClose, onSaved,
+}: {
+  studentId: string;
+  amount: number;
+  asOf: string | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [direction, setDirection] = useState<"due" | "advance">(amount >= 0 ? "due" : "advance");
+  const [value, setValue] = useState(String(Math.abs(amount)));
+  const [entryDate, setEntryDate] = useState(asOf ?? todayISO());
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const abs = Number(value);
+    if (!abs || abs <= 0) return toast.error("Amount must be a positive number");
+    setSaving(true);
+    try {
+      const signed = direction === "advance" ? -abs : abs;
+      const { error } = await supabase.from("students")
+        .update({ opening_balance: signed, opening_balance_as_of: entryDate })
+        .eq("id", studentId);
+      if (error) throw new Error(error.message);
+      const d = diffValues(
+        { opening_balance: amount, opening_balance_as_of: asOf },
+        { opening_balance: signed, opening_balance_as_of: entryDate },
+      );
+      await logAudit({
+        action: "update", entity: "opening_balance", entityId: studentId, studentId,
+        label: `Opening balance ${inr(signed)}`, oldValues: d.old, newValues: d.new,
+      });
+      toast.success("Opening balance updated");
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Edit Opening Balance</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Type</Label>
+            <RadioGroup value={direction} onValueChange={(v) => setDirection(v as "due" | "advance")} className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="due" id="ob-due" />
+                <Label htmlFor="ob-due" className="font-normal">Student owes (adds to due)</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="advance" id="ob-adv" />
+                <Label htmlFor="ob-adv" className="font-normal">Advance paid (reduces due)</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="ob-amount">Amount (₹)</Label>
+            <Input id="ob-amount" type="number" min="0" value={value} onChange={(e) => setValue(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>As of Date</Label>
+            <DateInput value={entryDate} onChange={setEntryDate} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
