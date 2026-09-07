@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { computeHolidayDeduction, fetchFeeSlabs, formatDMY, formatMonth, missingSlabMessage } from "@/lib/fees";
+import { computeHolidayDeduction, fetchFeeSlabs, formatDMY, formatMonth, holidaySegmentLabel, missingSlabMessage } from "@/lib/fees";
 import { logAudit } from "@/lib/audit";
 import { toast } from "sonner";
 
@@ -171,10 +171,9 @@ export function BulkHolidayModal({
                 {calc.segments.map((seg) => (
                   <div key={seg.month} className="flex justify-between text-xs text-muted-foreground gap-2">
                     <span>
-                      {formatMonth(seg.month)} — {seg.days} day{seg.days === 1 ? "" : "s"}{" "}
-                      {seg.qualifies ? "(16+ threshold met) — half month deduction" : "(below 16-day threshold) — no deduction"}
+                      {formatMonth(seg.month)} — {seg.days} day{seg.days === 1 ? "" : "s"} off, {holidaySegmentLabel(seg)}
                     </span>
-                    <span className="shrink-0">{seg.qualifies ? `−${inr(seg.amount)}` : "₹0"}</span>
+                    <span className="shrink-0">{seg.amount > 0 ? `−${inr(seg.amount)}` : "₹0"}</span>
                   </div>
                 ))}
                 <div className="flex justify-between font-semibold pt-1 border-t">
