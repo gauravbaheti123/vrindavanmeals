@@ -693,6 +693,7 @@ function StudentDetail() {
                     </span>
                   }
                   meta={[{ label: "Source", value: "Imported carry-forward" }]}
+                  actions={<div className="flex gap-1 print:hidden">{openingActions}</div>}
                 />
               )}
               {data.pays.length === 0 && summary.opening === 0 && data.adjs.length === 0 ? (
@@ -943,6 +944,15 @@ function StudentDetail() {
           existing={adjModal.existing}
           onClose={() => setAdjModal(null)}
           onSaved={() => { setAdjModal(null); refresh(); }}
+        />
+      )}
+      {openingModal && (
+        <OpeningBalanceModal
+          studentId={s.id}
+          amount={summary.opening}
+          asOf={summary.openingAsOf}
+          onClose={() => setOpeningModal(false)}
+          onSaved={() => { setOpeningModal(false); refresh(); }}
         />
       )}
       {depositModal && (
