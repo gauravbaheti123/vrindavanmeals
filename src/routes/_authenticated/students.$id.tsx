@@ -1566,6 +1566,85 @@ function DeactivateStudentModal({
   );
 }
 
+/* ---------------- Opening Balance Modal ---------------- */
+
+function OpeningBalanceModal({
+  studentId, amount, asOf, onClose, onSaved,
+}: {
+  studentId: string;
+  amount: number;
+  asOf: string | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [direction, setDirection] = useState<"due" | "advance">(amount >= 0 ? "due" : "advance");
+  const [value, setValue] = useState(String(Math.abs(amount)));
+  const [entryDate, setEntryDate] = useState(asOf ?? todayISO());
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const abs = Number(value);
+    if (!abs || abs <= 0) return toast.error("Amount must be a positive number");
+    setSaving(true);
+    try {
+      const signed = direction === "advance" ? -abs : abs;
+      const { error } = await supabase.from("students")
+        .update({ opening_balance: signed, opening_balance_as_of: entryDate })
+        .eq("id", studentId);
+      if (error) throw new Error(error.message);
+      const d = diffValues(
+        { opening_balance: amount, opening_balance_as_of: asOf },
+        { opening_balance: signed, opening_balance_as_of: entryDate },
+      );
+      await logAudit({
+        action: "update", entity: "opening_balance", entityId: studentId, studentId,
+        label: `Opening balance ${inr(signed)}`, oldValues: d.old, newValues: d.new,
+      });
+      toast.success("Opening balance updated");
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Edit Opening Balance</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Type</Label>
+            <RadioGroup value={direction} onValueChange={(v) => setDirection(v as "due" | "advance")} className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="due" id="ob-due" />
+                <Label htmlFor="ob-due" className="font-normal">Student owes (adds to due)</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="advance" id="ob-adv" />
+                <Label htmlFor="ob-adv" className="font-normal">Advance paid (reduces due)</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="ob-amount">Amount (₹)</Label>
+            <Input id="ob-amount" type="number" min="0" value={value} onChange={(e) => setValue(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>As of Date</Label>
+            <DateInput value={entryDate} onChange={setEntryDate} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /* ---------------- Ledger Adjustment Modal ---------------- */
 
 function AdjustmentModal({
