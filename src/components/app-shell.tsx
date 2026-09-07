@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
