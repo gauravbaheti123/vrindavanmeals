@@ -15,6 +15,8 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
   const [pull, setPull] = useState(0);
   const startY = useRef<number | null>(null);
   const active = useRef(false);
+  const pullRef = useRef(0);
+  pullRef.current = pull;
 
   useEffect(() => {
     const scrollTop = () => window.scrollY || document.documentElement.scrollTop || 0;
@@ -63,9 +65,6 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
       window.removeEventListener("touchcancel", onEnd);
     };
   }, [refresh, refreshing]);
-
-  const pullRef = useRef(0);
-  pullRef.current = pull;
 
   const showing = pull > 0 || refreshing;
 
