@@ -103,6 +103,7 @@ export function AppShell() {
     });
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="min-h-screen flex bg-background overflow-x-hidden">
       <aside className={cn(
         "hidden md:flex flex-col bg-sidebar border-r text-sidebar-foreground transition-[width] duration-200",
@@ -226,6 +227,7 @@ export function AppShell() {
         )}
       </main>
     </div>
+    </TooltipProvider>
   );
 }
 
