@@ -636,15 +636,20 @@ function StudentDetail() {
 
           <MobileOnly className="p-3">
             <MobileCardList>
-              {summary.opening > 0 && (
+              {summary.opening !== 0 && (
                 <MobileCard
                   title="Opening Balance"
                   subtitle={summary.openingAsOf ? fmtDate(summary.openingAsOf) : "—"}
-                  right={<span className="font-semibold whitespace-nowrap">{inr(summary.opening)}</span>}
+                  right={
+                    <span className={`font-semibold whitespace-nowrap ${summary.opening < 0 ? "text-destructive" : "text-success"}`}>
+                      {summary.opening < 0 ? "−" : "+"}{inr(Math.abs(summary.opening))}
+                    </span>
+                  }
                   meta={[{ label: "Source", value: "Imported carry-forward" }]}
                 />
               )}
-              {data.pays.length === 0 && summary.opening <= 0 && data.adjs.length === 0 ? (
+              {data.pays.length === 0 && summary.opening === 0 && data.adjs.length === 0 ? (
+
                 <MobileEmpty>No payments yet.</MobileEmpty>
               ) : null}
               {(() => {
