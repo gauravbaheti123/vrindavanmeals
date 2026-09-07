@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pencil, Plus, Save, Upload, Fingerprint, Users, ChevronRight, ShoppingBag, History } from "lucide-react";
 import { toast } from "sonner";
@@ -73,6 +74,7 @@ function BrandingCard() {
     brand_signature_line: "",
     brand_logo_url: "",
     brand_stamp_url: "",
+    noc_print_format: "a4",
   });
   const [saving, setSaving] = useState(false);
 
@@ -86,6 +88,7 @@ function BrandingCard() {
       brand_signature_line: data.brand_signature_line ?? "Authorised Signatory",
       brand_logo_url: data.brand_logo_url ?? "",
       brand_stamp_url: data.brand_stamp_url ?? "",
+      noc_print_format: data.noc_print_format === "thermal80" ? "thermal80" : "a4",
     });
   }, [data, hydrate]);
 
@@ -144,6 +147,17 @@ function BrandingCard() {
           <div className="space-y-2">
             <Label>Signature / Authority Line</Label>
             <Input value={form.brand_signature_line} onChange={(e) => set("brand_signature_line", e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>NOC Print Format</Label>
+            <Select value={form.noc_print_format} onValueChange={(v) => set("noc_print_format", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="a4">A4 (full-page letter)</SelectItem>
+                <SelectItem value="thermal80">80mm Thermal (compact receipt)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Used by default when Issue NOC is clicked.</p>
           </div>
         </div>
 
