@@ -5,10 +5,12 @@ import { useCurrentUser, roleFlags } from "@/hooks/use-current-user";
 import {
   UtensilsCrossed, LayoutDashboard, Users, CalendarClock,
   ClipboardList, BarChart3, Settings, ShieldCheck, LogOut, Receipt, ShoppingCart, Menu,
+  ChevronsLeft, ChevronsRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -38,6 +40,8 @@ const BOTTOM_TABS = ["/dashboard", "/dues", "/students", "/pos", "/attendance"];
 const isActivePath = (pathname: string, to: string) =>
   pathname === to || pathname.startsWith(to + "/");
 
+const SIDEBAR_COLLAPSED_KEY = "vm-sidebar-collapsed";
+
 export function AppShell() {
   const { profile, roles, loading } = useCurrentUser();
   const flags = roleFlags(roles);
@@ -45,6 +49,17 @@ export function AppShell() {
   const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1"; } catch { return false; }
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      const next = !c;
+      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   const signOut = async () => {
     await qc.cancelQueries();
@@ -57,24 +72,33 @@ export function AppShell() {
   const items = NAV.filter((n) => n.show(flags));
   const tabs = items.filter((n) => BOTTOM_TABS.includes(n.to)).slice(0, 5);
 
-  const navLinks = (onNavigate?: () => void) =>
+  const navLinks = (onNavigate?: () => void, iconOnly = false) =>
     items.map((n) => {
       const active = isActivePath(pathname, n.to);
-      return (
+      const link = (
         <Link
           key={n.to}
           to={n.to}
           onClick={onNavigate}
+          aria-label={iconOnly ? n.label : undefined}
           className={cn(
             "flex items-center gap-3 px-3 min-h-11 rounded-md text-sm transition-colors",
+            iconOnly && "justify-center px-0",
             active
               ? "bg-sidebar-primary text-sidebar-primary-foreground"
               : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           )}
         >
           <n.icon className="h-4 w-4 shrink-0" />
-          {n.label}
+          {!iconOnly && n.label}
         </Link>
+      );
+      if (!iconOnly) return link;
+      return (
+        <Tooltip key={n.to}>
+          <TooltipTrigger asChild>{link}</TooltipTrigger>
+          <TooltipContent side="right">{n.label}</TooltipContent>
+        </Tooltip>
       );
     });
 
