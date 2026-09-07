@@ -169,11 +169,12 @@ export function BulkHolidayModal({
             ) : calc ? (
               <>
                 {calc.segments.map((seg) => (
-                  <div key={seg.month} className="flex justify-between text-xs text-muted-foreground">
+                  <div key={seg.month} className="flex justify-between text-xs text-muted-foreground gap-2">
                     <span>
-                      {formatMonth(seg.month)} — {seg.days} day{seg.days === 1 ? "" : "s"} × {inr(seg.monthlyFee)}/{seg.daysInMonth}
+                      {formatMonth(seg.month)} — {seg.days} day{seg.days === 1 ? "" : "s"}{" "}
+                      {seg.qualifies ? "(16+ threshold met) — half month deduction" : "(below 16-day threshold) — no deduction"}
                     </span>
-                    <span>−{inr(seg.amount)}</span>
+                    <span className="shrink-0">{seg.qualifies ? `−${inr(seg.amount)}` : "₹0"}</span>
                   </div>
                 ))}
                 <div className="flex justify-between font-semibold pt-1 border-t">
@@ -183,9 +184,11 @@ export function BulkHolidayModal({
                   <span className="text-destructive">−{inr(totalCredit)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  This will apply a Holiday Deduction of {inr(calc.amount)} each to {selectedCount} student
-                  {selectedCount === 1 ? "" : "s"}, totalling {inr(totalCredit)} in credits.
+                  {calc.amount <= 0
+                    ? "No deduction — fewer than 16 holiday days in each month."
+                    : `This will apply a Holiday Deduction of ${inr(calc.amount)} each to ${selectedCount} student${selectedCount === 1 ? "" : "s"}, totalling ${inr(totalCredit)} in credits.`}
                 </p>
+
               </>
             ) : null}
           </div>

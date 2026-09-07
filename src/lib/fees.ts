@@ -60,7 +60,14 @@ export function missingSlabMessage(dateISO: string): string {
 
 /* ---------------- Holiday / Leave deduction ---------------- */
 
-export type HolidaySegment = { month: string; days: number; monthlyFee: number; daysInMonth: number; amount: number };
+export type HolidaySegment = {
+  month: string;
+  days: number;
+  monthlyFee: number;
+  daysInMonth: number;
+  amount: number;
+  qualifies: boolean;
+};
 export type HolidayCalc = { days: number; amount: number; segments: HolidaySegment[]; missingMonths: string[] };
 
 function daysInMonth(monthISO: string): number {
@@ -68,9 +75,14 @@ function daysInMonth(monthISO: string): number {
   return new Date(y, m, 0).getDate();
 }
 
+/** Days in a month that must be missed before any deduction applies. */
+export const HOLIDAY_THRESHOLD_DAYS = 16;
+
 /**
- * Per-day rate = monthly fee (slab active for that month) ÷ days in that month.
- * A range spanning months is split so each month uses its own rate.
+ * Block rule (mirrors the 15th-pivot joining/exit logic):
+ *   1–15 holiday days in a month  → no deduction
+ *   16+ holiday days in a month   → half of that month's fee
+ * Ranges spanning months are evaluated per month with that month's own slab.
  */
 export function computeHolidayDeduction(slabs: FeeSlab[], fromISO: string, toISO: string): HolidayCalc {
   const start = new Date(fromISO + "T00:00:00");
@@ -89,12 +101,14 @@ export function computeHolidayDeduction(slabs: FeeSlab[], fromISO: string, toISO
     const fee = feeForMonth(slabs, month);
     if (fee === null) { missingMonths.push(month); continue; }
     const dim = daysInMonth(month);
-    const seg = (fee / dim) * count;
+    const qualifies = count >= HOLIDAY_THRESHOLD_DAYS;
+    const seg = qualifies ? Math.round(fee / 2) : 0;
     amount += seg;
-    segments.push({ month, days: count, monthlyFee: fee, daysInMonth: dim, amount: Math.round(seg) });
+    segments.push({ month, days: count, monthlyFee: fee, daysInMonth: dim, amount: seg, qualifies });
   }
   return { days, amount: Math.round(amount), segments, missingMonths };
 }
+
 
 export function formatDMY(iso: string): string {
   return fmtDate(iso);
