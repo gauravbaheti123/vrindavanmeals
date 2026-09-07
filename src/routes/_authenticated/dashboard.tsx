@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { StudentSearchDialog, QuickPaymentDialog } from "@/components/quick-actions";
 import { fetchLedgerRows } from "@/lib/dues";
 import { useDueThresholds } from "@/hooks/use-due-thresholds";
+import { useAppRefresh } from "@/hooks/use-app-refresh";
 
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -34,6 +35,7 @@ const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 function Dashboard() {
   const [unitId, setUnitId] = useState<string>("all");
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const { refresh, refreshing } = useAppRefresh();
   const [searchOpen, setSearchOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
 
