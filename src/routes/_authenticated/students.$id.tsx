@@ -26,7 +26,7 @@ import { isValidMessNo, isMessNoAvailable } from "@/lib/mess-no";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
 import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from "@/lib/billing";
 import { fetchFeeSlabs, feeForMonth, missingSlabMessage, computeHolidayDeduction, holidaySegmentLabel, formatDMY, formatMonth, type FeeSlab } from "@/lib/fees";
-import { generateNocPdf, printNocThermal } from "@/lib/noc";
+import { printNoc } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
 import { StudentPhoto, StudentPhotoEditor } from "@/components/student-photo";
 import { MobileOnly, DesktopOnly, MobileCard, MobileCardList, MobileEmpty } from "@/components/mobile-list";
@@ -191,15 +191,9 @@ function StudentDetail() {
           exitDate: (st as unknown as { exit_date?: string | null }).exit_date ?? null,
           due: summary.due,
       };
-      if (settings.noc_print_format === "thermal80") {
-        printNocThermal(brand, nocData);
-        toast.success("NOC sent to printer");
-      } else {
-        const doc = generateNocPdf(brand, nocData);
-        const safeName = st.full_name.replace(/[^a-z0-9]+/gi, "_");
-        doc.save(`NOC_${safeName}.pdf`);
-        toast.success("NOC generated");
-      }
+      const format = settings.noc_print_format === "thermal80" ? "thermal80" : "a4";
+      await printNoc(brand, nocData, format);
+      toast.success("NOC sent to printer");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not generate NOC");
     } finally {
