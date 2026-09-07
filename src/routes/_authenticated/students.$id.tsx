@@ -106,6 +106,7 @@ function StudentDetail() {
   const [payModal, setPayModal] = useState<{ mode: "new" | "edit"; payment?: Payment; defaultAmount?: number } | null>(null);
   const [adjModal, setAdjModal] = useState<{ existing: Adjustment | null } | null>(null);
   const [holidayModal, setHolidayModal] = useState<{ existing: Adjustment | null } | null>(null);
+  const [openingModal, setOpeningModal] = useState(false);
   const [depositModal, setDepositModal] = useState<{ kind: "received" | "refunded"; existing: Deposit | null; held: number } | null>(null);
 
   const [activateOpen, setActivateOpen] = useState(false);
