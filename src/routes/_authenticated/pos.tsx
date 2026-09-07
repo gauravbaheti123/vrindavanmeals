@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Minus, X, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { printHtmlDocument } from "@/lib/print-html";
 
 export const Route = createFileRoute("/_authenticated/pos")({
   head: () => ({ meta: [{ title: "POS — Vrindavan Meals" }] }),
@@ -260,16 +261,16 @@ function printReceipt(
   saleNumber: number, lines: CartLine[], subtotal: number, discount: number,
   taxRate: number, tax: number, total: number, mode: string,
 ) {
-  const w = window.open("", "_blank", "width=320,height=600");
-  if (!w) return;
   const rows = lines.map((l) => `
     <tr><td>${l.item_name}<br/><span style="font-size:10px">${l.quantity} × ₹${l.unit_price.toFixed(2)}</span></td>
     <td style="text-align:right">₹${(l.unit_price * l.quantity).toFixed(2)}</td></tr>
   `).join("");
-  w.document.write(`
-<html><head><title>Receipt #${saleNumber}</title>
+
+  const html = `<!doctype html>
+<html><head><meta charset="utf-8" /><title>Receipt #${saleNumber}</title>
 <style>
   @page { size: 80mm auto; margin: 4mm; }
+  html, body { margin:0; padding:0; }
   body { font-family: monospace; font-size: 12px; width: 72mm; }
   h2 { text-align:center; margin:0 0 4px; }
   table { width:100%; border-collapse: collapse; }
@@ -293,8 +294,6 @@ ${tax > 0 ? `<div class="row"><span>Tax (${taxRate}%)</span><span>₹${tax.toFix
 <div class="row"><span>Paid via</span><span>${mode}</span></div>
 <div class="line"></div>
 <div style="text-align:center;margin-top:6px">Thank you!</div>
-<script>window.onload = () => { window.print(); setTimeout(() => window.close(), 300); };</script>
-</body></html>
-  `);
-  w.document.close();
+</body></html>`;
+  void printHtmlDocument(html, `Receipt #${saleNumber}`);
 }

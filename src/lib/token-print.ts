@@ -1,6 +1,7 @@
 import { fmtDate } from "@/lib/dates";
 // Client helpers for token printing + WhatsApp fallback
 import { supabase } from "@/integrations/supabase/client";
+import { printHtmlDocument } from "@/lib/print-html";
 
 export interface TokenData {
   attendance_id: string;
@@ -17,10 +18,8 @@ export interface TokenData {
 }
 
 export function printToken(token: TokenData) {
-  const w = window.open("", "PRINT", "width=380,height=600");
-  if (!w) return false;
   const time = new Date(token.scan_time).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
-  w.document.write(`<!doctype html><html><head><title>Token</title>
+  const html = `<!doctype html><html><head><title>Token</title>
 <style>
   @page { size: 80mm auto; margin: 4mm; }
   body { font-family: 'Courier New', monospace; width: 72mm; margin: 0; padding: 4px; }
@@ -40,10 +39,8 @@ export function printToken(token: TokenData) {
   <hr />
   <div class="center">${time}</div>
   <div class="center" style="font-size:11px">Valid for today only</div>
-</body></html>`);
-  w.document.close();
-  w.focus();
-  setTimeout(() => { w.print(); w.close(); }, 250);
+</body></html>`;
+  void printHtmlDocument(html, "Meal Token");
   // Mark printed (best-effort)
   supabase.from("attendance").update({ token_printed: true }).eq("id", token.attendance_id);
   return true;
