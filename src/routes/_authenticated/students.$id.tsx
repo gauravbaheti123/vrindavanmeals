@@ -26,7 +26,7 @@ import { isValidMessNo, isMessNoAvailable } from "@/lib/mess-no";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
 import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from "@/lib/billing";
 import { fetchFeeSlabs, feeForMonth, missingSlabMessage, computeHolidayDeduction, holidaySegmentLabel, formatDMY, formatMonth, type FeeSlab } from "@/lib/fees";
-import { generateNocPdf } from "@/lib/noc";
+import { generateNocPdf, printNocThermal } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
 import { StudentPhoto, StudentPhotoEditor } from "@/components/student-photo";
 import { MobileOnly, DesktopOnly, MobileCard, MobileCardList, MobileEmpty } from "@/components/mobile-list";
@@ -167,16 +167,15 @@ function StudentDetail() {
       const settings = Object.fromEntries((settingsRows ?? []).map((r) => [r.key, r.value])) as Record<string, string>;
       const st = data.student;
       if (!st) throw new Error("Student not loaded");
-      const doc = generateNocPdf(
-        {
+      const brand = {
           orgName: settings.brand_org_name || "Vrindavan Meals",
           address: settings.brand_address || "",
           contact: settings.brand_contact || "",
           signatureLine: settings.brand_signature_line || "Authorised Signatory",
           logoDataUrl: settings.brand_logo_url || null,
           stampDataUrl: settings.brand_stamp_url || null,
-        },
-        {
+      };
+      const nocData = {
           studentName: st.full_name,
           messNo: st.roll_number,
           room: st.hostel_room,
@@ -187,11 +186,20 @@ function StudentDetail() {
             .sort((a, b) => (a.start_date < b.start_date ? -1 : 1))
             .map((sub) => ({ start: sub.start_date, end: sub.end_date })),
           issueDate: new Date().toISOString().slice(0, 10),
-        },
-      );
-      const safeName = st.full_name.replace(/[^a-z0-9]+/gi, "_");
-      doc.save(`NOC_${safeName}.pdf`);
-      toast.success("NOC generated");
+          rollNumber: (st as unknown as { college_roll_number?: string | null }).college_roll_number ?? null,
+          joiningDate: (st as unknown as { joining_date?: string | null }).joining_date ?? null,
+          exitDate: (st as unknown as { exit_date?: string | null }).exit_date ?? null,
+          due: summary.due,
+      };
+      if (settings.noc_print_format === "thermal80") {
+        printNocThermal(brand, nocData);
+        toast.success("NOC sent to printer");
+      } else {
+        const doc = generateNocPdf(brand, nocData);
+        const safeName = st.full_name.replace(/[^a-z0-9]+/gi, "_");
+        doc.save(`NOC_${safeName}.pdf`);
+        toast.success("NOC generated");
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not generate NOC");
     } finally {

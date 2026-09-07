@@ -18,6 +18,10 @@ export type NocData = {
   mobile: string | null;
   subscriptionPeriods: { start: string; end: string }[];
   issueDate: string; // YYYY-MM-DD
+  rollNumber?: string | null;
+  joiningDate?: string | null;
+  exitDate?: string | null;
+  due?: number;
 };
 
 function formatDate(iso: string) {
@@ -163,4 +167,65 @@ export function generateNocPdf(brand: NocBranding, data: NocData): jsPDF {
   doc.text(brand.orgName || "Vrindavan Meals", sigX, sigY + 11);
 
   return doc;
+}
+
+function esc(v: string) {
+  return v.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+}
+
+/**
+ * Compact 80mm thermal NOC — receipt density, same print width approach as POS receipts.
+ */
+export function printNocThermal(brand: NocBranding, data: NocData) {
+  const w = window.open("", "_blank", "width=380,height=640");
+  if (!w) throw new Error("Popup blocked — allow popups to print the NOC");
+
+  const org = brand.orgName || "Vrindavan Meals";
+  const rows: [string, string][] = [["Name", data.studentName]];
+  if (data.messNo) rows.push(["Mess No", data.messNo]);
+  if (data.rollNumber) rows.push(["Roll No", data.rollNumber]);
+  if (data.joiningDate) rows.push(["Joined", formatDate(data.joiningDate)]);
+  if (data.exitDate) rows.push(["Exit", formatDate(data.exitDate)]);
+  const due = Number(data.due ?? 0);
+  const statement =
+    due > 0
+      ? `Outstanding due of Rs ${due.toFixed(0)} pending as on date of issue.`
+      : "No dues are pending against the above student as on date of issue.";
+
+  w.document.write(`
+<html><head><title>NOC — ${esc(data.studentName)}</title>
+<style>
+  @page { size: 80mm auto; margin: 4mm; }
+  body { font-family: monospace; font-size: 12px; width: 72mm; }
+  h2 { text-align:center; margin:0; font-size:14px; }
+  .logo { display:block; margin:0 auto 4px; max-height:36px; max-width:36mm; }
+  .line { border-top: 1px dashed #000; margin: 4px 0; }
+  .row { display:flex; justify-content:space-between; gap:6px; }
+  .row span:last-child { text-align:right; }
+  .title { text-align:center; font-weight:bold; margin:4px 0; }
+  .stmt { margin: 4px 0; }
+  .sig { margin-top: 18px; text-align:right; }
+  .sig .ln { border-top:1px solid #000; display:inline-block; width:40mm; }
+</style></head><body>
+${brand.logoDataUrl ? `<img class="logo" src="${brand.logoDataUrl}" />` : ""}
+<h2>${esc(org)}</h2>
+${brand.address ? `<div style="text-align:center;font-size:10px">${esc(brand.address)}</div>` : ""}
+${brand.contact ? `<div style="text-align:center;font-size:10px">${esc(brand.contact)}</div>` : ""}
+<div class="line"></div>
+<div class="title">NO OBJECTION CERTIFICATE</div>
+<div class="line"></div>
+${rows.map(([k, v]) => `<div class="row"><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("")}
+<div class="line"></div>
+<div class="stmt">${esc(statement)}</div>
+<div class="line"></div>
+<div class="row"><span>Issued on</span><span>${formatDate(data.issueDate)}</span></div>
+<div class="sig">
+  <div class="ln"></div>
+  <div>${esc(brand.signatureLine || "Authorised Signatory")}</div>
+  <div style="font-size:10px">${esc(org)}</div>
+</div>
+<script>window.onload = () => { window.print(); setTimeout(() => window.close(), 300); };</script>
+</body></html>
+  `);
+  w.document.close();
 }
