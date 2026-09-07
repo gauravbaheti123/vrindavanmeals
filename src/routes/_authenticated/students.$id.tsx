@@ -309,6 +309,50 @@ function StudentDetail() {
     );
   };
 
+  const openingActions = (
+    <>
+      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setOpeningModal(true)}>
+        <Pencil className="h-3 w-3" />
+      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive">
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete the opening balance?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {inr(Math.abs(summary.opening))} carried forward will be removed from this student's ledger.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const { error } = await supabase
+                  .from("students")
+                  .update({ opening_balance: 0, opening_balance_as_of: null })
+                  .eq("id", s.id);
+                if (error) return toast.error(error.message);
+                await logAudit({
+                  action: "delete", entity: "opening_balance", entityId: s.id, studentId: s.id,
+                  label: `Opening balance ${inr(summary.opening)}`,
+                  oldValues: { opening_balance: summary.opening, opening_balance_as_of: summary.openingAsOf },
+                });
+                toast.success("Opening balance deleted");
+                refresh();
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+
   const depActions = (d: Deposit) => (
     <>
       <Button
