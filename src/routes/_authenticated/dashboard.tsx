@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { StudentSearchDialog, QuickPaymentDialog } from "@/components/quick-actions";
 import { fetchLedgerRows } from "@/lib/dues";
 import { useDueThresholds } from "@/hooks/use-due-thresholds";
+import { useAppRefresh } from "@/hooks/use-app-refresh";
 
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -34,6 +35,7 @@ const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 function Dashboard() {
   const [unitId, setUnitId] = useState<string>("all");
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const { refresh, refreshing } = useAppRefresh();
   const [searchOpen, setSearchOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
 
@@ -163,18 +165,30 @@ function Dashboard() {
         <div className="min-w-0">
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <RefreshCw className="h-3 w-3 shrink-0" />
             Updated {lastUpdated.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
           </p>
         </div>
-        <Select value={unitId} onValueChange={setUnitId}>
-          <SelectTrigger className="w-[140px] sm:w-[180px]"><SelectValue placeholder="All units" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Units</SelectItem>
-            {units?.map((u) => (<SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 shrink-0"
+            aria-label="Refresh dashboard"
+            disabled={refreshing}
+            onClick={() => void refresh()}
+          >
+            <RefreshCw className={"h-4 w-4" + (refreshing ? " animate-spin" : "")} />
+          </Button>
+          <Select value={unitId} onValueChange={setUnitId}>
+            <SelectTrigger className="w-[140px] sm:w-[180px]"><SelectValue placeholder="All units" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Units</SelectItem>
+              {units?.map((u) => (<SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
 
       {/* Quick actions — always above the fold */}
       <div className="grid grid-cols-2 gap-3">
