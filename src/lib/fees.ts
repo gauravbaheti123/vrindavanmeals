@@ -66,7 +66,8 @@ export type HolidaySegment = {
   monthlyFee: number;
   daysInMonth: number;
   amount: number;
-  qualifies: boolean;
+  daysPresent: number;
+  tier: "full" | "half" | "none";
 };
 export type HolidayCalc = { days: number; amount: number; segments: HolidaySegment[]; missingMonths: string[] };
 
@@ -75,13 +76,11 @@ function daysInMonth(monthISO: string): number {
   return new Date(y, m, 0).getDate();
 }
 
-/** Days in a month that must be missed before any deduction applies. */
-export const HOLIDAY_THRESHOLD_DAYS = 16;
-
 /**
- * Block rule (mirrors the 15th-pivot joining/exit logic):
- *   1–15 holiday days in a month  → no deduction
- *   16+ holiday days in a month   → half of that month's fee
+ * 3-tier rule based on days PRESENT in the month:
+ *   0 days present   → full month deduction (month billed ₹0)
+ *   1–15 days present → half month deduction
+ *   16+ days present  → no deduction (full month fee)
  * Ranges spanning months are evaluated per month with that month's own slab.
  */
 export function computeHolidayDeduction(slabs: FeeSlab[], fromISO: string, toISO: string): HolidayCalc {
@@ -101,12 +100,20 @@ export function computeHolidayDeduction(slabs: FeeSlab[], fromISO: string, toISO
     const fee = feeForMonth(slabs, month);
     if (fee === null) { missingMonths.push(month); continue; }
     const dim = daysInMonth(month);
-    const qualifies = count >= HOLIDAY_THRESHOLD_DAYS;
-    const seg = qualifies ? Math.round(fee / 2) : 0;
+    const daysPresent = dim - count;
+    const tier: HolidaySegment["tier"] = daysPresent <= 0 ? "full" : daysPresent <= 15 ? "half" : "none";
+    const seg = tier === "full" ? fee : tier === "half" ? Math.round(fee / 2) : 0;
     amount += seg;
-    segments.push({ month, days: count, monthlyFee: fee, daysInMonth: dim, amount: seg, qualifies });
+    segments.push({ month, days: count, monthlyFee: fee, daysInMonth: dim, amount: seg, daysPresent, tier });
   }
   return { days, amount: Math.round(amount), segments, missingMonths };
+}
+
+/** Preview label for a holiday segment, e.g. "0 days present (full month) — Full deduction". */
+export function holidaySegmentLabel(seg: HolidaySegment): string {
+  if (seg.tier === "full") return `${seg.daysPresent} days present (full month) — Full deduction`;
+  if (seg.tier === "half") return `${seg.daysPresent} days present — Half month deduction`;
+  return `${seg.daysPresent} days present — No deduction`;
 }
 
 

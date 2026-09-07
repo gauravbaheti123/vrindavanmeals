@@ -25,7 +25,7 @@ import { logAudit, diffValues } from "@/lib/audit";
 import { isValidMessNo, isMessNoAvailable } from "@/lib/mess-no";
 import { computeSubscriptionStatus } from "@/lib/subscription-status";
 import { computeActivationBilling, computeDeactivationRefund, addDaysISO } from "@/lib/billing";
-import { fetchFeeSlabs, feeForMonth, missingSlabMessage, computeHolidayDeduction, formatDMY, formatMonth, type FeeSlab } from "@/lib/fees";
+import { fetchFeeSlabs, feeForMonth, missingSlabMessage, computeHolidayDeduction, holidaySegmentLabel, formatDMY, formatMonth, type FeeSlab } from "@/lib/fees";
 import { generateNocPdf } from "@/lib/noc";
 import type { Database } from "@/integrations/supabase/types";
 import { StudentPhoto, StudentPhotoEditor } from "@/components/student-photo";
@@ -1701,10 +1701,9 @@ function HolidayModal({
                 {calc.segments.map((seg) => (
                   <div key={seg.month} className="flex justify-between text-xs text-muted-foreground gap-2">
                     <span>
-                      {formatMonth(seg.month)} — {seg.days} day{seg.days === 1 ? "" : "s"}{" "}
-                      {seg.qualifies ? "(16+ threshold met) — half month deduction" : "(below 16-day threshold) — no deduction"}
+                      {formatMonth(seg.month)} — {seg.days} day{seg.days === 1 ? "" : "s"} off, {holidaySegmentLabel(seg)}
                     </span>
-                    <span className="shrink-0">{seg.qualifies ? `−${inr(seg.amount)}` : "₹0"}</span>
+                    <span className="shrink-0">{seg.amount > 0 ? `−${inr(seg.amount)}` : "₹0"}</span>
                   </div>
                 ))}
                 <div className="flex justify-between font-semibold pt-1 border-t">
