@@ -66,7 +66,8 @@ export type HolidaySegment = {
   monthlyFee: number;
   daysInMonth: number;
   amount: number;
-  qualifies: boolean;
+  daysPresent: number;
+  tier: "full" | "half" | "none";
 };
 export type HolidayCalc = { days: number; amount: number; segments: HolidaySegment[]; missingMonths: string[] };
 
