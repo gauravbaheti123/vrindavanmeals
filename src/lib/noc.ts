@@ -1,4 +1,5 @@
 import { fmtDate } from "@/lib/dates";
+import { printHtmlDocument } from "@/lib/print-html";
 import { jsPDF } from "jspdf";
 
 export type NocBranding = {
