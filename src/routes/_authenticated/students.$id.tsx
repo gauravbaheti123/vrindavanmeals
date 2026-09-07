@@ -1691,18 +1691,19 @@ function HolidayModal({
             ) : calc ? (
               <>
                 {calc.segments.map((seg) => (
-                  <div key={seg.month} className="flex justify-between text-xs text-muted-foreground">
+                  <div key={seg.month} className="flex justify-between text-xs text-muted-foreground gap-2">
                     <span>
-                      {formatMonth(seg.month)} — {seg.days} day{seg.days === 1 ? "" : "s"} ×{" "}
-                      {inr(seg.monthlyFee)}/{seg.daysInMonth}
+                      {formatMonth(seg.month)} — {seg.days} day{seg.days === 1 ? "" : "s"}{" "}
+                      {seg.qualifies ? "(16+ threshold met) — half month deduction" : "(below 16-day threshold) — no deduction"}
                     </span>
-                    <span>−{inr(seg.amount)}</span>
+                    <span className="shrink-0">{seg.qualifies ? `−${inr(seg.amount)}` : "₹0"}</span>
                   </div>
                 ))}
                 <div className="flex justify-between font-semibold pt-1 border-t">
                   <span>{calc.days} holiday day{calc.days === 1 ? "" : "s"}</span>
                   <span className="text-destructive">−{inr(calc.amount)}</span>
                 </div>
+
               </>
             ) : null}
           </div>
