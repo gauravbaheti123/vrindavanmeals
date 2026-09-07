@@ -173,29 +173,35 @@ function esc(v: string) {
   return v.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 }
 
-/**
- * Compact 80mm thermal NOC — receipt density, same print width approach as POS receipts.
- */
-export function printNocThermal(brand: NocBranding, data: NocData) {
-  const w = window.open("", "_blank", "width=380,height=640");
-  if (!w) throw new Error("Popup blocked — allow popups to print the NOC");
-
-  const org = brand.orgName || "Vrindavan Meals";
+function nocRows(data: NocData): [string, string][] {
   const rows: [string, string][] = [["Name", data.studentName]];
   if (data.messNo) rows.push(["Mess No", data.messNo]);
   if (data.rollNumber) rows.push(["Roll No", data.rollNumber]);
   if (data.joiningDate) rows.push(["Joined", formatDate(data.joiningDate)]);
   if (data.exitDate) rows.push(["Exit", formatDate(data.exitDate)]);
-  const due = Number(data.due ?? 0);
-  const statement =
-    due > 0
-      ? `Outstanding due of Rs ${due.toFixed(0)} pending as on date of issue.`
-      : "No dues are pending against the above student as on date of issue.";
+  return rows;
+}
 
-  w.document.write(`
-<html><head><title>NOC — ${esc(data.studentName)}</title>
+function nocStatement(data: NocData) {
+  const due = Number(data.due ?? 0);
+  return due > 0
+    ? `Outstanding due of Rs ${due.toFixed(0)} pending as on date of issue.`
+    : "No dues are pending against the above student as on date of issue.";
+}
+
+/**
+ * Compact 80mm thermal NOC — receipt density, same print width approach as POS receipts.
+ */
+export function nocThermalHtml(brand: NocBranding, data: NocData) {
+  const org = brand.orgName || "Vrindavan Meals";
+  const rows = nocRows(data);
+  const statement = nocStatement(data);
+
+  return `<!doctype html>
+<html><head><meta charset="utf-8" /><title>NOC — ${esc(data.studentName)}</title>
 <style>
   @page { size: 80mm auto; margin: 4mm; }
+  html, body { margin:0; padding:0; }
   body { font-family: monospace; font-size: 12px; width: 72mm; }
   h2 { text-align:center; margin:0; font-size:14px; }
   .logo { display:block; margin:0 auto 4px; max-height:36px; max-width:36mm; }
@@ -207,7 +213,7 @@ export function printNocThermal(brand: NocBranding, data: NocData) {
   .sig { margin-top: 18px; text-align:right; }
   .sig .ln { border-top:1px solid #000; display:inline-block; width:40mm; }
 </style></head><body>
-${brand.logoDataUrl ? `<img class="logo" src="${brand.logoDataUrl}" />` : ""}
+${brand.logoDataUrl ? `<img class="logo" src="${esc(brand.logoDataUrl)}" />` : ""}
 <h2>${esc(org)}</h2>
 ${brand.address ? `<div style="text-align:center;font-size:10px">${esc(brand.address)}</div>` : ""}
 ${brand.contact ? `<div style="text-align:center;font-size:10px">${esc(brand.contact)}</div>` : ""}
@@ -224,8 +230,91 @@ ${rows.map(([k, v]) => `<div class="row"><span>${esc(k)}</span><span>${esc(v)}</
   <div>${esc(brand.signatureLine || "Authorised Signatory")}</div>
   <div style="font-size:10px">${esc(org)}</div>
 </div>
-<script>window.onload = () => { window.print(); setTimeout(() => window.close(), 300); };</script>
-</body></html>
-  `);
-  w.document.close();
+</body></html>`;
 }
+
+/** Full-page A4 NOC as print-ready HTML (same content as the PDF version). */
+export function nocA4Html(brand: NocBranding, data: NocData) {
+  const org = brand.orgName || "Vrindavan Meals";
+  const detail: [string, string][] = [
+    ["Mess Number", data.messNo || "—"],
+    ["Student Name", data.studentName],
+    ["Room / Unit", [data.room, data.unitName].filter(Boolean).join(" · ") || "—"],
+  ];
+  if (data.rollNumber) detail.push(["Roll Number", data.rollNumber]);
+  if (data.mobile) detail.push(["Mobile", data.mobile]);
+  if (data.joiningDate) detail.push(["Joining Date", formatDate(data.joiningDate)]);
+  if (data.exitDate) detail.push(["Exit Date", formatDate(data.exitDate)]);
+
+  return `<!doctype html>
+<html><head><meta charset="utf-8" /><title>NOC — ${esc(data.studentName)}</title>
+<style>
+  @page { size: A4; margin: 18mm; }
+  html, body { margin:0; padding:0; }
+  body { font-family: Helvetica, Arial, sans-serif; color:#111; font-size: 12pt; line-height: 1.5; }
+  .head { display:flex; align-items:center; gap:12mm; }
+  .head img { max-height: 28mm; max-width: 28mm; }
+  .org { font-size: 20pt; font-weight: bold; color:#78350f; margin:0; }
+  .meta { font-size: 10pt; color:#555; margin-top: 2mm; }
+  hr { border:0; border-top: 1.5pt solid #c86428; margin: 6mm 0; }
+  h1 { text-align:center; font-size: 15pt; letter-spacing: .5pt; margin: 0; }
+  .issue { text-align:center; font-size: 10pt; color:#666; margin-top: 2mm; }
+  table.detail { margin: 6mm 0; border-collapse: collapse; }
+  table.detail td { padding: 1.5mm 0; vertical-align: top; }
+  table.detail td.k { font-weight: bold; width: 45mm; }
+  ul { margin: 2mm 0 0 5mm; padding: 0; }
+  .stmt { font-weight: bold; margin-top: 5mm; }
+  .sig { margin-top: 26mm; text-align: right; }
+  .sig img { max-height: 25mm; display:block; margin-left:auto; }
+  .sig .ln { border-top: 1px solid #666; width: 60mm; display:inline-block; margin-top: 2mm; }
+  .sig .who { font-weight: bold; font-size: 11pt; }
+  .sig .org2 { font-size: 10pt; color:#555; }
+</style></head><body>
+<div class="head">
+  ${brand.logoDataUrl ? `<img src="${esc(brand.logoDataUrl)}" />` : ""}
+  <div>
+    <p class="org">${esc(org)}</p>
+    ${brand.address ? `<div class="meta">${esc(brand.address)}</div>` : ""}
+    ${brand.contact ? `<div class="meta">${esc(brand.contact)}</div>` : ""}
+  </div>
+</div>
+<hr />
+<h1>NO OBJECTION CERTIFICATE</h1>
+<div class="issue">Issue Date: ${formatDate(data.issueDate)}</div>
+<p>To Whom It May Concern,</p>
+<p>This is to certify that the following student has availed the mess/canteen services and, as of the date of issue of this certificate, ${
+    Number(data.due ?? 0) > 0
+      ? `has an outstanding balance recorded against their account with ${esc(org)}.`
+      : `has no outstanding dues or pending payments against their account with ${esc(org)}.`
+  }</p>
+<table class="detail">
+  ${detail.map(([k, v]) => `<tr><td class="k">${esc(k)}</td><td>: &nbsp;${esc(v)}</td></tr>`).join("")}
+</table>
+${
+  data.subscriptionPeriods.length
+    ? `<div><b>Subscription Period(s):</b><ul>${data.subscriptionPeriods
+        .map((p) => `<li>${formatDate(p.start)} &rarr; ${formatDate(p.end)}</li>`)
+        .join("")}</ul></div>`
+    : ""
+}
+<p class="stmt">${esc(nocStatement(data))}</p>
+<p>This certificate is issued upon request for the student's use and record.</p>
+<div class="sig">
+  ${brand.stampDataUrl ? `<img src="${esc(brand.stampDataUrl)}" />` : ""}
+  <div class="ln"></div>
+  <div class="who">${esc(brand.signatureLine || "Authorised Signatory")}</div>
+  <div class="org2">${esc(org)}</div>
+</div>
+</body></html>`;
+}
+
+/** Print the NOC in the configured format via the device's native print dialog. */
+export function printNoc(brand: NocBranding, data: NocData, format: "a4" | "thermal80") {
+  const html = format === "thermal80" ? nocThermalHtml(brand, data) : nocA4Html(brand, data);
+  return printHtmlDocument(html, `NOC — ${data.studentName}`);
+}
+
+export function printNocThermal(brand: NocBranding, data: NocData) {
+  return printHtmlDocument(nocThermalHtml(brand, data), `NOC — ${data.studentName}`);
+}
+
