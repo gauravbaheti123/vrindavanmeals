@@ -114,11 +114,25 @@ export function AppShell() {
             <UtensilsCrossed className="h-5 w-5" />
           </div>
           {!collapsed && (
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="font-semibold leading-tight truncate">Vrindavan Meals</div>
               <div className="text-xs text-muted-foreground">Canteen Portal</div>
             </div>
           )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={toggleCollapsed}
+                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{collapsed ? "Expand sidebar" : "Collapse sidebar"}</TooltipContent>
+          </Tooltip>
         </div>
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto overflow-x-hidden">{navLinks(undefined, collapsed)}</nav>
         <div className={cn("p-3 border-t space-y-2", collapsed && "p-2 flex flex-col items-center")}>
@@ -140,22 +154,6 @@ export function AppShell() {
               <LogOut className="h-4 w-4 mr-2" />Sign out
             </Button>
           )}
-        </div>
-        <div className={cn("border-t p-2 flex", collapsed ? "justify-center" : "justify-end")}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={toggleCollapsed}
-                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              >
-                {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">{collapsed ? "Expand sidebar" : "Collapse sidebar"}</TooltipContent>
-          </Tooltip>
         </div>
       </aside>
 
