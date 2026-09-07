@@ -617,7 +617,7 @@ function StudentDetail() {
               </TableHeader>
               <TableBody>
                 {summary.opening !== 0 && (
-                  <TableRow className="bg-muted/40">
+                  <TableRow>
                     <TableCell className="text-sm whitespace-nowrap">{summary.openingAsOf ? fmtDate(summary.openingAsOf) : "—"}</TableCell>
                     <TableCell className="text-sm italic">Opening Balance</TableCell>
                     <TableCell><Badge variant="secondary">carry-forward</Badge></TableCell>
@@ -626,7 +626,9 @@ function StudentDetail() {
                       {summary.opening < 0 ? "−" : "+"}{inr(Math.abs(summary.opening))}
                     </TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
-                    <TableCell className="print:hidden" />
+                    <TableCell className="text-right print:hidden">
+                      <div className="flex justify-end gap-1">{openingActions}</div>
+                    </TableCell>
                   </TableRow>
                 )}
                 {data.pays.length === 0 && summary.opening === 0 ? (

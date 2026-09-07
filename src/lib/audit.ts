@@ -10,6 +10,7 @@ export type AuditEntity =
   | "fee_slab"
   | "biometric_mapping"
   | "security_deposit"
+  | "opening_balance"
   | "billing";
 
 export const ENTITY_LABEL: Record<AuditEntity, string> = {
@@ -20,6 +21,7 @@ export const ENTITY_LABEL: Record<AuditEntity, string> = {
   fee_slab: "Fee Slab",
   biometric_mapping: "Biometric Mapping",
   security_deposit: "Security Deposit",
+  opening_balance: "Opening Balance",
   billing: "Billing",
 };
 
