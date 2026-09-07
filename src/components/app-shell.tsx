@@ -50,7 +50,7 @@ export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1"; } catch { return false; }
+    try { return typeof window !== "undefined" && localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1"; } catch { return false; }
   });
 
   const toggleCollapsed = () => {
@@ -104,27 +104,58 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen flex bg-background overflow-x-hidden">
-      <aside className="w-64 hidden md:flex flex-col bg-sidebar border-r text-sidebar-foreground">
-        <div className="p-4 border-b flex items-center gap-2">
+      <aside className={cn(
+        "hidden md:flex flex-col bg-sidebar border-r text-sidebar-foreground transition-[width] duration-200",
+        collapsed ? "w-16" : "w-64",
+      )}>
+        <div className={cn("p-4 border-b flex items-center gap-2", collapsed && "justify-center p-3")}>
           <div className="h-9 w-9 rounded-lg bg-primary text-primary-foreground grid place-items-center shrink-0">
             <UtensilsCrossed className="h-5 w-5" />
           </div>
-          <div className="min-w-0">
-            <div className="font-semibold leading-tight truncate">Vrindavan Meals</div>
-            <div className="text-xs text-muted-foreground">Canteen Portal</div>
-          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <div className="font-semibold leading-tight truncate">Vrindavan Meals</div>
+              <div className="text-xs text-muted-foreground">Canteen Portal</div>
+            </div>
+          )}
         </div>
-        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">{navLinks()}</nav>
-        <div className="p-3 border-t space-y-2">
-          {profile?.name ? (
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto overflow-x-hidden">{navLinks(undefined, collapsed)}</nav>
+        <div className={cn("p-3 border-t space-y-2", collapsed && "p-2 flex flex-col items-center")}>
+          {!collapsed && profile?.name ? (
             <div className="text-xs font-medium truncate">{profile.name}</div>
           ) : null}
-          <Badge variant="secondary" className="capitalize">{primaryRole.replace("_", " ")}</Badge>
-          <Button variant="outline" size="sm" className="w-full" onClick={signOut}>
-            <LogOut className="h-4 w-4 mr-2" />Sign out
-          </Button>
+          {!collapsed && <Badge variant="secondary" className="capitalize">{primaryRole.replace("_", " ")}</Badge>}
+          {collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" className="h-9 w-9" onClick={signOut} aria-label="Sign out">
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Sign out</TooltipContent>
+            </Tooltip>
+          ) : (
+            <Button variant="outline" size="sm" className="w-full" onClick={signOut}>
+              <LogOut className="h-4 w-4 mr-2" />Sign out
+            </Button>
+          )}
         </div>
-
+        <div className={cn("border-t p-2 flex", collapsed ? "justify-center" : "justify-end")}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={toggleCollapsed}
+                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{collapsed ? "Expand sidebar" : "Collapse sidebar"}</TooltipContent>
+          </Tooltip>
+        </div>
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0">
