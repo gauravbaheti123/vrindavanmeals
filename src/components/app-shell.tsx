@@ -155,22 +155,6 @@ export function AppShell() {
             </Button>
           )}
         </div>
-        <div className={cn("border-t p-2 flex", collapsed ? "justify-center" : "justify-end")}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={toggleCollapsed}
-                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              >
-                {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">{collapsed ? "Expand sidebar" : "Collapse sidebar"}</TooltipContent>
-          </Tooltip>
-        </div>
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0">
