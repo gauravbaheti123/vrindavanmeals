@@ -168,24 +168,25 @@ export function BulkHolidayModal({
               <p className="text-destructive">{missingSlabMessage(calc.missingMonths[0])}</p>
             ) : calc ? (
               <>
+                <p className="text-xs font-medium">
+                  {formatDMY(fromDate)} → {formatDMY(toDate)} ({calc.days} day{calc.days === 1 ? "" : "s"})
+                </p>
                 {calc.segments.map((seg) => (
-                  <div key={seg.month} className="flex justify-between text-xs text-muted-foreground gap-2">
-                    <span>
-                      {formatMonth(seg.month)} — {seg.days} day{seg.days === 1 ? "" : "s"} off, {holidaySegmentLabel(seg)}
-                    </span>
+                  <div key={seg.key} className="flex justify-between text-xs text-muted-foreground gap-2">
+                    <span>{holidaySegmentLabel(seg)}</span>
                     <span className="shrink-0">{seg.amount > 0 ? `−${inr(seg.amount)}` : "₹0"}</span>
                   </div>
                 ))}
                 <div className="flex justify-between font-semibold pt-1 border-t">
                   <span>
-                    {calc.days} day{calc.days === 1 ? "" : "s"} × {selectedCount} student{selectedCount === 1 ? "" : "s"}
+                    Total per student × {selectedCount} student{selectedCount === 1 ? "" : "s"}
                   </span>
                   <span className="text-destructive">−{inr(totalCredit)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {calc.amount <= 0
-                    ? "No deduction — fewer than 16 holiday days in each month."
-                    : `This will apply a Holiday Deduction of ${inr(calc.amount)} each to ${selectedCount} student${selectedCount === 1 ? "" : "s"}, totalling ${inr(totalCredit)} in credits.`}
+                    ? "No deduction — the holiday is shorter than one complete 15-day block."
+                    : `This will apply a Holiday Deduction of ${inr(calc.amount)} each to ${selectedCount} student${selectedCount === 1 ? "" : "s"}, totalling ${inr(totalCredit)}.`}
                 </p>
 
               </>
