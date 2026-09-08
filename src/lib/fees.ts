@@ -61,59 +61,93 @@ export function missingSlabMessage(dateISO: string): string {
 /* ---------------- Holiday / Leave deduction ---------------- */
 
 export type HolidaySegment = {
-  month: string;
+  /** unique key for rendering */
+  key: string;
+  kind: "block" | "tail";
+  index: number;
+  from: string;
+  to: string;
   days: number;
+  /** month whose slab was used (block only) */
+  month: string;
   monthlyFee: number;
-  daysInMonth: number;
   amount: number;
-  daysPresent: number;
-  tier: "full" | "half" | "none";
 };
 export type HolidayCalc = { days: number; amount: number; segments: HolidaySegment[]; missingMonths: string[] };
 
-function daysInMonth(monthISO: string): number {
-  const [y, m] = monthISO.split("-").map(Number);
-  return new Date(y, m, 0).getDate();
+const BLOCK_DAYS = 15;
+
+function addDays(iso: string, n: number): string {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Month containing the majority of days between two ISO dates (inclusive). */
+function predominantMonth(fromISO: string, toISO: string): string {
+  const counts = new Map<string, number>();
+  const end = new Date(toISO + "T00:00:00");
+  for (const d = new Date(fromISO + "T00:00:00"); d <= end; d.setDate(d.getDate() + 1)) {
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  let best = monthKey(fromISO);
+  let bestN = -1;
+  for (const [k, n] of counts) if (n > bestN) { best = k; bestN = n; }
+  return best;
 }
 
 /**
- * 3-tier rule based on days PRESENT in the month:
- *   0 days present   → full month deduction (month billed ₹0)
- *   1–15 days present → half month deduction
- *   16+ days present  → no deduction (full month fee)
- * Ranges spanning months are evaluated per month with that month's own slab.
+ * Continuous-span rule: walk forward from the start date in complete 15-day blocks.
+ * Each complete block deducts half of the monthly fee for the month that block
+ * predominantly falls in. Any leftover tail shorter than 15 days deducts ₹0.
  */
 export function computeHolidayDeduction(slabs: FeeSlab[], fromISO: string, toISO: string): HolidayCalc {
   const start = new Date(fromISO + "T00:00:00");
   const end = new Date(toISO + "T00:00:00");
-  const byMonth = new Map<string, number>();
-  let days = 0;
-  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-    byMonth.set(key, (byMonth.get(key) ?? 0) + 1);
-    days += 1;
+  const totalDays = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+  if (!Number.isFinite(totalDays) || totalDays <= 0) {
+    return { days: 0, amount: 0, segments: [], missingMonths: [] };
   }
+
   const segments: HolidaySegment[] = [];
   const missingMonths: string[] = [];
   let amount = 0;
-  for (const [month, count] of byMonth) {
+
+  const blocks = Math.floor(totalDays / BLOCK_DAYS);
+  for (let i = 0; i < blocks; i++) {
+    const bFrom = addDays(fromISO, i * BLOCK_DAYS);
+    const bTo = addDays(fromISO, i * BLOCK_DAYS + BLOCK_DAYS - 1);
+    const month = predominantMonth(bFrom, bTo);
     const fee = feeForMonth(slabs, month);
     if (fee === null) { missingMonths.push(month); continue; }
-    const dim = daysInMonth(month);
-    const daysPresent = dim - count;
-    const tier: HolidaySegment["tier"] = daysPresent <= 0 ? "full" : daysPresent <= 15 ? "half" : "none";
-    const seg = tier === "full" ? fee : tier === "half" ? Math.round(fee / 2) : 0;
+    const seg = Math.round(fee / 2);
     amount += seg;
-    segments.push({ month, days: count, monthlyFee: fee, daysInMonth: dim, amount: seg, daysPresent, tier });
+    segments.push({
+      key: `block-${i}`, kind: "block", index: i + 1,
+      from: bFrom, to: bTo, days: BLOCK_DAYS, month, monthlyFee: fee, amount: seg,
+    });
   }
-  return { days, amount: Math.round(amount), segments, missingMonths };
+
+  const tailDays = totalDays - blocks * BLOCK_DAYS;
+  if (tailDays > 0) {
+    const tFrom = addDays(fromISO, blocks * BLOCK_DAYS);
+    segments.push({
+      key: "tail", kind: "tail", index: blocks + 1,
+      from: tFrom, to: toISO, days: tailDays,
+      month: predominantMonth(tFrom, toISO), monthlyFee: 0, amount: 0,
+    });
+  }
+
+  return { days: totalDays, amount: Math.round(amount), segments, missingMonths };
 }
 
-/** Preview label for a holiday segment, e.g. "0 days present (full month) — Full deduction". */
+/** Preview label for a holiday segment. */
 export function holidaySegmentLabel(seg: HolidaySegment): string {
-  if (seg.tier === "full") return `${seg.daysPresent} days present (full month) — Full deduction`;
-  if (seg.tier === "half") return `${seg.daysPresent} days present — Half month deduction`;
-  return `${seg.daysPresent} days present — No deduction`;
+  if (seg.kind === "tail") {
+    return `Remaining ${seg.days} day${seg.days === 1 ? "" : "s"} — no additional deduction`;
+  }
+  return `Block ${seg.index} (${fmtDate(seg.from)} to ${fmtDate(seg.to)}, ${seg.days} days) — half month deduction`;
 }
 
 

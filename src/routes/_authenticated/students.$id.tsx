@@ -1836,16 +1836,17 @@ function HolidayModal({
               <p className="text-destructive">{missingSlabMessage(calc.missingMonths[0])}</p>
             ) : calc ? (
               <>
+                <p className="text-xs font-medium">
+                  {formatDMY(fromDate)} → {formatDMY(toDate)} ({calc.days} day{calc.days === 1 ? "" : "s"})
+                </p>
                 {calc.segments.map((seg) => (
-                  <div key={seg.month} className="flex justify-between text-xs text-muted-foreground gap-2">
-                    <span>
-                      {formatMonth(seg.month)} — {seg.days} day{seg.days === 1 ? "" : "s"} off, {holidaySegmentLabel(seg)}
-                    </span>
+                  <div key={seg.key} className="flex justify-between text-xs text-muted-foreground gap-2">
+                    <span>{holidaySegmentLabel(seg)}</span>
                     <span className="shrink-0">{seg.amount > 0 ? `−${inr(seg.amount)}` : "₹0"}</span>
                   </div>
                 ))}
                 <div className="flex justify-between font-semibold pt-1 border-t">
-                  <span>{calc.days} holiday day{calc.days === 1 ? "" : "s"}</span>
+                  <span>Total deduction</span>
                   <span className="text-destructive">−{inr(calc.amount)}</span>
                 </div>
 
