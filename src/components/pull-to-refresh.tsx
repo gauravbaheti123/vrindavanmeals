@@ -21,8 +21,29 @@ export function PullToRefresh({ children }: { children: ReactNode }) {
   useEffect(() => {
     const scrollTop = () => window.scrollY || document.documentElement.scrollTop || 0;
 
+    // If the touch started inside a scrollable element (POS list, cart, dialog
+    // body, etc.) that container owns the gesture — never hijack it for
+    // pull-to-refresh, even when the container is at its top.
+    const isInsideScrollable = (target: EventTarget | null): boolean => {
+      let el = target instanceof Element ? target : null;
+      while (el && el !== document.body && el !== document.documentElement) {
+        const style = window.getComputedStyle(el);
+        if (
+          (style.overflowY === "auto" || style.overflowY === "scroll") &&
+          el.scrollHeight > el.clientHeight
+        ) {
+          return true;
+        }
+        el = el.parentElement;
+      }
+      return false;
+    };
+
     const onStart = (e: TouchEvent) => {
       if (e.touches.length !== 1 || scrollTop() > 0 || refreshing) return;
+      // Never engage while a dialog/sheet is open.
+      if (document.querySelector('[role="dialog"]')) return;
+      if (isInsideScrollable(e.target)) return;
       startY.current = e.touches[0].clientY;
       active.current = false;
     };
